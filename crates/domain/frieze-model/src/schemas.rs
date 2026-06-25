@@ -10,9 +10,16 @@ use crate::schema_name::SchemaName;
 ///
 /// Schemas are stored in a [`BTreeMap`] so that top-level keys are emitted in
 /// alphabetical order, matching the documented output ordering.
+///
+/// Validation happens once, in [`Schemas::new`]. The `by_name` field is `pub`
+/// because the type's contract is its shape, not behavior: callers iterate,
+/// look up, count, etc. directly through the inner map's API. Maintaining the
+/// documented invariants on a value built via struct-literal or
+/// post-construction mutation is the caller's responsibility — the
+/// constructor is the only place that checks them.
 #[derive(Debug, Clone, Default)]
 pub struct Schemas {
-    by_name: BTreeMap<SchemaName, Schema>,
+    pub by_name: BTreeMap<SchemaName, Schema>,
 }
 
 impl Schemas {
@@ -21,26 +28,13 @@ impl Schemas {
     pub fn new(schemas: Vec<Schema>) -> Result<Self, Error> {
         let mut by_name: BTreeMap<SchemaName, Schema> = BTreeMap::new();
         for schema in schemas {
-            let key = schema.name().clone();
+            let key = schema.name.clone();
             if by_name.contains_key(&key) {
                 return Err(Error::DuplicateSchema(key.into_string()));
             }
             by_name.insert(key, schema);
         }
         Ok(Self { by_name })
-    }
-
-    /// Iterates the schemas in alphabetical order by name.
-    pub fn iter(&self) -> impl Iterator<Item = (&SchemaName, &Schema)> {
-        self.by_name.iter()
-    }
-
-    pub fn len(&self) -> usize {
-        self.by_name.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.by_name.is_empty()
     }
 }
 
@@ -73,7 +67,7 @@ mod tests {
         .unwrap();
         let u = user_schema();
         let schemas = Schemas::new(vec![u, a]).unwrap();
-        let names: Vec<&str> = schemas.iter().map(|(n, _)| n.as_str()).collect();
+        let names: Vec<&str> = schemas.by_name.keys().map(|n| n.as_str()).collect();
         assert_eq!(names, vec!["Album", "User"]);
     }
 }

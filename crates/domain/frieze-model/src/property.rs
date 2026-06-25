@@ -6,12 +6,16 @@ use crate::property_type::PropertyType;
 
 /// A property attached to a schema, in its validated form.
 ///
-/// Constructed via [`Property::new`]; the inner fields are private to prevent
-/// construction that bypasses validation.
+/// Validation happens once, in [`Property::new`]. The fields are `pub`
+/// because the type's contract is its shape, not behavior: callers may read
+/// or (re-)assign fields directly. Maintaining the documented invariants on
+/// a value built via struct-literal or post-construction mutation is the
+/// caller's responsibility — the constructor is the only place that checks
+/// them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Property {
-    name: PropertyName,
-    ty: PropertyType,
+    pub name: PropertyName,
+    pub ty: PropertyType,
 }
 
 impl Property {
@@ -21,14 +25,6 @@ impl Property {
             name: PropertyName::new(name)?,
             ty,
         })
-    }
-
-    pub fn name(&self) -> &PropertyName {
-        &self.name
-    }
-
-    pub fn ty(&self) -> PropertyType {
-        self.ty
     }
 }
 
@@ -45,7 +41,7 @@ mod tests {
     #[test]
     fn accepts_named_property() {
         let property = Property::new("id", PropertyType::Int64).unwrap();
-        assert_eq!(property.name().as_str(), "id");
-        assert_eq!(property.ty(), PropertyType::Int64);
+        assert_eq!(property.name.as_str(), "id");
+        assert_eq!(property.ty, PropertyType::Int64);
     }
 }

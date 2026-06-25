@@ -15,7 +15,7 @@ use serde_yaml::{Mapping, Value};
 /// - `required`: same order as `properties`
 pub fn to_value(schemas: &Schemas) -> Value {
     let mut top = Mapping::new();
-    for (name, schema) in schemas.iter() {
+    for (name, schema) in &schemas.by_name {
         let openapi = to_openapi(schema);
         top.insert(
             Value::String(name.as_str().to_string()),
@@ -28,9 +28,9 @@ pub fn to_value(schemas: &Schemas) -> Value {
 /// Boundary conversion: validated domain schema -> plain OAS schema object.
 fn to_openapi(schema: &Schema) -> SchemaObject {
     let mut properties: IndexMap<String, SchemaObject> = IndexMap::new();
-    let mut required: Vec<String> = Vec::with_capacity(schema.properties().len());
-    for (name, property) in schema.properties() {
-        let (ty, format) = match property.ty() {
+    let mut required: Vec<String> = Vec::with_capacity(schema.properties.len());
+    for (name, property) in &schema.properties {
+        let (ty, format) = match property.ty {
             PropertyType::Int64 => (SchemaType::Integer, Some("int64".to_string())),
             PropertyType::String => (SchemaType::String, None),
         };

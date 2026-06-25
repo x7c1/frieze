@@ -12,10 +12,17 @@ use crate::schema_name::SchemaName;
 ///
 /// Properties are stored in declaration order (the order passed to
 /// [`Schema::new`]).
+///
+/// Validation happens once, in [`Schema::new`]. The fields are `pub` because
+/// the type's contract is its shape, not behavior: callers may read or
+/// (re-)assign fields directly. Maintaining the documented invariants on a
+/// value built via struct-literal or post-construction mutation is the
+/// caller's responsibility — the constructor is the only place that checks
+/// them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Schema {
-    name: SchemaName,
-    properties: IndexMap<PropertyName, Property>,
+    pub name: SchemaName,
+    pub properties: IndexMap<PropertyName, Property>,
 }
 
 impl Schema {
@@ -28,7 +35,7 @@ impl Schema {
         }
         let mut map: IndexMap<PropertyName, Property> = IndexMap::with_capacity(properties.len());
         for property in properties {
-            let key = property.name().clone();
+            let key = property.name.clone();
             if map.contains_key(&key) {
                 return Err(Error::DuplicateProperty {
                     schema: name.into_string(),
@@ -41,15 +48,6 @@ impl Schema {
             name,
             properties: map,
         })
-    }
-
-    pub fn name(&self) -> &SchemaName {
-        &self.name
-    }
-
-    /// Properties in declaration order.
-    pub fn properties(&self) -> &IndexMap<PropertyName, Property> {
-        &self.properties
     }
 }
 
@@ -90,7 +88,7 @@ mod tests {
         let id = Property::new("id", PropertyType::Int64).unwrap();
         let name = Property::new("name", PropertyType::String).unwrap();
         let schema = Schema::new("User", vec![id, name]).unwrap();
-        let keys: Vec<&str> = schema.properties().keys().map(|k| k.as_str()).collect();
+        let keys: Vec<&str> = schema.properties.keys().map(|k| k.as_str()).collect();
         assert_eq!(keys, vec!["id", "name"]);
     }
 }
