@@ -1,0 +1,5 @@
+error: frieze: #[derive(Schema)] requires a struct with named fields; tuple structs are not supported.
+ --> tests/ui/tuple_struct.rs:4:8
+  |
+4 | struct S(i64);
+  |        ^

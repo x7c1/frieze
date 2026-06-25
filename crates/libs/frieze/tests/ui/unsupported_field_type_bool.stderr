@@ -1,0 +1,5 @@
+error: frieze: unsupported field type `bool`; only `i64` and `String` are supported in Phase 1. Future PRs will add support.
+ --> tests/ui/unsupported_field_type_bool.rs:5:8
+  |
+5 |     x: bool,
+  |        ^^^^
