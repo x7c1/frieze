@@ -33,6 +33,7 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
         let (ty, format) = match property.ty {
             PropertyType::Int64 => (SchemaType::Integer, Some("int64".to_string())),
             PropertyType::String => (SchemaType::String, None),
+            PropertyType::Boolean => (SchemaType::Boolean, None),
         };
         properties.insert(
             name.as_str().to_string(),
@@ -62,6 +63,7 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
             SchemaType::Object => "object",
             SchemaType::Integer => "integer",
             SchemaType::String => "string",
+            SchemaType::Boolean => "boolean",
         };
         map.insert(Value::String("type".into()), Value::String(ty_str.into()));
     }

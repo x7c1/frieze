@@ -7,4 +7,6 @@ pub enum PropertyType {
     Int64,
     /// Maps to OpenAPI `type: string` (no format).
     String,
+    /// Maps to OpenAPI `type: boolean` (no format).
+    Boolean,
 }
