@@ -1,0 +1,11 @@
+[package]
+name = "frieze-openapi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Plain Rust representation of the OpenAPI Specification."
+
+[dependencies]
+indexmap.workspace = true
+serde.workspace = true
