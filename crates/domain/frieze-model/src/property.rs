@@ -15,6 +15,11 @@ use crate::property_type::PropertyType;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Property {
     pub name: PropertyName,
+    /// `ty` follows the Rust AST convention (e.g. `syn::Field::ty`, the `ty`
+    /// fragment specifier in `macro_rules!`). `frieze-macros` reads
+    /// `syn::Field::ty` to populate this field, so the naming is consistent
+    /// across the AST boundary. Kept short and idiomatic rather than
+    /// `type_` / `tpe` / `r#type`.
     pub ty: PropertyType,
 }
 
