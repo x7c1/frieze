@@ -35,7 +35,7 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
         let field_name = field_ident.to_string();
         let property_type_expr = property_type_for(&field.ty)?;
         property_exprs.push(quote! {
-            ::frieze_model::ValidatedProperty::new(#field_name, #property_type_expr)
+            ::frieze_model::Property::new(#field_name, #property_type_expr)
                 .expect("frieze: property name is non-empty and derived from a struct field")
         });
     }
@@ -46,8 +46,8 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
             fn name() -> &'static str {
                 #schema_name
             }
-            fn schema() -> ::frieze_model::ValidatedSchema {
-                ::frieze_model::ValidatedSchema::new(
+            fn schema() -> ::frieze_model::Schema {
+                ::frieze_model::Schema::new(
                     #schema_name,
                     ::std::vec![ #( #property_exprs ),* ],
                 )

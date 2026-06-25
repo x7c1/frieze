@@ -9,12 +9,12 @@ struct User {
 
 #[test]
 fn user_struct_minimum() {
-    let schemas = frieze::Schemas::new()
+    let s: frieze::Schemas = frieze::schemas()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(schemas.to_value(), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
     User:
       type: object
       properties:

@@ -7,5 +7,5 @@
 fn main() {
     // Intentionally empty in Phase 1. A `--help` flag and subcommands will be
     // added in a later PR once there is something to expose.
-    let _ = frieze_usecase::Schemas::new();
+    let _ = frieze_usecase::SchemasBuilder::new();
 }

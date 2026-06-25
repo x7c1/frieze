@@ -10,6 +10,4 @@ description = "Use cases for frieze: Schema trait, builder, and OAS boundary con
 frieze-model.workspace = true
 frieze-openapi.workspace = true
 indexmap.workspace = true
-serde.workspace = true
 serde_yaml.workspace = true
-thiserror.workspace = true

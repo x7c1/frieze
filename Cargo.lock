@@ -103,9 +103,7 @@ dependencies = [
  "frieze-model",
  "frieze-openapi",
  "indexmap",
- "serde",
  "serde_yaml",
- "thiserror",
 ]
 
 [[package]]
