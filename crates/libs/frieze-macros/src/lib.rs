@@ -1,15 +1,18 @@
 //! Proc-macro derives for frieze.
 //!
 //! Currently exposes `#[derive(Schema)]`, which generates an implementation
-//! of the `frieze_usecase::Schema` trait for a named struct whose fields are
-//! all of type `i64` or `String`. Any other shape produces a compile error.
+//! of the `frieze::Schema` trait for a named struct whose fields are all of
+//! type `i64` or `String`. Any other shape produces a compile error.
+//!
+//! The expansion routes every reference to the supporting crates through the
+//! `frieze::__private` module so downstream users only need to depend on the
+//! `frieze` facade crate.
 
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Field, Fields, Type};
 
-/// Derive `frieze_usecase::Schema` for a named struct with `i64` / `String`
-/// fields.
+/// Derive `frieze::Schema` for a named struct with `i64` / `String` fields.
 #[proc_macro_derive(Schema)]
 pub fn derive_schema(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -35,19 +38,19 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
         let field_name = field_ident.to_string();
         let property_type_expr = property_type_for(&field.ty)?;
         property_exprs.push(quote! {
-            ::frieze_model::Property::new(#field_name, #property_type_expr)
+            ::frieze::__private::frieze_model::Property::new(#field_name, #property_type_expr)
                 .expect("frieze: property name is non-empty and derived from a struct field")
         });
     }
 
     let schema_name = ident.to_string();
     let expanded = quote! {
-        impl ::frieze_usecase::Schema for #ident {
+        impl ::frieze::__private::frieze_usecase::Schema for #ident {
             fn name() -> &'static str {
                 #schema_name
             }
-            fn schema() -> ::frieze_model::Schema {
-                ::frieze_model::Schema::new(
+            fn schema() -> ::frieze::__private::frieze_model::Schema {
+                ::frieze::__private::frieze_model::Schema::new(
                     #schema_name,
                     ::std::vec![ #( #property_exprs ),* ],
                 )
@@ -89,15 +92,16 @@ fn named_fields(
     }
 }
 
-/// Maps a Rust field type to the matching `frieze_model::PropertyType`.
+/// Maps a Rust field type to the matching `frieze_model::PropertyType`,
+/// emitted as a path that resolves through the facade re-export.
 ///
-/// Anything other than `i64` and `String` produces a compile error pointing at
-/// the field's type.
+/// Anything other than `i64` and `String` produces a compile error pointing
+/// at the field's type.
 fn property_type_for(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
     let rendered = type_to_display(ty);
     match rendered.as_str() {
-        "i64" => Ok(quote! { ::frieze_model::PropertyType::Int64 }),
-        "String" => Ok(quote! { ::frieze_model::PropertyType::String }),
+        "i64" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Int64 }),
+        "String" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::String }),
         other => Err(syn::Error::new_spanned(
             ty,
             format!(
