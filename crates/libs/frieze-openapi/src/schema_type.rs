@@ -9,4 +9,5 @@ pub enum SchemaType {
     Object,
     Integer,
     String,
+    Boolean,
 }
