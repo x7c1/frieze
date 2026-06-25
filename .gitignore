@@ -1,0 +1,12 @@
+# Rust
+/target/
+
+# Scratch / agent progress logs
+.tmp/
+
+# Local env
+.env
+.env.local
+
+# OS / editor
+.DS_Store
