@@ -1,0 +1,13 @@
+[package]
+name = "frieze-usecase"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Use cases for frieze: Schema trait, builder, and OAS boundary conversion."
+
+[dependencies]
+frieze-model.workspace = true
+frieze-openapi.workspace = true
+indexmap.workspace = true
+serde_yaml.workspace = true
