@@ -14,3 +14,4 @@ frieze-macros.workspace = true
 
 [dev-dependencies]
 insta.workspace = true
+trybuild.workspace = true
