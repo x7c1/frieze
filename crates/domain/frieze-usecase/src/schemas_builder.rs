@@ -43,8 +43,8 @@ mod tests {
             frieze_model::Schema::new(
                 "User",
                 vec![
-                    Property::new("id", PropertyType::Int64).unwrap(),
-                    Property::new("name", PropertyType::String).unwrap(),
+                    Property::new("id", PropertyType::Int64, false).unwrap(),
+                    Property::new("name", PropertyType::String, false).unwrap(),
                 ],
             )
             .unwrap()

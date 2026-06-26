@@ -41,7 +41,7 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
         let field_name = field_ident.to_string();
         let property_type_expr = property_type_for(&field.ty)?;
         property_exprs.push(quote! {
-            ::frieze::__private::frieze_model::Property::new(#field_name, #property_type_expr)
+            ::frieze::__private::frieze_model::Property::new(#field_name, #property_type_expr, false)
                 .expect("frieze: property name is non-empty and derived from a struct field")
         });
     }
