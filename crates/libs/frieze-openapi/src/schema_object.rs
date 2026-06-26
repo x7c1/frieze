@@ -10,12 +10,19 @@ use crate::schema_type::SchemaType;
 /// `properties` uses [`IndexMap`] to preserve declaration order.
 ///
 /// Field declaration order matches the canonical YAML output order
-/// (`type`, `items`, `format`, `minimum`, `nullable`, `properties`,
-/// `required`): `type` first, then `items` (for array schemas), then
-/// `format`, then numeric constraints, then the nullability marker, then
-/// container fields.
+/// (`$ref`, `type`, `items`, `format`, `minimum`, `allOf`, `oneOf`,
+/// `nullable`, `properties`, `required`).
+///
+/// A schema object set to a `$ref` is, per OAS, a leaf — when `reference`
+/// is set, callers must not also set sibling fields. The renderer in
+/// `frieze-usecase` honours this by emitting `$ref` alone when present.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct SchemaObject {
+    /// JSON pointer to another schema (typically
+    /// `#/components/schemas/<name>`). When set, the schema object is a
+    /// pure reference: any sibling fields are ignored on the wire.
+    #[serde(rename = "$ref", skip_serializing_if = "Option::is_none")]
+    pub reference: Option<String>,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub ty: Option<SchemaType>,
     /// Element schema for array types. Boxed because [`SchemaObject`]
@@ -35,6 +42,14 @@ pub struct SchemaObject {
     /// emission detail.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minimum: Option<f64>,
+    /// `allOf` composition. Used under OAS 3.0 to express
+    /// "nullable reference" (`allOf: [$ref], nullable: true`).
+    #[serde(rename = "allOf", skip_serializing_if = "Option::is_none")]
+    pub all_of: Option<Vec<SchemaObject>>,
+    /// `oneOf` composition. Used under OAS 3.1 to express
+    /// "nullable reference" (`oneOf: [$ref, {type: "null"}]`).
+    #[serde(rename = "oneOf", skip_serializing_if = "Option::is_none")]
+    pub one_of: Option<Vec<SchemaObject>>,
     /// Carries the intent that this schema accepts `null` in addition to
     /// values of `ty`. The field exists irrespective of the active OAS
     /// version feature — it stores the intent only. The renderer in
@@ -45,8 +60,11 @@ pub struct SchemaObject {
     pub nullable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub properties: Option<IndexMap<String, SchemaObject>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub required: Option<Vec<String>>,
+    /// Names of properties that must appear on the wire. Omitted from
+    /// the emitted schema entirely when empty (an all-optional struct
+    /// renders without a `required` key, rather than `required: []`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub required: Vec<String>,
 }
 
 impl SchemaObject {

@@ -1,8 +1,10 @@
-# frieze
+# frieze — agent operating rules
 
 `frieze` generates OpenAPI Schema Objects from Rust types via `proc-macros`.
+Published as `x7c1/frieze` on GitHub. License: GPL-3.0-or-later.
 
-Published as `x7c1/frieze` on GitHub. License: GPL-3.0-or-later. Future crates.io publication is planned.
+This file is for AI agents working in this repository. End-user-facing
+specification lives in [`docs/`](docs/) and [`README.md`](README.md).
 
 ## Repository layout
 
@@ -21,16 +23,14 @@ crates/
     frieze               # Facade crate for end users
 ```
 
-### Dependency direction (must hold)
+## Dependency direction and invariants
 
 ```
-frieze-cli       → frieze-usecase
-frieze-usecase   → frieze-model, frieze-openapi
-frieze-macros    → frieze-usecase
-frieze (facade)  → all of the above
+frieze-cli       -> frieze-usecase
+frieze-usecase   -> frieze-model, frieze-openapi
+frieze-macros    -> frieze-usecase
+frieze (facade)  -> all of the above
 ```
-
-### Invariants
 
 1. `frieze-model` depends on nothing else within frieze (and minimally on external crates).
 2. `frieze-openapi` does not know about `frieze-model` or `frieze-usecase`.
@@ -40,12 +40,11 @@ frieze (facade)  → all of the above
 
 ## Terminology
 
-The term **"DTO"** (Data Transfer Object) is **not** used in this repository. Each crate hosts types with distinct responsibilities:
-
-- `frieze-openapi` types are a plain representation of the OAS specification.
-- `frieze-model` types are validated domain types that uphold internal invariants.
-
-Lumping them as "DTOs" hides the responsibility difference that the architecture is built upon. Refer to them by their crate-specific roles instead.
+The term **"DTO"** is **not** used here. `frieze-openapi` types are a
+plain representation of the OAS specification; `frieze-model` types are
+validated domain types that uphold internal invariants. Lumping them as
+"DTOs" hides the responsibility difference the architecture is built
+upon — refer to them by their crate-specific roles instead.
 
 ## Development workflow
 
@@ -53,116 +52,19 @@ Lumping them as "DTOs" hides the responsibility difference that the architecture
 - **1 PR = 1 feature addition = 1 test addition** is the rough granularity. Start from the smallest case and expand incrementally.
 - **Unsupported types and structures must produce a compile error.** Better to draw a hard line than to behave partially.
 
-## Supported field shapes
+## Build / Test matrix
 
-`#[derive(Schema)]` recognises a fixed scalar set, optionally composed
-with `Vec<T>`, `Option<T>`, and the frieze-defined `Maybe<T>` wrapper.
-
-### Scalars
-
-| Scalar Rust type | Maps to OAS                                            |
-|------------------|--------------------------------------------------------|
-| `i32`, `i64`     | `type: integer, format: int32 / int64`                 |
-| `u32`, `u64`     | `type: integer, format: int32 / int64, minimum: 0`     |
-| `f32`, `f64`     | `type: number, format: float / double`                 |
-| `bool`           | `type: boolean`                                        |
-| `String`         | `type: string`                                         |
-
-`T` below stands for any of these scalars.
-
-### Composite shapes (presence × nullability)
-
-OpenAPI optionality has two **independent** axes: **presence** controls
-whether the field name appears in the schema's `required` array, and
-**nullability** controls whether the value may be `null`. The four
-combinations map to the following Rust shapes:
-
-| Rust shape                                                            | Presence | Nullability        |
-|-----------------------------------------------------------------------|----------|--------------------|
-| `T`                                                                   | required | non-nullable       |
-| `Option<T>` (serde default)                                           | required | nullable           |
-| `Option<T>` + `#[serde(skip_serializing_if = "Option::is_none")]`     | optional | non-nullable       |
-| `Maybe<T>`                                                            | optional | nullable           |
-| `Vec<T>`                                                              | required | array, items as `T` |
-| `Vec<Option<T>>`                                                      | required | array, nullable items |
-| `Option<Vec<T>>`                                                      | required | nullable array     |
-| `Option<Vec<Option<T>>>`                                              | required | nullable array, nullable items |
-
-Notes:
-
-- **`Option<T>` is required-and-nullable by default**, because serde
-  emits `None` as `null` and expects the key to be present. This is
-  surprising if you read `Option` as "may be omitted" — to get
-  **optional + non-nullable**, pair `Option<T>` with the standard
-  `#[serde(skip_serializing_if = "Option::is_none")]` attribute. The
-  derive inspects that attribute and switches branches accordingly.
-- **`Maybe<T>` is the dedicated three-state type** for "missing / null /
-  present" — the one combination not expressible by `Option<T>` alone.
-  Re-exported as `frieze::Maybe`. Add `#[serde(default, skip_serializing_if = "Maybe::is_missing")]`
-  on the field to make missing-key handling work in both directions.
-- **Nullability lives on the type tree** (`PropertyType::Nullable`),
-  not on the property as a whole. That is how `Vec<Option<T>>` becomes
-  an array of nullable items rather than a nullable array.
-
-### Unsupported shapes (compile error)
-
-The macro rejects ambiguous or unsupported compositions before they
-reach the schema-building code:
-
-| Shape                | Reason                                                  |
-|----------------------|---------------------------------------------------------|
-| `Option<Option<T>>`  | serde flattens nested options.                          |
-| `Vec<Vec<T>>`        | nested arrays are deferred to a future PR.              |
-| `Vec<Maybe<T>>`      | array elements are always present on the wire; use `Vec<Option<T>>` for nullable items. |
-| `Option<Maybe<T>>`   | presence is doubly defined.                             |
-| `Maybe<Option<T>>`   | nullability is doubly defined.                          |
-| `Maybe<Maybe<T>>`    | nested `Maybe` is not supported.                        |
-
-## Output ordering
-
-`frieze` guarantees specific output ordering even where the OAS treats maps as unordered:
-
-| Output                       | Order                                |
-|------------------------------|--------------------------------------|
-| `Schema.properties` keys     | Struct field declaration order       |
-| `Schema.required` array      | Same order as `properties`           |
-| `Schema.enum` array          | Variant declaration order            |
-| `#/components/schemas` keys  | Alphabetical by schema name          |
-
-`IndexMap` is used internally where insertion order matters; `BTreeMap` where alphabetical order is desired.
-
-Within a single schema object, keys are emitted in canonical OAS reading order: `type`, `items`, `format`, `minimum`, `nullable` (3.0 only), `properties`, `required`.
-
-## OAS version feature flags
-
-frieze targets exactly ONE OpenAPI Specification version per build. The version is selected by a Cargo feature on the `frieze` facade:
-
-| Feature   | OAS version | Default | Nullability encoding         |
-|-----------|-------------|---------|------------------------------|
-| `oas-3-0` | 3.0.x       | yes     | `nullable: true`             |
-| `oas-3-1` | 3.1.x       | no      | `type: [<base>, "null"]`     |
-
-The two features are mutually exclusive and enforced via `compile_error!` in both `frieze-openapi` and `frieze-usecase`. Build / test with one of:
+Both feature gates must remain green:
 
 ```
-cargo build --workspace --no-default-features --features oas-3-0
-cargo test  --workspace --no-default-features --features oas-3-0
-cargo build --workspace --no-default-features --features oas-3-1
-cargo test  --workspace --no-default-features --features oas-3-1
-```
-
-`--all-features` and `--no-default-features` (without picking one) both fail at compile time on purpose.
-
-## Build / Test
-
-```
-cargo build --workspace --no-default-features --features oas-3-0
-cargo test  --workspace --no-default-features --features oas-3-0
+cargo build  --workspace --no-default-features --features oas-3-0
+cargo test   --workspace --no-default-features --features oas-3-0
+cargo build  --workspace --no-default-features --features oas-3-1
+cargo test   --workspace --no-default-features --features oas-3-1
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets --no-default-features --features oas-3-0 -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features oas-3-1 -- -D warnings
 ```
-
-Substitute `oas-3-1` for `oas-3-0` to run the same checks against the 3.1 emission path.
 
 ## Branch and PR conventions
 
@@ -171,3 +73,12 @@ Substitute `oas-3-1` for `oas-3-0` to run the same checks against the 3.1 emissi
 - Direct commits to `main` are not allowed (admin enforcement is on).
 - PR titles follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `ci:`, `build:`, `perf:`, `revert:`).
 - Snapshot tests use `insta`. Update snapshots intentionally via `cargo insta review`; never blindly accept.
+
+## Documentation pointers
+
+When you change behaviour, also update the matching specification file:
+
+- Supported field shapes, compile-error categories, `Maybe<T>` handling, nested-struct (`$ref`) behaviour → [`docs/field-shapes.md`](docs/field-shapes.md)
+- Output ordering, canonical key order, the empty-container omission rule → [`docs/output-ordering.md`](docs/output-ordering.md)
+- OAS feature flags, per-version encoding differences, the build/test matrix → [`docs/oas-versions.md`](docs/oas-versions.md)
+- End-user-visible behaviour or quick-start surface → also check [`README.md`](README.md)
