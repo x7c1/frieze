@@ -1,7 +1,7 @@
 //! Boundary conversion from [`frieze_model::Schemas`] to
 //! [`serde_yaml::Value`], via [`frieze_openapi`].
 
-use frieze_model::{PropertyType, Schema, Schemas};
+use frieze_model::{Property, PropertyType, Schema, Schemas};
 use frieze_openapi::{SchemaObject, SchemaType};
 use indexmap::IndexMap;
 use serde_yaml::{Mapping, Number, Value};
@@ -30,23 +30,30 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     let mut properties: IndexMap<String, SchemaObject> = IndexMap::new();
     let mut required: Vec<String> = Vec::with_capacity(schema.properties.len());
     for (name, property) in &schema.properties {
-        properties.insert(name.as_str().to_string(), property_to_openapi(property.ty));
-        required.push(name.as_str().to_string());
+        properties.insert(name.as_str().to_string(), property_to_openapi(property));
+        if !property.optional {
+            required.push(name.as_str().to_string());
+        }
     }
     SchemaObject {
         ty: Some(SchemaType::Object),
         format: None,
         minimum: None,
+        nullable: None,
         properties: Some(properties),
         required: Some(required),
     }
 }
 
-/// Single mapping from a [`PropertyType`] to the OAS schema object that
+/// Single mapping from a [`Property`] to the OAS schema object that
 /// represents it. This is the one place to edit when a new scalar variant is
 /// added to [`PropertyType`].
-fn property_to_openapi(pt: PropertyType) -> SchemaObject {
-    let (ty, format, minimum) = match pt {
+///
+/// The `nullable` intent on the resulting `SchemaObject` is set from the
+/// property's `optional` flag; [`schema_object_to_value`] renders that
+/// intent into the version-appropriate YAML shape.
+fn property_to_openapi(property: &Property) -> SchemaObject {
+    let (ty, format, minimum) = match property.ty {
         PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
         PropertyType::Int64 => (SchemaType::Integer, Some("int64"), None),
         PropertyType::UInt32 => (SchemaType::Integer, Some("int32"), Some(0.0)),
@@ -60,19 +67,25 @@ fn property_to_openapi(pt: PropertyType) -> SchemaObject {
         ty: Some(ty),
         format: format.map(str::to_owned),
         minimum,
+        nullable: if property.optional { Some(true) } else { None },
         properties: None,
         required: None,
     }
 }
 
 /// Serializes a [`SchemaObject`] into a [`Value`] with manually ordered keys
-/// (`type`, `format`, `minimum`, `properties`, `required`) so that the YAML
-/// output is stable.
+/// so that the YAML output is stable.
+///
+/// Key ordering depends on the selected OAS version feature:
+///
+/// - `oas-3-0`: `type`, `format`, `minimum`, `nullable`, `properties`,
+///   `required`. The nullability intent is emitted as `nullable: true`.
+/// - `oas-3-1`: `type`, `format`, `minimum`, `properties`, `required`.
+///   The nullability intent is folded into `type` as a 2-element sequence
+///   `[<base>, "null"]`. The OAS 3.1 spec drops the `nullable` keyword.
 fn schema_object_to_value(schema: &SchemaObject) -> Value {
     let mut map = Mapping::new();
-    if let Some(ty) = schema.ty {
-        map.insert(Value::String("type".into()), schema_type_to_value(ty));
-    }
+    insert_type(&mut map, schema);
     if let Some(format) = &schema.format {
         map.insert(
             Value::String("format".into()),
@@ -82,6 +95,7 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
     if let Some(minimum) = schema.minimum {
         map.insert(Value::String("minimum".into()), minimum_to_value(minimum));
     }
+    insert_nullable(&mut map, schema);
     if let Some(properties) = &schema.properties {
         let mut inner = Mapping::new();
         for (name, child) in properties {
@@ -97,6 +111,52 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
         map.insert(Value::String("required".into()), Value::Sequence(items));
     }
     Value::Mapping(map)
+}
+
+/// Emits the `type` key.
+///
+/// Under `oas-3-0`, `type` is always a scalar string (the nullability
+/// intent is emitted separately by [`insert_nullable`]).
+///
+/// Under `oas-3-1`, `type` becomes a 2-element sequence `[<base>, "null"]`
+/// when the schema is nullable. The `"null"` is intentionally quoted —
+/// unquoted `null` in YAML resolves to the null value, not the string
+/// `"null"`.
+#[cfg(feature = "oas-3-0")]
+fn insert_type(map: &mut Mapping, schema: &SchemaObject) {
+    if let Some(ty) = schema.ty {
+        map.insert(Value::String("type".into()), schema_type_to_value(ty));
+    }
+}
+
+#[cfg(feature = "oas-3-1")]
+fn insert_type(map: &mut Mapping, schema: &SchemaObject) {
+    if let Some(ty) = schema.ty {
+        let base = schema_type_to_value(ty);
+        let value = if schema.nullable == Some(true) {
+            Value::Sequence(vec![base, Value::String("null".into())])
+        } else {
+            base
+        };
+        map.insert(Value::String("type".into()), value);
+    }
+}
+
+/// Emits the nullability marker between `minimum` and `properties`.
+///
+/// Under `oas-3-0`, a nullable schema gets `nullable: true`. Under
+/// `oas-3-1`, the nullability marker is folded into `type` (see
+/// [`insert_type`]) and this function emits nothing.
+#[cfg(feature = "oas-3-0")]
+fn insert_nullable(map: &mut Mapping, schema: &SchemaObject) {
+    if schema.nullable == Some(true) {
+        map.insert(Value::String("nullable".into()), Value::Bool(true));
+    }
+}
+
+#[cfg(feature = "oas-3-1")]
+fn insert_nullable(_map: &mut Mapping, _schema: &SchemaObject) {
+    // OAS 3.1 has no `nullable` keyword; the intent is encoded in `type`.
 }
 
 /// Delegates the [`SchemaType`] -> string conversion to its `Serialize`
@@ -140,8 +200,8 @@ mod tests {
             frieze_model::Schema::new(
                 "User",
                 vec![
-                    Property::new("id", PropertyType::Int64).unwrap(),
-                    Property::new("name", PropertyType::String).unwrap(),
+                    Property::new("id", PropertyType::Int64, false).unwrap(),
+                    Property::new("name", PropertyType::String, false).unwrap(),
                 ],
             )
             .unwrap()

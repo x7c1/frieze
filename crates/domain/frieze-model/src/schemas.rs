@@ -47,7 +47,7 @@ mod tests {
     fn user_schema() -> Schema {
         Schema::new(
             "User",
-            vec![Property::new("id", PropertyType::Int64).unwrap()],
+            vec![Property::new("id", PropertyType::Int64, false).unwrap()],
         )
         .unwrap()
     }
@@ -62,7 +62,7 @@ mod tests {
     fn iterates_alphabetically() {
         let a = Schema::new(
             "Album",
-            vec![Property::new("id", PropertyType::Int64).unwrap()],
+            vec![Property::new("id", PropertyType::Int64, false).unwrap()],
         )
         .unwrap();
         let u = user_schema();
