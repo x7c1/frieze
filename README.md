@@ -45,18 +45,29 @@ println!("{}", frieze::to_yaml(&schemas));
 OpenAPI separates two concepts that Rust users often conflate:
 **presence** (does the key appear in the object?) and **nullability**
 (can the value be `null`?). `frieze` keeps them orthogonal — see the
-table in [CLAUDE.md](CLAUDE.md#supported-field-shapes) for the full
-mapping. The short version: `Option<T>` alone is required-and-nullable
-(matching serde's default behaviour), `Option<T>` + `skip_serializing_if`
-is optional-and-non-nullable, and `Maybe<T>` is the dedicated type for
-the remaining "optional-and-nullable" combination that serde cannot
-express in a single attribute.
+[composite shapes table](docs/field-shapes.md#composite-shapes-presence-x-nullability)
+for the full mapping. The short version: `Option<T>` alone is
+required-and-nullable (matching serde's default behaviour),
+`Option<T>` + `skip_serializing_if` is optional-and-non-nullable, and
+`Maybe<T>` is the dedicated type for the remaining
+"optional-and-nullable" combination that serde cannot express in a
+single attribute.
 
 ## OpenAPI version
 
 Pick exactly one of `oas-3-0` (default) or `oas-3-1` as a Cargo feature.
 The two encode nullability differently (`nullable: true` vs
-`type: [..., "null"]`) and are mutually exclusive.
+`type: [..., "null"]`) and are mutually exclusive. See
+[`docs/oas-versions.md`](docs/oas-versions.md) for the full encoding
+table and the version-specific shapes for nullable references.
+
+## Documentation
+
+| File                                                       | Topic                                            |
+|------------------------------------------------------------|--------------------------------------------------|
+| [`docs/field-shapes.md`](docs/field-shapes.md)             | Field types and presence/nullability             |
+| [`docs/output-ordering.md`](docs/output-ordering.md)       | Output ordering guarantees                       |
+| [`docs/oas-versions.md`](docs/oas-versions.md)             | OAS feature flags and version differences        |
 
 ## License
 
