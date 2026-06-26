@@ -2,7 +2,8 @@
 //!
 //! Currently exposes `#[derive(Schema)]`, which generates an implementation
 //! of the `frieze::Schema` trait for a named struct whose fields are all of
-//! type `i64`, `String`, or `bool`. Any other shape produces a compile error.
+//! a small fixed scalar set (see [`property_type_for`]). Any other shape
+//! produces a compile error.
 //!
 //! The expansion routes every reference to the supporting crates through the
 //! `frieze::__private` module so downstream users only need to depend on the
@@ -12,7 +13,9 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Field, Fields, Type};
 
-/// Derive `frieze::Schema` for a named struct with `i64` / `String` / `bool` fields.
+/// Derive `frieze::Schema` for a named struct whose fields are scalars
+/// supported by Phase 1 (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`,
+/// `String`).
 #[proc_macro_derive(Schema)]
 pub fn derive_schema(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -95,18 +98,23 @@ fn named_fields(
 /// Maps a Rust field type to the matching `frieze_model::PropertyType`,
 /// emitted as a path that resolves through the facade re-export.
 ///
-/// Anything other than `i64`, `String`, and `bool` produces a compile error
-/// pointing at the field's type.
+/// Anything other than the small fixed scalar set listed in the error
+/// message produces a compile error pointing at the field's type.
 fn property_type_for(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
     let rendered = type_to_display(ty);
     match rendered.as_str() {
+        "i32" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Int32 }),
         "i64" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Int64 }),
+        "u32" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::UInt32 }),
+        "u64" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::UInt64 }),
+        "f32" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Float }),
+        "f64" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Double }),
         "String" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::String }),
         "bool" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Boolean }),
         other => Err(syn::Error::new_spanned(
             ty,
             format!(
-                "frieze: unsupported field type `{other}`; only `i64`, `String`, and `bool` are supported in Phase 1. Future PRs will add support."
+                "frieze: unsupported field type `{other}`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String. Future PRs will add more."
             ),
         )),
     }

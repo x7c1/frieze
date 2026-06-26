@@ -8,6 +8,7 @@ use serde::Serialize;
 pub enum SchemaType {
     Object,
     Integer,
+    Number,
     String,
     Boolean,
 }
