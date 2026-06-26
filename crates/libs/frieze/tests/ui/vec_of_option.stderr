@@ -1,5 +1,0 @@
-error: frieze: Vec<Option<T>> is not supported in Phase 1; shape-level optionality requires a Property restructure that will be revisited in a future PR.
- --> tests/ui/vec_of_option.rs:5:8
-  |
-5 |     x: Vec<Option<String>>,
-  |        ^^^^^^^^^^^^^^^^^^^

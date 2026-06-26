@@ -1,0 +1,5 @@
+error: frieze: Option<Maybe<T>> is ambiguous; presence is doubly defined. Use Maybe<T> alone.
+ --> tests/ui/option_of_maybe.rs:5:8
+  |
+5 |     x: Option<Maybe<String>>,
+  |        ^^^^^^^^^^^^^^^^^^^^^

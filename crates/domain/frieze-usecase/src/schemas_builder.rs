@@ -31,7 +31,7 @@ impl SchemasBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use frieze_model::{Error, Property, PropertyType};
+    use frieze_model::{Error, Presence, Property, PropertyType};
 
     struct DummyUser;
 
@@ -43,8 +43,8 @@ mod tests {
             frieze_model::Schema::new(
                 "User",
                 vec![
-                    Property::new("id", PropertyType::Int64, false).unwrap(),
-                    Property::new("name", PropertyType::String, false).unwrap(),
+                    Property::new("id", PropertyType::Int64, Presence::Required).unwrap(),
+                    Property::new("name", PropertyType::String, Presence::Required).unwrap(),
                 ],
             )
             .unwrap()

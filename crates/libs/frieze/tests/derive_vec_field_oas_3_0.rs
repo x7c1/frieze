@@ -1,3 +1,7 @@
+//! `Vec<T>` and `Option<Vec<T>>` field shapes under OAS 3.0. Both are
+//! required at the presence axis; the latter additionally carries
+//! `nullable: true` on the outer array (not on the items).
+
 #![cfg(feature = "oas-3-0")]
 
 use frieze::Schema;
@@ -36,5 +40,6 @@ fn vec_field_renders_as_type_array_under_oas_3_0() {
       required:
         - name
         - aliases
+        - parent_ids
     "###);
 }

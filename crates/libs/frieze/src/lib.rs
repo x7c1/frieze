@@ -7,7 +7,9 @@
 //! `use frieze::Schema;` brings both the trait and the derive into scope.
 
 pub use frieze_macros::Schema;
-pub use frieze_model::{Error, Property, PropertyName, PropertyType, SchemaName, Schemas};
+pub use frieze_model::{
+    Error, Maybe, Presence, Property, PropertyName, PropertyType, SchemaName, Schemas,
+};
 pub use frieze_usecase::{to_value, to_yaml, Schema, SchemasBuilder};
 
 /// Convenience entry point: returns a fresh [`SchemasBuilder`].

@@ -16,6 +16,12 @@
 //! The names are intentionally bare (`Schema`, `Property`, etc.) — domain
 //! types in this crate ARE the validated form, so no `Validated-` prefix
 //! is used.
+//!
+//! [`Maybe`] is the one type here that is not "validated domain data" but
+//! a value-type primitive: it expresses the three-state "missing / null /
+//! present" distinction that frieze maps to OAS optional + nullable, and
+//! that is independently useful for serde-driven Rust code (e.g. HTTP
+//! `PATCH` request bodies).
 
 mod schema;
 pub use schema::Schema;
@@ -31,6 +37,12 @@ pub use property_name::PropertyName;
 
 mod property_type;
 pub use property_type::PropertyType;
+
+mod presence;
+pub use presence::Presence;
+
+mod maybe;
+pub use maybe::Maybe;
 
 mod schema_name;
 pub use schema_name::SchemaName;

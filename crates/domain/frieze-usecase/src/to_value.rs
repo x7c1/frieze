@@ -27,12 +27,17 @@ pub fn to_value(schemas: &Schemas) -> Value {
 }
 
 /// Boundary conversion: validated domain schema -> plain OAS schema object.
+///
+/// The `required` array is built from each property's [`Property::presence`]
+/// — and only that. Value-level nullability lives on the type tree
+/// ([`PropertyType::Nullable`]) and is rendered independently by
+/// [`property_to_openapi`].
 fn to_openapi(schema: &Schema) -> SchemaObject {
     let mut properties: IndexMap<String, SchemaObject> = IndexMap::new();
     let mut required: Vec<String> = Vec::with_capacity(schema.properties.len());
     for (name, property) in &schema.properties {
         properties.insert(name.as_str().to_string(), property_to_openapi(property));
-        if !property.optional {
+        if property.presence.is_required() {
             required.push(name.as_str().to_string());
         }
     }
@@ -48,26 +53,20 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
 }
 
 /// Single mapping from a [`Property`] to the OAS schema object that
-/// represents it. This is the one place to edit when a new scalar variant is
-/// added to [`PropertyType`].
-///
-/// The `nullable` intent on the resulting `SchemaObject` is set from the
-/// property's `optional` flag; [`schema_object_to_value`] renders that
-/// intent into the version-appropriate YAML shape.
+/// represents it. The property's presence is consumed up at
+/// [`to_openapi`] (for the `required` array); only the type tree affects
+/// the per-property schema object emitted here.
 fn property_to_openapi(property: &Property) -> SchemaObject {
-    let mut schema = property_type_to_openapi(&property.ty);
-    if property.optional {
-        schema.nullable = Some(true);
-    }
-    schema
+    property_type_to_openapi(&property.ty)
 }
 
-/// Single mapping from a [`PropertyType`] to the matching schema object,
-/// without consideration of nullability (that intent lives on the
-/// outer `Property` and is applied by [`property_to_openapi`]).
+/// Single mapping from a [`PropertyType`] to the matching schema object.
 ///
 /// Recurses on [`PropertyType::Array`] so the element schema is rendered
-/// into the `items` slot.
+/// into the `items` slot, and on [`PropertyType::Nullable`] so the
+/// nullability marker is attached at whichever position in the tree it
+/// appears. `Array(Nullable(...))` therefore makes the items nullable;
+/// `Nullable(Array(...))` makes the array itself nullable.
 fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
     let (schema_ty, format, minimum) = match ty {
         PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
@@ -88,6 +87,11 @@ fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
                 properties: None,
                 required: None,
             };
+        }
+        PropertyType::Nullable(inner) => {
+            let mut inner_schema = property_type_to_openapi(inner);
+            inner_schema.nullable = Some(true);
+            return inner_schema;
         }
     };
     SchemaObject {
@@ -116,7 +120,8 @@ fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
 ///
 /// `items` is emitted on array schemas only; the element schema is
 /// rendered through the same `schema_object_to_value` recursively so its
-/// own keys obey the same ordering rules.
+/// own keys obey the same ordering rules (and so a nullable item gets
+/// its `nullable` marker at the items level, not the array level).
 fn schema_object_to_value(schema: &SchemaObject) -> Value {
     let mut map = Mapping::new();
     insert_type(&mut map, schema);
@@ -225,7 +230,7 @@ mod tests {
     use super::*;
     use crate::schema::Schema as SchemaTrait;
     use crate::schemas_builder::SchemasBuilder;
-    use frieze_model::{Property, PropertyType};
+    use frieze_model::{Presence, Property, PropertyType};
 
     struct DummyUser;
 
@@ -237,8 +242,8 @@ mod tests {
             frieze_model::Schema::new(
                 "User",
                 vec![
-                    Property::new("id", PropertyType::Int64, false).unwrap(),
-                    Property::new("name", PropertyType::String, false).unwrap(),
+                    Property::new("id", PropertyType::Int64, Presence::Required).unwrap(),
+                    Property::new("name", PropertyType::String, Presence::Required).unwrap(),
                 ],
             )
             .unwrap()
