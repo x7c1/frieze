@@ -121,10 +121,7 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
     let mut map = Mapping::new();
     insert_type(&mut map, schema);
     if let Some(items) = &schema.items {
-        map.insert(
-            Value::String("items".into()),
-            schema_object_to_value(items),
-        );
+        map.insert(Value::String("items".into()), schema_object_to_value(items));
     }
     if let Some(format) = &schema.format {
         map.insert(

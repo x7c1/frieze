@@ -1,4 +1,4 @@
-error: frieze: unsupported field type `u128`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String. Future PRs will add more.
+error: frieze: unsupported field type `u128`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Option<T>, Option<Vec<T>> (for any supported scalar T). Future PRs will add more.
  --> tests/ui/unsupported_field_type_u128.rs:5:8
   |
 5 |     x: u128,
