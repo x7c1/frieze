@@ -57,6 +57,8 @@ Lumping them as "DTOs" hides the responsibility difference that the architecture
 
 `#[derive(Schema)]` recognises a fixed scalar set, optionally composed
 with `Vec<T>`, `Option<T>`, and the frieze-defined `Maybe<T>` wrapper.
+Field types that are themselves `Schema`-deriving structs are emitted as
+`$ref` (see [Nested structs and `$ref`](#nested-structs-and-ref)).
 
 ### Scalars
 
@@ -87,6 +89,12 @@ combinations map to the following Rust shapes:
 | `Vec<Option<T>>`                                                      | required | array, nullable items |
 | `Option<Vec<T>>`                                                      | required | nullable array     |
 | `Option<Vec<Option<T>>>`                                              | required | nullable array, nullable items |
+| `U` (another `Schema`-deriving struct)                                | required | `$ref` to `U`      |
+| `Option<U>` (serde default)                                           | required | nullable `$ref`    |
+| `Option<U>` + `#[serde(skip_serializing_if = "Option::is_none")]`     | optional | non-nullable `$ref` |
+| `Maybe<U>`                                                            | optional | nullable `$ref`    |
+| `Vec<U>`                                                              | required | array of `$ref`    |
+| `Vec<Option<U>>`                                                      | required | array of nullable `$ref` |
 
 Notes:
 
@@ -103,6 +111,37 @@ Notes:
 - **Nullability lives on the type tree** (`PropertyType::Nullable`),
   not on the property as a whole. That is how `Vec<Option<T>>` becomes
   an array of nullable items rather than a nullable array.
+
+### Nested structs and `$ref`
+
+A field whose type is another `Schema`-deriving struct is emitted as a
+[`PropertyType::Reference(SchemaName)`][reference] in `frieze-model`, and
+rendered as `$ref: "#/components/schemas/<Name>"` at the boundary. The
+referenced schema must be registered in the same
+`SchemasBuilder` — explicit registration is the only mode in Phase 1.
+`SchemasBuilder::build()` walks every property's type tree and returns
+[`Error::UnresolvedReference`][unresolved] for the first `$ref` whose
+target schema isn't registered.
+
+[reference]: ./crates/domain/frieze-model/src/property_type.rs
+[unresolved]: ./crates/domain/frieze-model/src/error.rs
+
+Nullable references cannot use a sibling `nullable: true` on a `$ref`
+schema (OAS 3.0 ignores it; OAS 3.1 disallows it), so the renderer
+wraps them in the version-appropriate composition:
+
+| OAS version | Shape for `Option<U>` (serde default) / `Maybe<U>` |
+|-------------|-----------------------------------------------------|
+| 3.0         | `allOf: [{$ref}], nullable: true`                  |
+| 3.1         | `oneOf: [{$ref}, {type: "null"}]`                  |
+
+Restrictions on user-written types in field positions, enforced as
+compile errors:
+
+- **Qualified paths** (`mymod::User`) — bring the type into scope with a
+  `use` statement first.
+- **Generic type parameters** (`Foo<u32>`) — concrete user types only
+  in Phase 1; generics over user schemas are deferred to Phase 1 #11.
 
 ### Unsupported shapes (compile error)
 
@@ -131,7 +170,7 @@ reach the schema-building code:
 
 `IndexMap` is used internally where insertion order matters; `BTreeMap` where alphabetical order is desired.
 
-Within a single schema object, keys are emitted in canonical OAS reading order: `type`, `items`, `format`, `minimum`, `nullable` (3.0 only), `properties`, `required`.
+Within a single schema object, keys are emitted in canonical OAS reading order: `$ref`, `type`, `items`, `format`, `minimum`, `allOf`, `oneOf`, `nullable` (3.0 only), `properties`, `required`. A schema object set to a `$ref` is emitted on its own — sibling keys are dropped, matching the OAS rule that `$ref` schemas are treated as leaves.
 
 ## OAS version feature flags
 
