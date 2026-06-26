@@ -47,7 +47,12 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
 /// added to [`PropertyType`].
 fn property_to_openapi(pt: PropertyType) -> SchemaObject {
     let (ty, format, minimum) = match pt {
+        PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
         PropertyType::Int64 => (SchemaType::Integer, Some("int64"), None),
+        PropertyType::UInt32 => (SchemaType::Integer, Some("int32"), Some(0.0)),
+        PropertyType::UInt64 => (SchemaType::Integer, Some("int64"), Some(0.0)),
+        PropertyType::Float => (SchemaType::Number, Some("float"), None),
+        PropertyType::Double => (SchemaType::Number, Some("double"), None),
         PropertyType::String => (SchemaType::String, None, None),
         PropertyType::Boolean => (SchemaType::Boolean, None, None),
     };
