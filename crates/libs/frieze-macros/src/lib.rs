@@ -1,10 +1,39 @@
 //! Proc-macro derives for frieze.
 //!
 //! Currently exposes `#[derive(Schema)]`, which generates an implementation
-//! of the `frieze::Schema` trait for a named struct whose fields are all of
-//! a small fixed scalar set (see [`parse_field_type`]), optionally wrapped
-//! in `Option<T>` and/or a single layer of `Vec<T>`. Any other shape
-//! produces a compile error.
+//! of the `frieze::Schema` trait for a named struct whose fields are all
+//! built from a small fixed scalar set, optionally composed with `Vec<T>`,
+//! `Option<T>`, and/or `Maybe<T>` according to the table below. Any other
+//! shape produces a compile error.
+//!
+//! # Rust shape → OAS combination
+//!
+//! The derive maps each field shape to the four presence × nullability
+//! combinations as follows. The decision is driven by syntactic type
+//! recognition plus a single serde attribute (`skip_serializing_if =
+//! "Option::is_none"`); the macro does not interpret any other serde
+//! attribute.
+//!
+//! | Rust shape                                                       | Presence | Nullability        |
+//! |------------------------------------------------------------------|----------|--------------------|
+//! | `T` (scalar)                                                     | required | non-nullable       |
+//! | `Option<T>` (serde default)                                      | required | nullable           |
+//! | `Option<T>` + `#[serde(skip_serializing_if = "Option::is_none")]`| optional | non-nullable       |
+//! | `Maybe<T>`                                                       | optional | nullable           |
+//! | `Vec<T>`                                                         | required | array, items as T  |
+//! | `Vec<Option<T>>`                                                 | required | array, items nullable |
+//! | `Option<Vec<T>>`                                                 | required | nullable array     |
+//! | `Option<Vec<Option<T>>>`                                         | required | nullable array, items nullable |
+//!
+//! # Rejected shapes (compile error)
+//!
+//! - `Option<Option<T>>` — serde flattens nested options.
+//! - `Vec<Vec<T>>` — nested arrays are not modelled in Phase 1.
+//! - `Vec<Maybe<T>>` — array elements cannot be `Missing`; use
+//!   `Vec<Option<T>>` for arrays of nullable items.
+//! - `Option<Maybe<T>>` — presence is doubly defined.
+//! - `Maybe<Option<T>>` — nullability is doubly defined.
+//! - `Maybe<Maybe<T>>` — nested `Maybe` is not supported.
 //!
 //! The expansion routes every reference to the supporting crates through the
 //! `frieze::__private` module so downstream users only need to depend on the
@@ -13,13 +42,12 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments, Type,
+    parse_macro_input, Attribute, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments,
+    Type,
 };
 
-/// Derive `frieze::Schema` for a named struct whose fields are scalars
-/// supported by Phase 1 (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`,
-/// `String`), optionally wrapped in `Vec<T>` for array fields and/or
-/// `Option<...>` for nullable fields.
+/// Derive `frieze::Schema` for a named struct. See the crate-level docs for
+/// the full mapping from Rust shape to OAS presence × nullability.
 #[proc_macro_derive(Schema)]
 pub fn derive_schema(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -43,10 +71,14 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
     for field in fields {
         let field_ident = field.ident.as_ref().expect("named field has an identifier");
         let field_name = field_ident.to_string();
-        let (property_type_expr, optional) = parse_field_type(&field.ty)?;
+        let (property_type_expr, presence_expr) = parse_field(field)?;
         property_exprs.push(quote! {
-            ::frieze::__private::frieze_model::Property::new(#field_name, #property_type_expr, #optional)
-                .expect("frieze: property name is non-empty and derived from a struct field")
+            ::frieze::__private::frieze_model::Property::new(
+                #field_name,
+                #property_type_expr,
+                #presence_expr,
+            )
+            .expect("frieze: property name is non-empty and derived from a struct field")
         });
     }
 
@@ -99,71 +131,179 @@ fn named_fields(
     }
 }
 
-/// Maps a Rust field type to the (`PropertyType` expression, optional flag)
-/// pair used by the derive expansion.
+/// Decision entry point: given a struct field, return the
+/// `PropertyType` expression and the `Presence` expression that should
+/// be passed to `Property::new` in the generated code.
 ///
-/// Accepts:
-///
-/// - a directly-supported scalar (see [`scalar_property_type_expr`]),
-/// - a single layer of `Vec<T>` wrapping such a scalar (array field),
-/// - a single layer of `Option<T>` wrapping a scalar (nullable scalar),
-/// - a single layer of `Option<Vec<T>>` wrapping a scalar (nullable array).
-///
-/// Compile errors are raised for nested `Option` (`Option<Option<T>>`),
-/// nested `Vec` (`Vec<Vec<T>>`), and `Vec<Option<T>>` shapes — the latter
-/// because shape-level optionality cannot be expressed with the current
-/// `Property` representation.
-fn parse_field_type(ty: &Type) -> Result<(proc_macro2::TokenStream, bool), syn::Error> {
-    if let Some(inner) = unwrap_option(ty) {
+/// Recognises (in order): `Maybe<T>`, `Option<T>` (with serde
+/// `skip_serializing_if` attribute discrimination), `Vec<T>`, scalar
+/// types. See the crate-level docs for the full table.
+fn parse_field(
+    field: &Field,
+) -> Result<(proc_macro2::TokenStream, proc_macro2::TokenStream), syn::Error> {
+    let ty = &field.ty;
+
+    if let Some(inner) = unwrap_maybe(ty) {
+        // Block doubly-defined / nested cases at the Maybe layer.
+        if unwrap_option(inner).is_some() {
+            return Err(syn::Error::new_spanned(
+                ty,
+                "frieze: Maybe<Option<T>> is ambiguous; nullability is doubly defined. Use Maybe<T> alone.",
+            ));
+        }
+        if unwrap_maybe(inner).is_some() {
+            return Err(syn::Error::new_spanned(
+                ty,
+                "frieze: nested Maybe is not supported.",
+            ));
+        }
+        let element = inner_to_property_type_expr(inner, ty, "Maybe<...>")?;
+        Ok((nullable_property_type_expr(element), presence_optional()))
+    } else if let Some(inner) = unwrap_option(ty) {
         if unwrap_option(inner).is_some() {
             return Err(syn::Error::new_spanned(
                 ty,
                 "frieze: nested Option is not supported.",
             ));
         }
-        if let Some(vec_inner) = unwrap_vec(inner) {
-            reject_vec_inner(ty, vec_inner)?;
-            let element = scalar_property_type_expr(vec_inner).map_err(|_| {
-                syn::Error::new_spanned(
-                    ty,
-                    unsupported_inside_message(vec_inner, "Option<Vec<...>>"),
-                )
-            })?;
-            return Ok((array_property_type_expr(element), true));
+        if unwrap_maybe(inner).is_some() {
+            return Err(syn::Error::new_spanned(
+                ty,
+                "frieze: Option<Maybe<T>> is ambiguous; presence is doubly defined. Use Maybe<T> alone.",
+            ));
         }
-        let pt = scalar_property_type_expr(inner).map_err(|_| {
+        // Option<Vec<T>> and Option<Vec<Option<T>>> are both rendered as
+        // "outer nullable array"; the items' own nullability is
+        // independent.
+        if let Some(vec_inner) = unwrap_vec(inner) {
+            let element = vec_element_property_type_expr(ty, vec_inner)?;
+            let array = array_property_type_expr(element);
+            return Ok((nullable_property_type_expr(array), presence_required()));
+        }
+        // Scalar `T` inside Option — branch ② / ③.
+        let scalar = scalar_property_type_expr(inner).map_err(|_| {
             syn::Error::new_spanned(ty, unsupported_inside_message(inner, "Option<...>"))
         })?;
-        Ok((pt, true))
+        if has_skip_serializing_if_option_is_none(&field.attrs) {
+            // Branch ③: optional, non-nullable.
+            Ok((scalar, presence_optional()))
+        } else {
+            // Branch ② (serde default): required, nullable.
+            Ok((nullable_property_type_expr(scalar), presence_required()))
+        }
     } else if let Some(vec_inner) = unwrap_vec(ty) {
-        reject_vec_inner(ty, vec_inner)?;
-        let element = scalar_property_type_expr(vec_inner).map_err(|_| {
-            syn::Error::new_spanned(ty, unsupported_inside_message(vec_inner, "Vec<...>"))
-        })?;
-        Ok((array_property_type_expr(element), false))
+        let element = vec_element_property_type_expr(ty, vec_inner)?;
+        Ok((array_property_type_expr(element), presence_required()))
     } else {
         let pt = scalar_property_type_expr(ty)
             .map_err(|_| syn::Error::new_spanned(ty, unsupported_message(&type_to_display(ty))))?;
-        Ok((pt, false))
+        Ok((pt, presence_required()))
     }
 }
 
-/// Rejects `Vec<Option<...>>` and `Vec<Vec<...>>` with the targeted
-/// error messages used by the macro's UI tests.
-fn reject_vec_inner(outer: &Type, vec_inner: &Type) -> Result<(), syn::Error> {
-    if unwrap_option(vec_inner).is_some() {
-        return Err(syn::Error::new_spanned(
-            outer,
-            "frieze: Vec<Option<T>> is not supported in Phase 1; shape-level optionality requires a Property restructure that will be revisited in a future PR.",
-        ));
-    }
+/// Builds the items expression for `Vec<inner>`, rejecting compositions
+/// not allowed inside `Vec` (nested `Vec`, `Maybe`). Allows `Option<T>`
+/// inside `Vec` (rendered as `items: { nullable }`).
+fn vec_element_property_type_expr(
+    outer: &Type,
+    vec_inner: &Type,
+) -> Result<proc_macro2::TokenStream, syn::Error> {
     if unwrap_vec(vec_inner).is_some() {
         return Err(syn::Error::new_spanned(
             outer,
             "frieze: nested Vec is not supported.",
         ));
     }
-    Ok(())
+    if unwrap_maybe(vec_inner).is_some() {
+        return Err(syn::Error::new_spanned(
+            outer,
+            "frieze: Vec<Maybe<T>> is not allowed; array elements are always present on the wire. Use Vec<Option<T>> if elements may be null.",
+        ));
+    }
+    if let Some(opt_inner) = unwrap_option(vec_inner) {
+        // Recursive Option<...> inside Vec — block the same ambiguities as
+        // at the top level.
+        if unwrap_option(opt_inner).is_some() {
+            return Err(syn::Error::new_spanned(
+                outer,
+                "frieze: nested Option is not supported.",
+            ));
+        }
+        if unwrap_maybe(opt_inner).is_some() {
+            return Err(syn::Error::new_spanned(
+                outer,
+                "frieze: Option<Maybe<T>> is ambiguous; presence is doubly defined.",
+            ));
+        }
+        if unwrap_vec(opt_inner).is_some() {
+            return Err(syn::Error::new_spanned(
+                outer,
+                "frieze: nested Vec is not supported.",
+            ));
+        }
+        let scalar = scalar_property_type_expr(opt_inner).map_err(|_| {
+            syn::Error::new_spanned(
+                outer,
+                unsupported_inside_message(opt_inner, "Vec<Option<...>>"),
+            )
+        })?;
+        return Ok(nullable_property_type_expr(scalar));
+    }
+    scalar_property_type_expr(vec_inner).map_err(|_| {
+        syn::Error::new_spanned(outer, unsupported_inside_message(vec_inner, "Vec<...>"))
+    })
+}
+
+/// Builds the property-type expression for the inner type of `Maybe<inner>`.
+/// `Maybe` may wrap a scalar `T` or a `Vec<T>` / `Vec<Option<T>>`.
+fn inner_to_property_type_expr(
+    inner: &Type,
+    outer_for_span: &Type,
+    container: &str,
+) -> Result<proc_macro2::TokenStream, syn::Error> {
+    if let Some(vec_inner) = unwrap_vec(inner) {
+        let element = vec_element_property_type_expr(outer_for_span, vec_inner)?;
+        return Ok(array_property_type_expr(element));
+    }
+    scalar_property_type_expr(inner).map_err(|_| {
+        syn::Error::new_spanned(outer_for_span, unsupported_inside_message(inner, container))
+    })
+}
+
+/// Returns `true` if any `#[serde(...)]` attribute on the field contains
+/// `skip_serializing_if = "Option::is_none"`.
+///
+/// The check is strictly syntactic — the right-hand side must be the
+/// literal string `"Option::is_none"`. Other helper names (custom
+/// predicates) do not switch the property into branch ③.
+fn has_skip_serializing_if_option_is_none(attrs: &[Attribute]) -> bool {
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+        let mut matched = false;
+        // Best-effort parse: serde may carry attribute forms we don't
+        // recognise (e.g. lone idents like `default`), and `parse_nested_meta`
+        // returns `Ok` for those when the callback accepts them. We only
+        // care about the one name-value pair we look for and ignore the
+        // result either way.
+        let _ = attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("skip_serializing_if") {
+                if let Ok(value) = meta.value() {
+                    if let Ok(lit) = value.parse::<syn::LitStr>() {
+                        if lit.value() == "Option::is_none" {
+                            matched = true;
+                        }
+                    }
+                }
+            }
+            Ok(())
+        });
+        if matched {
+            return true;
+        }
+    }
+    false
 }
 
 /// Maps a Rust scalar field type to the matching
@@ -190,8 +330,7 @@ fn scalar_property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn:
     }
 }
 
-/// Wraps a scalar `PropertyType` expression in
-/// `PropertyType::Array(Box::new(...))`.
+/// Wraps a `PropertyType` expression in `PropertyType::Array(Box::new(...))`.
 fn array_property_type_expr(element: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     quote! {
         ::frieze::__private::frieze_model::PropertyType::Array(
@@ -200,19 +339,36 @@ fn array_property_type_expr(element: proc_macro2::TokenStream) -> proc_macro2::T
     }
 }
 
+/// Wraps a `PropertyType` expression in `PropertyType::Nullable(Box::new(...))`.
+fn nullable_property_type_expr(inner: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! {
+        ::frieze::__private::frieze_model::PropertyType::Nullable(
+            ::std::boxed::Box::new(#inner)
+        )
+    }
+}
+
+fn presence_required() -> proc_macro2::TokenStream {
+    quote! { ::frieze::__private::frieze_model::Presence::Required }
+}
+
+fn presence_optional() -> proc_macro2::TokenStream {
+    quote! { ::frieze::__private::frieze_model::Presence::Optional }
+}
+
 /// Standard "unsupported field type" error message, listing the Phase 1
 /// supported shapes.
 fn unsupported_message(rendered: &str) -> String {
     format!(
-        "frieze: unsupported field type `{rendered}`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Option<T>, Option<Vec<T>> (for any supported scalar T). Future PRs will add more."
+        "frieze: unsupported field type `{rendered}`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Vec<Option<T>>, Option<T>, Option<Vec<T>>, Maybe<T> (for any supported scalar T). Future PRs will add more."
     )
 }
 
 /// Variant of [`unsupported_message`] that names the wrapper containing
-/// the offending inner type (e.g. `Option<...>` or `Vec<...>`).
+/// the offending inner type (e.g. `Option<...>` / `Vec<...>` / `Maybe<...>`).
 fn unsupported_inside_message(inner: &Type, container: &str) -> String {
     format!(
-        "frieze: unsupported field type `{}` inside {container}; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Option<T>, Option<Vec<T>> (for any supported scalar T). Future PRs will add more.",
+        "frieze: unsupported field type `{}` inside {container}; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Vec<Option<T>>, Option<T>, Option<Vec<T>>, Maybe<T> (for any supported scalar T). Future PRs will add more.",
         type_to_display(inner)
     )
 }
@@ -236,6 +392,19 @@ fn unwrap_vec(ty: &Type) -> Option<&Type> {
     unwrap_single_generic(
         ty,
         &[&["Vec"], &["std", "vec", "Vec"], &["alloc", "vec", "Vec"]],
+    )
+}
+
+/// If `ty` syntactically names `Maybe<T>` (via `Maybe`, `frieze::Maybe`,
+/// or `frieze_model::Maybe`), returns `T`.
+///
+/// Plain `Maybe` is the form users get from `use frieze::Maybe;` (the
+/// facade re-export); the longer paths cover users who reach into the
+/// underlying crates directly.
+fn unwrap_maybe(ty: &Type) -> Option<&Type> {
+    unwrap_single_generic(
+        ty,
+        &[&["Maybe"], &["frieze", "Maybe"], &["frieze_model", "Maybe"]],
     )
 }
 
