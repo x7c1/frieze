@@ -30,7 +30,7 @@ impl Schemas {
         for schema in schemas {
             let key = schema.name.clone();
             if by_name.contains_key(&key) {
-                return Err(Error::DuplicateSchema(key.into_string()));
+                return Err(Error::DuplicateSchema(key));
             }
             by_name.insert(key, schema);
         }
@@ -56,7 +56,10 @@ mod tests {
     #[test]
     fn rejects_duplicate_names() {
         let err = Schemas::new(vec![user_schema(), user_schema()]).unwrap_err();
-        assert_eq!(err, Error::DuplicateSchema("User".into()));
+        assert_eq!(
+            err,
+            Error::DuplicateSchema(SchemaName::new("User").unwrap())
+        );
     }
 
     #[test]

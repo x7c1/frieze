@@ -1,7 +1,7 @@
 //! Boundary conversion from [`frieze_model::Schemas`] to
 //! [`serde_yaml::Value`], via [`frieze_openapi`].
 
-use frieze_model::{Property, PropertyType, Schema, Schemas};
+use frieze_model::{Property, PropertyType, Schema, SchemaName, Schemas};
 use frieze_openapi::{SchemaObject, SchemaType};
 use indexmap::IndexMap;
 use serde_yaml::{Mapping, Number, Value};
@@ -10,8 +10,9 @@ use serde_yaml::{Mapping, Number, Value};
 /// preserving the canonical output order:
 ///
 /// - top-level keys (schema names): alphabetical (via [`std::collections::BTreeMap`])
-/// - inside one schema: `type`, `items`, `format`, `minimum`,
-///   (`nullable` under `oas-3-0`,) `properties`, `required`
+/// - inside one schema: `$ref`, `type`, `items`, `format`, `minimum`,
+///   `allOf`, `oneOf`, (`nullable` under `oas-3-0`,) `properties`,
+///   `required`
 /// - `properties`: declaration order (via [`IndexMap`])
 /// - `required`: same order as `properties`
 pub fn to_value(schemas: &Schemas) -> Value {
@@ -43,12 +44,9 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     }
     SchemaObject {
         ty: Some(SchemaType::Object),
-        items: None,
-        format: None,
-        minimum: None,
-        nullable: None,
         properties: Some(properties),
         required: Some(required),
+        ..SchemaObject::empty()
     }
 }
 
@@ -67,6 +65,13 @@ fn property_to_openapi(property: &Property) -> SchemaObject {
 /// nullability marker is attached at whichever position in the tree it
 /// appears. `Array(Nullable(...))` therefore makes the items nullable;
 /// `Nullable(Array(...))` makes the array itself nullable.
+///
+/// [`PropertyType::Reference`] is rendered as a pure `$ref` schema; if
+/// the renderer's recursion finds itself wrapping a `Reference` in
+/// [`PropertyType::Nullable`], it falls through to the OAS-version-specific
+/// "nullable reference" shape ([`nullable_reference_object`]) rather than
+/// attempting to attach `nullable: true` directly to the `$ref` (which is
+/// invalid OAS).
 fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
     let (schema_ty, format, minimum) = match ty {
         PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
@@ -81,27 +86,73 @@ fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
             return SchemaObject {
                 ty: Some(SchemaType::Array),
                 items: Some(Box::new(property_type_to_openapi(inner))),
-                format: None,
-                minimum: None,
-                nullable: None,
-                properties: None,
-                required: None,
+                ..SchemaObject::empty()
             };
         }
         PropertyType::Nullable(inner) => {
+            // A nullable reference cannot simply set `nullable: true` on a
+            // `$ref` schema object — `$ref` siblings are ignored in OAS 3.0
+            // and disallowed in 3.1. Use the version-specific wrap instead.
+            if let PropertyType::Reference(name) = inner.as_ref() {
+                return nullable_reference_object(name);
+            }
             let mut inner_schema = property_type_to_openapi(inner);
             inner_schema.nullable = Some(true);
             return inner_schema;
         }
+        PropertyType::Reference(name) => {
+            return reference_object(name);
+        }
     };
     SchemaObject {
         ty: Some(schema_ty),
-        items: None,
         format: format.map(str::to_owned),
         minimum,
-        nullable: None,
-        properties: None,
-        required: None,
+        ..SchemaObject::empty()
+    }
+}
+
+/// Builds a pure `$ref` schema object pointing at
+/// `#/components/schemas/<name>`.
+fn reference_object(name: &SchemaName) -> SchemaObject {
+    SchemaObject {
+        reference: Some(format!("#/components/schemas/{}", name.as_str())),
+        ..SchemaObject::empty()
+    }
+}
+
+/// Builds the OAS-version-specific "nullable reference" schema object.
+///
+/// - OAS 3.0: `allOf: [{$ref}], nullable: true`. The `allOf` wrap is the
+///   idiomatic 3.0 escape hatch for siblings on a referencing schema.
+/// - OAS 3.1: `oneOf: [{$ref}, {type: "null"}]`. The `nullable` keyword
+///   was dropped in 3.1, and a sibling `$ref` would be rejected.
+///
+/// The `$ref` element is always first; the null sibling is second. This
+/// is purely for snapshot stability.
+#[cfg(feature = "oas-3-0")]
+fn nullable_reference_object(name: &SchemaName) -> SchemaObject {
+    SchemaObject {
+        all_of: Some(vec![reference_object(name)]),
+        nullable: Some(true),
+        ..SchemaObject::empty()
+    }
+}
+
+#[cfg(feature = "oas-3-1")]
+fn nullable_reference_object(name: &SchemaName) -> SchemaObject {
+    SchemaObject {
+        one_of: Some(vec![
+            reference_object(name),
+            SchemaObject {
+                // `type: "null"` is emitted as a quoted string by the
+                // renderer to preserve the user-visible scalar form. See
+                // `schema_type_to_value` / `insert_type`.
+                ty: Some(SchemaType::Null),
+                ..SchemaObject::empty()
+            },
+        ]),
+        ..SchemaObject::empty()
     }
 }
 
@@ -110,20 +161,33 @@ fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
 ///
 /// Key ordering depends on the selected OAS version feature:
 ///
-/// - `oas-3-0`: `type`, `items`, `format`, `minimum`, `nullable`,
-///   `properties`, `required`. The nullability intent is emitted as
-///   `nullable: true`.
-/// - `oas-3-1`: `type`, `items`, `format`, `minimum`, `properties`,
-///   `required`. The nullability intent is folded into `type` as a
-///   2-element sequence `[<base>, "null"]`. The OAS 3.1 spec drops the
-///   `nullable` keyword.
+/// - `oas-3-0`: `$ref`, `type`, `items`, `format`, `minimum`, `allOf`,
+///   `oneOf`, `nullable`, `properties`, `required`. The nullability
+///   intent for scalars is emitted as `nullable: true`; the nullability
+///   intent for references is emitted via `allOf` + `nullable`.
+/// - `oas-3-1`: `$ref`, `type`, `items`, `format`, `minimum`, `allOf`,
+///   `oneOf`, `properties`, `required`. The nullability intent for
+///   scalars is folded into `type` as a 2-element sequence
+///   `[<base>, "null"]`; the nullability intent for references is
+///   emitted via `oneOf` with a `{type: "null"}` sibling. The OAS 3.1
+///   spec drops the `nullable` keyword.
 ///
 /// `items` is emitted on array schemas only; the element schema is
 /// rendered through the same `schema_object_to_value` recursively so its
 /// own keys obey the same ordering rules (and so a nullable item gets
 /// its `nullable` marker at the items level, not the array level).
+///
+/// When `$ref` is present, no other keys are emitted: OAS treats a
+/// `$ref` schema as a leaf and discards sibling keys.
 fn schema_object_to_value(schema: &SchemaObject) -> Value {
     let mut map = Mapping::new();
+    if let Some(reference) = &schema.reference {
+        map.insert(
+            Value::String("$ref".into()),
+            Value::String(reference.clone()),
+        );
+        return Value::Mapping(map);
+    }
     insert_type(&mut map, schema);
     if let Some(items) = &schema.items {
         map.insert(Value::String("items".into()), schema_object_to_value(items));
@@ -136,6 +200,18 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
     }
     if let Some(minimum) = schema.minimum {
         map.insert(Value::String("minimum".into()), minimum_to_value(minimum));
+    }
+    if let Some(all_of) = &schema.all_of {
+        map.insert(
+            Value::String("allOf".into()),
+            Value::Sequence(all_of.iter().map(schema_object_to_value).collect()),
+        );
+    }
+    if let Some(one_of) = &schema.one_of {
+        map.insert(
+            Value::String("oneOf".into()),
+            Value::Sequence(one_of.iter().map(schema_object_to_value).collect()),
+        );
     }
     insert_nullable(&mut map, schema);
     if let Some(properties) = &schema.properties {
@@ -184,7 +260,7 @@ fn insert_type(map: &mut Mapping, schema: &SchemaObject) {
     }
 }
 
-/// Emits the nullability marker between `minimum` and `properties`.
+/// Emits the nullability marker between `oneOf` and `properties`.
 ///
 /// Under `oas-3-0`, a nullable schema gets `nullable: true`. Under
 /// `oas-3-1`, the nullability marker is folded into `type` (see

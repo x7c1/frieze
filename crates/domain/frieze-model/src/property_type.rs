@@ -1,5 +1,7 @@
 //! The enum of property types supported in Phase 1.
 
+use crate::schema_name::SchemaName;
+
 /// Property types currently supported by the derive in Phase 1.
 ///
 /// Unsigned variants (`UInt32`, `UInt64`) carry their non-negative
@@ -18,6 +20,13 @@
 /// per-element nullability for arrays (`Vec<Option<T>>` →
 /// `Array(Nullable(...))`) and keeps presence (`required`) cleanly
 /// orthogonal to value-level nullability.
+///
+/// [`PropertyType::Reference`] carries a [`SchemaName`] pointing at another
+/// schema registered in the surrounding [`crate::Schemas`] — this is how
+/// nested struct fields are expressed. Resolution (`name exists in the
+/// collection`) is enforced by `SchemasBuilder::build` in
+/// `frieze-usecase`, not by this enum: the value here only records *that*
+/// a reference was requested.
 ///
 /// `Copy` is intentionally NOT derived because `Array(Box<PropertyType>)`
 /// and `Nullable(Box<PropertyType>)` own heap memory.
@@ -48,4 +57,9 @@ pub enum PropertyType {
     /// where this variant appears in the tree (so `Array(Nullable(...))`
     /// makes the array **items** nullable, not the array itself).
     Nullable(Box<PropertyType>),
+    /// A reference to another schema registered in the same
+    /// [`crate::Schemas`] collection. Rendered as
+    /// `$ref: "#/components/schemas/<name>"` (non-nullable) or wrapped in
+    /// `allOf` / `oneOf` when nullable, per the active OAS version.
+    Reference(SchemaName),
 }
