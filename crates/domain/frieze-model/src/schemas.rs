@@ -41,13 +41,14 @@ impl Schemas {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::presence::Presence;
     use crate::property::Property;
     use crate::property_type::PropertyType;
 
     fn user_schema() -> Schema {
         Schema::new(
             "User",
-            vec![Property::new("id", PropertyType::Int64, false).unwrap()],
+            vec![Property::new("id", PropertyType::Int64, Presence::Required).unwrap()],
         )
         .unwrap()
     }
@@ -62,7 +63,7 @@ mod tests {
     fn iterates_alphabetically() {
         let a = Schema::new(
             "Album",
-            vec![Property::new("id", PropertyType::Int64, false).unwrap()],
+            vec![Property::new("id", PropertyType::Int64, Presence::Required).unwrap()],
         )
         .unwrap();
         let u = user_schema();

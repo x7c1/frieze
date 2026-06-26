@@ -1,10 +1,17 @@
 //! A validated property attached to a schema.
 
 use crate::error::Error;
+use crate::presence::Presence;
 use crate::property_name::PropertyName;
 use crate::property_type::PropertyType;
 
 /// A property attached to a schema, in its validated form.
+///
+/// A property is the triple (name, presence, type). **Presence** controls
+/// whether the field name is listed under the schema's `required` array;
+/// **nullability** of the value is encoded inside [`PropertyType`] via
+/// [`PropertyType::Nullable`]. The two axes are independent — see
+/// [`Presence`] for the four combinations they enumerate.
 ///
 /// Validation happens once, in [`Property::new`]. The fields are `pub`
 /// because the type's contract is its shape, not behavior: callers may read
@@ -21,23 +28,23 @@ pub struct Property {
     /// across the AST boundary. Kept short and idiomatic rather than
     /// `type_` / `tpe` / `r#type`.
     pub ty: PropertyType,
-    /// Whether the field is wrapped in `Option<T>` at the Rust source level.
-    ///
-    /// Carries the intent that the value is allowed to be absent / null. How
-    /// this intent is rendered into OAS YAML depends on the selected OAS
-    /// version feature (`nullable: true` for `oas-3-0`, a 2-element `type`
-    /// sequence for `oas-3-1`). Also drives whether the field name is
-    /// included in the schema's `required` array (optional fields are not).
-    pub optional: bool,
+    /// Whether the property key is required to appear in the serialized
+    /// object. Drives the schema's `required` array; the value-level
+    /// nullability is independent and lives inside [`PropertyType`].
+    pub presence: Presence,
 }
 
 impl Property {
     /// Builds a property, rejecting empty names.
-    pub fn new(name: impl Into<String>, ty: PropertyType, optional: bool) -> Result<Self, Error> {
+    pub fn new(
+        name: impl Into<String>,
+        ty: PropertyType,
+        presence: Presence,
+    ) -> Result<Self, Error> {
         Ok(Self {
             name: PropertyName::new(name)?,
             ty,
-            optional,
+            presence,
         })
     }
 }
@@ -48,23 +55,31 @@ mod tests {
 
     #[test]
     fn rejects_empty_name() {
-        let err = Property::new("", PropertyType::Int64, false).unwrap_err();
+        let err = Property::new("", PropertyType::Int64, Presence::Required).unwrap_err();
         assert_eq!(err, Error::EmptyPropertyName);
     }
 
     #[test]
-    fn accepts_named_property() {
-        let property = Property::new("id", PropertyType::Int64, false).unwrap();
+    fn accepts_required_property() {
+        let property = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
         assert_eq!(property.name.as_str(), "id");
         assert_eq!(property.ty, PropertyType::Int64);
-        assert!(!property.optional);
+        assert_eq!(property.presence, Presence::Required);
     }
 
     #[test]
     fn accepts_optional_property() {
-        let property = Property::new("nickname", PropertyType::String, true).unwrap();
+        let property = Property::new(
+            "nickname",
+            PropertyType::Nullable(Box::new(PropertyType::String)),
+            Presence::Optional,
+        )
+        .unwrap();
         assert_eq!(property.name.as_str(), "nickname");
-        assert_eq!(property.ty, PropertyType::String);
-        assert!(property.optional);
+        assert_eq!(
+            property.ty,
+            PropertyType::Nullable(Box::new(PropertyType::String))
+        );
+        assert_eq!(property.presence, Presence::Optional);
     }
 }

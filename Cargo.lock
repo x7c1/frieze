@@ -62,6 +62,8 @@ dependencies = [
  "frieze-openapi",
  "frieze-usecase",
  "insta",
+ "serde",
+ "serde_json",
  "trybuild",
 ]
 
@@ -86,6 +88,7 @@ name = "frieze-model"
 version = "0.1.0"
 dependencies = [
  "indexmap",
+ "serde",
  "thiserror",
 ]
 

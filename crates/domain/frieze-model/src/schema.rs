@@ -54,11 +54,12 @@ impl Schema {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::presence::Presence;
     use crate::property_type::PropertyType;
 
     #[test]
     fn rejects_empty_name() {
-        let property = Property::new("id", PropertyType::Int64, false).unwrap();
+        let property = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
         let err = Schema::new("", vec![property]).unwrap_err();
         assert_eq!(err, Error::EmptySchemaName);
     }
@@ -71,8 +72,8 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_properties() {
-        let a = Property::new("id", PropertyType::Int64, false).unwrap();
-        let b = Property::new("id", PropertyType::String, false).unwrap();
+        let a = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
+        let b = Property::new("id", PropertyType::String, Presence::Required).unwrap();
         let err = Schema::new("User", vec![a, b]).unwrap_err();
         assert_eq!(
             err,
@@ -85,8 +86,8 @@ mod tests {
 
     #[test]
     fn preserves_declaration_order() {
-        let id = Property::new("id", PropertyType::Int64, false).unwrap();
-        let name = Property::new("name", PropertyType::String, false).unwrap();
+        let id = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
+        let name = Property::new("name", PropertyType::String, Presence::Required).unwrap();
         let schema = Schema::new("User", vec![id, name]).unwrap();
         let keys: Vec<&str> = schema.properties.keys().map(|k| k.as_str()).collect();
         assert_eq!(keys, vec!["id", "name"]);
