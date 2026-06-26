@@ -44,9 +44,11 @@ use serde::ser::{Serialize, Serializer};
 ///   [`Maybe::Null`].
 ///
 /// The `#[derive(frieze::Schema)]` derive recognises `Maybe<T>` as the
-/// "optional + nullable" combination regardless of which of these
-/// attributes the user remembers to add; the attributes are a serde-side
-/// concern, not a schema-side concern.
+/// "optional + nullable" combination and **enforces** both attributes at
+/// compile time. Missing either one is a hard error: without them, the
+/// three-state mapping collapses on the wire (a silent runtime
+/// breakage), so the derive rejects the input rather than letting it
+/// through.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Maybe<T> {
     /// Key absent from the serialized object.
