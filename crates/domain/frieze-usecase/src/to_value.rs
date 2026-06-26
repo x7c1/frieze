@@ -1,7 +1,7 @@
 //! Boundary conversion from [`frieze_model::Schemas`] to
 //! [`serde_yaml::Value`], via [`frieze_openapi`].
 
-use frieze_model::{PropertyType, Schema, Schemas};
+use frieze_model::{Property, PropertyType, Schema, Schemas};
 use frieze_openapi::{SchemaObject, SchemaType};
 use indexmap::IndexMap;
 use serde_yaml::{Mapping, Number, Value};
@@ -30,8 +30,10 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     let mut properties: IndexMap<String, SchemaObject> = IndexMap::new();
     let mut required: Vec<String> = Vec::with_capacity(schema.properties.len());
     for (name, property) in &schema.properties {
-        properties.insert(name.as_str().to_string(), property_to_openapi(property.ty));
-        required.push(name.as_str().to_string());
+        properties.insert(name.as_str().to_string(), property_to_openapi(property));
+        if !property.optional {
+            required.push(name.as_str().to_string());
+        }
     }
     SchemaObject {
         ty: Some(SchemaType::Object),
@@ -43,11 +45,15 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     }
 }
 
-/// Single mapping from a [`PropertyType`] to the OAS schema object that
+/// Single mapping from a [`Property`] to the OAS schema object that
 /// represents it. This is the one place to edit when a new scalar variant is
 /// added to [`PropertyType`].
-fn property_to_openapi(pt: PropertyType) -> SchemaObject {
-    let (ty, format, minimum) = match pt {
+///
+/// The `nullable` intent on the resulting `SchemaObject` is set from the
+/// property's `optional` flag; [`schema_object_to_value`] renders that
+/// intent into the version-appropriate YAML shape.
+fn property_to_openapi(property: &Property) -> SchemaObject {
+    let (ty, format, minimum) = match property.ty {
         PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
         PropertyType::Int64 => (SchemaType::Integer, Some("int64"), None),
         PropertyType::UInt32 => (SchemaType::Integer, Some("int32"), Some(0.0)),
@@ -61,7 +67,7 @@ fn property_to_openapi(pt: PropertyType) -> SchemaObject {
         ty: Some(ty),
         format: format.map(str::to_owned),
         minimum,
-        nullable: None,
+        nullable: if property.optional { Some(true) } else { None },
         properties: None,
         required: None,
     }
