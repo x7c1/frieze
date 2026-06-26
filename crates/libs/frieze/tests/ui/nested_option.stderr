@@ -1,0 +1,5 @@
+error: frieze: nested Option is not supported.
+ --> tests/ui/nested_option.rs:5:8
+  |
+5 |     x: Option<Option<i64>>,
+  |        ^^^^^^^^^^^^^^^^^^^
