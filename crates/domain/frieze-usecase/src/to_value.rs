@@ -45,7 +45,7 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     SchemaObject {
         ty: Some(SchemaType::Object),
         properties: Some(properties),
-        required: Some(required),
+        required,
         ..SchemaObject::empty()
     }
 }
@@ -221,8 +221,9 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
         }
         map.insert(Value::String("properties".into()), Value::Mapping(inner));
     }
-    if let Some(required) = &schema.required {
-        let items: Vec<Value> = required
+    if !schema.required.is_empty() {
+        let items: Vec<Value> = schema
+            .required
             .iter()
             .map(|name| Value::String(name.clone()))
             .collect();

@@ -34,7 +34,6 @@ fn option_nested_with_skip_renders_plain_ref_and_optional_presence() {
       properties:
         user:
           $ref: "#/components/schemas/User"
-      required: []
     User:
       type: object
       properties:

@@ -60,8 +60,11 @@ pub struct SchemaObject {
     pub nullable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub properties: Option<IndexMap<String, SchemaObject>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub required: Option<Vec<String>>,
+    /// Names of properties that must appear on the wire. Omitted from
+    /// the emitted schema entirely when empty (an all-optional struct
+    /// renders without a `required` key, rather than `required: []`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub required: Vec<String>,
 }
 
 impl SchemaObject {

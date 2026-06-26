@@ -36,7 +36,6 @@ fn maybe_nested_renders_as_optional_nullable_ref_under_oas_3_1() {
           oneOf:
             - $ref: "#/components/schemas/User"
             - type: "null"
-      required: []
     User:
       type: object
       properties:
