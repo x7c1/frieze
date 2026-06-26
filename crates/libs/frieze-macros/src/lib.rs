@@ -35,6 +35,11 @@
 //! - `Maybe<Option<T>>` — nullability is doubly defined.
 //! - `Maybe<Maybe<T>>` — nested `Maybe` is not supported.
 //!
+//! In addition, a `Maybe<T>` field that is missing either
+//! `#[serde(default)]` or `#[serde(skip_serializing_if = "Maybe::is_missing")]`
+//! is rejected at compile time: without the pair, the three-state
+//! missing / null / present mapping collapses on the wire.
+//!
 //! The expansion routes every reference to the supporting crates through the
 //! `frieze::__private` module so downstream users only need to depend on the
 //! `frieze` facade crate.
@@ -157,6 +162,7 @@ fn parse_field(
                 "frieze: nested Maybe is not supported.",
             ));
         }
+        validate_maybe_serde_attrs(field)?;
         let element = inner_to_property_type_expr(inner, ty, "Maybe<...>")?;
         Ok((nullable_property_type_expr(element), presence_optional()))
     } else if let Some(inner) = unwrap_option(ty) {
@@ -268,6 +274,73 @@ fn inner_to_property_type_expr(
     scalar_property_type_expr(inner).map_err(|_| {
         syn::Error::new_spanned(outer_for_span, unsupported_inside_message(inner, container))
     })
+}
+
+/// Validates that a `Maybe<T>` field carries both serde attributes
+/// required for the documented optional-and-nullable round-trip:
+///
+/// - `#[serde(default)]` (bare form), so a missing key deserialises to
+///   `Maybe::Missing` via `Maybe::default()`.
+/// - `#[serde(skip_serializing_if = "Maybe::is_missing")]`, so a
+///   `Maybe::Missing` value is omitted from the serialised output rather
+///   than emitted as `null` (which would collide with `Maybe::Null`).
+///
+/// Without these, missing / null / present collapse to two states on the
+/// wire — a silent runtime breakage. The check enforces them at compile
+/// time so users get a clear, actionable diagnostic.
+///
+/// `default = "..."` with a custom path is rejected: serde must call
+/// `Maybe::default()` (which yields `Maybe::Missing`); a custom default
+/// would defeat the three-state mapping. The `skip_serializing_if` value
+/// is matched by exact string against `"Maybe::is_missing"`.
+fn validate_maybe_serde_attrs(field: &Field) -> Result<(), syn::Error> {
+    let mut has_default_bare = false;
+    let mut has_skip_serializing_if_maybe = false;
+    for attr in &field.attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+        // Best-effort parse: serde carries attribute forms we don't
+        // recognise. Ignore parse failures and only look at the two
+        // pieces we care about.
+        let _ = attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("default") {
+                // Bare `default` has no `=` value waiting; anything else
+                // (e.g. `default = "..."`) is rejected — consume the
+                // value to keep nested-meta parsing well-formed.
+                if meta.input.peek(syn::Token![=]) {
+                    let _ = meta.value().and_then(|v| v.parse::<syn::LitStr>());
+                } else {
+                    has_default_bare = true;
+                }
+            } else if meta.path.is_ident("skip_serializing_if") {
+                if let Ok(value) = meta.value() {
+                    if let Ok(lit) = value.parse::<syn::LitStr>() {
+                        if lit.value() == "Maybe::is_missing" {
+                            has_skip_serializing_if_maybe = true;
+                        }
+                    }
+                }
+            }
+            Ok(())
+        });
+    }
+    if has_default_bare && has_skip_serializing_if_maybe {
+        return Ok(());
+    }
+    let field_name = field
+        .ident
+        .as_ref()
+        .map(|i| i.to_string())
+        .unwrap_or_default();
+    let msg = if field_name.is_empty() {
+        "frieze: `Maybe<T>` field requires both `#[serde(default)]` and `#[serde(skip_serializing_if = \"Maybe::is_missing\")]`. Add: #[serde(default, skip_serializing_if = \"Maybe::is_missing\")]".to_string()
+    } else {
+        format!(
+            "frieze: `Maybe<T>` field `{field_name}` requires both `#[serde(default)]` and `#[serde(skip_serializing_if = \"Maybe::is_missing\")]`. Add: #[serde(default, skip_serializing_if = \"Maybe::is_missing\")]"
+        )
+    };
+    Err(syn::Error::new_spanned(&field.ty, msg))
 }
 
 /// Returns `true` if any `#[serde(...)]` attribute on the field contains
