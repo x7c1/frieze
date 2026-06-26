@@ -1,16 +1,25 @@
+//! `Option<T>` paired with `#[serde(skip_serializing_if = "Option::is_none")]`
+//! maps to branch ③ (optional + non-nullable). The field name is **dropped**
+//! from the `required` array and no `nullable` marker appears.
+//!
+//! This file also serves as a contract test that the macro inspects field-
+//! level serde attributes and switches its emission based on them.
+
 #![cfg(feature = "oas-3-0")]
 
 use frieze::Schema;
+use serde::Serialize;
 
-#[derive(Schema)]
+#[derive(Schema, Serialize)]
 #[allow(dead_code)] // Fields are read by the derive at compile time, not at runtime.
 struct User {
     id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
     nickname: Option<String>,
 }
 
 #[test]
-fn optional_field_emits_nullable_true_under_oas_3_0() {
+fn option_with_skip_serializing_if_renders_optional_non_nullable_under_oas_3_0() {
     let s: frieze::Schemas = frieze::schemas()
         .add::<User>()
         .build()
@@ -25,7 +34,6 @@ fn optional_field_emits_nullable_true_under_oas_3_0() {
           format: int64
         nickname:
           type: string
-          nullable: true
       required:
         - id
     "###);
