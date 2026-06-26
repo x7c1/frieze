@@ -1,0 +1,5 @@
+error: frieze: nested Vec is not supported.
+ --> tests/ui/nested_vec.rs:5:8
+  |
+5 |     x: Vec<Vec<String>>,
+  |        ^^^^^^^^^^^^^^^^
