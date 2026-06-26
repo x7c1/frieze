@@ -66,14 +66,36 @@ Lumping them as "DTOs" hides the responsibility difference that the architecture
 
 `IndexMap` is used internally where insertion order matters; `BTreeMap` where alphabetical order is desired.
 
+## OAS version feature flags
+
+frieze targets exactly ONE OpenAPI Specification version per build. The version is selected by a Cargo feature on the `frieze` facade:
+
+| Feature   | OAS version | Default | Nullability encoding         |
+|-----------|-------------|---------|------------------------------|
+| `oas-3-0` | 3.0.x       | yes     | `nullable: true`             |
+| `oas-3-1` | 3.1.x       | no      | `type: [<base>, "null"]`     |
+
+The two features are mutually exclusive and enforced via `compile_error!` in both `frieze-openapi` and `frieze-usecase`. Build / test with one of:
+
+```
+cargo build --workspace --no-default-features --features oas-3-0
+cargo test  --workspace --no-default-features --features oas-3-0
+cargo build --workspace --no-default-features --features oas-3-1
+cargo test  --workspace --no-default-features --features oas-3-1
+```
+
+`--all-features` and `--no-default-features` (without picking one) both fail at compile time on purpose.
+
 ## Build / Test
 
 ```
-cargo build --workspace
-cargo test --workspace
+cargo build --workspace --no-default-features --features oas-3-0
+cargo test  --workspace --no-default-features --features oas-3-0
 cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features oas-3-0 -- -D warnings
 ```
+
+Substitute `oas-3-1` for `oas-3-0` to run the same checks against the 3.1 emission path.
 
 ## Branch and PR conventions
 
