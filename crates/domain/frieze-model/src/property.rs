@@ -33,11 +33,7 @@ pub struct Property {
 
 impl Property {
     /// Builds a property, rejecting empty names.
-    pub fn new(
-        name: impl Into<String>,
-        ty: PropertyType,
-        optional: bool,
-    ) -> Result<Self, Error> {
+    pub fn new(name: impl Into<String>, ty: PropertyType, optional: bool) -> Result<Self, Error> {
         Ok(Self {
             name: PropertyName::new(name)?,
             ty,

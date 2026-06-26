@@ -11,7 +11,9 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments, Type};
+use syn::{
+    parse_macro_input, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments, Type,
+};
 
 /// Derive `frieze::Schema` for a named struct whose fields are scalars
 /// supported by Phase 1 (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`,
