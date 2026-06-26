@@ -55,26 +55,68 @@ Lumping them as "DTOs" hides the responsibility difference that the architecture
 
 ## Supported field shapes
 
-`#[derive(Schema)]` accepts the following field types in Phase 1:
+`#[derive(Schema)]` recognises a fixed scalar set, optionally composed
+with `Vec<T>`, `Option<T>`, and the frieze-defined `Maybe<T>` wrapper.
 
-| Shape              | Maps to OAS                                            |
-|--------------------|--------------------------------------------------------|
-| `i32`, `i64`       | `type: integer, format: int32 / int64`                 |
-| `u32`, `u64`       | `type: integer, format: int32 / int64, minimum: 0`     |
-| `f32`, `f64`       | `type: number, format: float / double`                 |
-| `bool`             | `type: boolean`                                        |
-| `String`           | `type: string`                                         |
-| `Vec<T>`           | `type: array, items: { ...T }`                         |
-| `Option<T>`        | nullable `T` (see [OAS version feature flags](#oas-version-feature-flags)) |
-| `Option<Vec<T>>`   | nullable array; nullability applies to the outer array, never to `items` |
+### Scalars
 
-`T` is any of the supported scalars (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`, `String`).
+| Scalar Rust type | Maps to OAS                                            |
+|------------------|--------------------------------------------------------|
+| `i32`, `i64`     | `type: integer, format: int32 / int64`                 |
+| `u32`, `u64`     | `type: integer, format: int32 / int64, minimum: 0`     |
+| `f32`, `f64`     | `type: number, format: float / double`                 |
+| `bool`           | `type: boolean`                                        |
+| `String`         | `type: string`                                         |
 
-The following shapes are explicitly rejected with compile errors:
+`T` below stands for any of these scalars.
 
-- `Option<Option<T>>` — nested options.
-- `Vec<Vec<T>>` — nested arrays. Future PR.
-- `Vec<Option<T>>` and `Option<Vec<Option<T>>>` — shape-level (per-array-element) optionality is not expressible with the current `Property` representation, which stores `optional` as a single boolean on the outer property. Adding it would require restructuring `Property` and is deferred to a future PR.
+### Composite shapes (presence × nullability)
+
+OpenAPI optionality has two **independent** axes: **presence** controls
+whether the field name appears in the schema's `required` array, and
+**nullability** controls whether the value may be `null`. The four
+combinations map to the following Rust shapes:
+
+| Rust shape                                                            | Presence | Nullability        |
+|-----------------------------------------------------------------------|----------|--------------------|
+| `T`                                                                   | required | non-nullable       |
+| `Option<T>` (serde default)                                           | required | nullable           |
+| `Option<T>` + `#[serde(skip_serializing_if = "Option::is_none")]`     | optional | non-nullable       |
+| `Maybe<T>`                                                            | optional | nullable           |
+| `Vec<T>`                                                              | required | array, items as `T` |
+| `Vec<Option<T>>`                                                      | required | array, nullable items |
+| `Option<Vec<T>>`                                                      | required | nullable array     |
+| `Option<Vec<Option<T>>>`                                              | required | nullable array, nullable items |
+
+Notes:
+
+- **`Option<T>` is required-and-nullable by default**, because serde
+  emits `None` as `null` and expects the key to be present. This is
+  surprising if you read `Option` as "may be omitted" — to get
+  **optional + non-nullable**, pair `Option<T>` with the standard
+  `#[serde(skip_serializing_if = "Option::is_none")]` attribute. The
+  derive inspects that attribute and switches branches accordingly.
+- **`Maybe<T>` is the dedicated three-state type** for "missing / null /
+  present" — the one combination not expressible by `Option<T>` alone.
+  Re-exported as `frieze::Maybe`. Add `#[serde(default, skip_serializing_if = "Maybe::is_missing")]`
+  on the field to make missing-key handling work in both directions.
+- **Nullability lives on the type tree** (`PropertyType::Nullable`),
+  not on the property as a whole. That is how `Vec<Option<T>>` becomes
+  an array of nullable items rather than a nullable array.
+
+### Unsupported shapes (compile error)
+
+The macro rejects ambiguous or unsupported compositions before they
+reach the schema-building code:
+
+| Shape                | Reason                                                  |
+|----------------------|---------------------------------------------------------|
+| `Option<Option<T>>`  | serde flattens nested options.                          |
+| `Vec<Vec<T>>`        | nested arrays are deferred to a future PR.              |
+| `Vec<Maybe<T>>`      | array elements are always present on the wire; use `Vec<Option<T>>` for nullable items. |
+| `Option<Maybe<T>>`   | presence is doubly defined.                             |
+| `Maybe<Option<T>>`   | nullability is doubly defined.                          |
+| `Maybe<Maybe<T>>`    | nested `Maybe` is not supported.                        |
 
 ## Output ordering
 
