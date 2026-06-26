@@ -10,8 +10,9 @@ use crate::schema_type::SchemaType;
 /// `properties` uses [`IndexMap`] to preserve declaration order.
 ///
 /// Field declaration order matches the canonical YAML output order
-/// (`type`, `format`, `minimum`, `properties`, `required`): `type` first,
-/// then `format`, then numeric constraints, then container fields.
+/// (`type`, `format`, `minimum`, `nullable`, `properties`, `required`):
+/// `type` first, then `format`, then numeric constraints, then the
+/// nullability marker, then container fields.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct SchemaObject {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
@@ -28,6 +29,14 @@ pub struct SchemaObject {
     /// emission detail.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub minimum: Option<f64>,
+    /// Carries the intent that this schema accepts `null` in addition to
+    /// values of `ty`. The field exists irrespective of the active OAS
+    /// version feature — it stores the intent only. The renderer in
+    /// `frieze-usecase` translates this flag into the version-appropriate
+    /// YAML shape (`nullable: true` for OAS 3.0; a 2-element `type` array
+    /// containing `"null"` for OAS 3.1).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nullable: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub properties: Option<IndexMap<String, SchemaObject>>,
     #[serde(skip_serializing_if = "Option::is_none")]
