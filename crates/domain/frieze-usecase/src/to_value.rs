@@ -37,6 +37,7 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     }
     SchemaObject {
         ty: Some(SchemaType::Object),
+        items: None,
         format: None,
         minimum: None,
         nullable: None,
@@ -65,6 +66,7 @@ fn property_to_openapi(property: &Property) -> SchemaObject {
     };
     SchemaObject {
         ty: Some(ty),
+        items: None,
         format: format.map(str::to_owned),
         minimum,
         nullable: if property.optional { Some(true) } else { None },
