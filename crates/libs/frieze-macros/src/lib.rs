@@ -201,8 +201,11 @@ fn parse_field(
         let element = vec_element_property_type_expr(ty, vec_inner)?;
         Ok((array_property_type_expr(element), presence_required()))
     } else {
-        let pt = scalar_property_type_expr(ty)
-            .map_err(|_| syn::Error::new_spanned(ty, unsupported_message(&type_to_display(ty))))?;
+        // Pass the error through verbatim so the dedicated "qualified
+        // paths" / "generic type parameters" messages from
+        // `reference_property_type_expr` reach the user. The generic
+        // fallback message already lives inside that helper.
+        let pt = scalar_property_type_expr(ty)?;
         Ok((pt, presence_required()))
     }
 }
@@ -383,11 +386,16 @@ fn has_skip_serializing_if_option_is_none(attrs: &[Attribute]) -> bool {
 /// `frieze_model::PropertyType`, emitted as a path that resolves through
 /// the facade re-export.
 ///
-/// Anything other than the small fixed scalar set listed in
-/// [`unsupported_message`] produces a compile error. Callers are
-/// responsible for surfacing that error with the context the user typed
-/// (e.g. "inside Option<...>"), since this function only sees the inner
-/// scalar.
+/// Falls through to [`reference_property_type_expr`] when the type is a
+/// single-segment, unparametrised identifier that isn't a known scalar —
+/// such an identifier is treated as a nested struct reference and the
+/// expansion emits a `PropertyType::Reference` whose name comes from
+/// `<T as frieze::Schema>::name()`. The `Schema` bound itself is enforced
+/// by rustc (the user sees the trait-bound diagnostic if the type doesn't
+/// implement `Schema`).
+///
+/// Anything else — qualified paths, generic arguments, primitive types
+/// not in the supported set — produces a compile error.
 fn scalar_property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
     let rendered = type_to_display(ty);
     match rendered.as_str() {
@@ -399,8 +407,63 @@ fn scalar_property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn:
         "f64" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Double }),
         "String" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::String }),
         "bool" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Boolean }),
-        _ => Err(syn::Error::new_spanned(ty, unsupported_message(&rendered))),
+        _ => reference_property_type_expr(ty),
     }
+}
+
+/// Treats a single-segment, unparametrised identifier as a reference to
+/// another `Schema`-implementing type, and emits the
+/// `PropertyType::Reference` constructor call.
+///
+/// Rejects:
+///
+/// - qualified paths (`mymod::User`) — the macro can't reliably resolve
+///   them, so we require the user to bring the type into scope.
+/// - generic arguments (`Foo<u32>`) — generics over user schemas are
+///   deferred to Phase 1 #11.
+/// - any other shape (references, tuples, etc.) — falls back to the
+///   generic "unsupported field type" error.
+///
+/// The Schema bound is enforced naturally by rustc when the generated
+/// `<#ident as ::frieze::__private::frieze_usecase::Schema>::name()` call
+/// fails to compile.
+fn reference_property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
+    let path = match ty {
+        Type::Path(p) if p.qself.is_none() => &p.path,
+        _ => {
+            return Err(syn::Error::new_spanned(
+                ty,
+                unsupported_message(&type_to_display(ty)),
+            ));
+        }
+    };
+    if path.segments.len() > 1 {
+        return Err(syn::Error::new_spanned(
+            ty,
+            "frieze: qualified paths in field type are not supported yet. \
+             Use a `use` statement to bring the type into scope.",
+        ));
+    }
+    let segment = path
+        .segments
+        .first()
+        .expect("path with >=1 segments has a first segment");
+    if !matches!(segment.arguments, PathArguments::None) {
+        return Err(syn::Error::new_spanned(
+            ty,
+            "frieze: generic type parameters in field type are not supported yet. \
+             Use a concrete type as the field, or wait for Phase 1 #11.",
+        ));
+    }
+    let ident = &segment.ident;
+    Ok(quote! {
+        ::frieze::__private::frieze_model::PropertyType::Reference(
+            ::frieze::__private::frieze_model::SchemaName::new(
+                <#ident as ::frieze::__private::frieze_usecase::Schema>::name()
+            )
+            .expect("frieze: referenced schema name violates the OAS component-name pattern")
+        )
+    })
 }
 
 /// Wraps a `PropertyType` expression in `PropertyType::Array(Box::new(...))`.
