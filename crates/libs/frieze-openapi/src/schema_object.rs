@@ -10,13 +10,19 @@ use crate::schema_type::SchemaType;
 /// `properties` uses [`IndexMap`] to preserve declaration order.
 ///
 /// Field declaration order matches the canonical YAML output order
-/// (`type`, `format`, `minimum`, `nullable`, `properties`, `required`):
-/// `type` first, then `format`, then numeric constraints, then the
-/// nullability marker, then container fields.
+/// (`type`, `items`, `format`, `minimum`, `nullable`, `properties`,
+/// `required`): `type` first, then `items` (for array schemas), then
+/// `format`, then numeric constraints, then the nullability marker, then
+/// container fields.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct SchemaObject {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub ty: Option<SchemaType>,
+    /// Element schema for array types. Boxed because [`SchemaObject`]
+    /// references itself recursively here (an array's items are themselves
+    /// schema objects).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub items: Option<Box<SchemaObject>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
     /// Inclusive lower bound for numeric values. Currently used only to

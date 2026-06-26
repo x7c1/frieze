@@ -3,7 +3,8 @@
 //! Currently exposes `#[derive(Schema)]`, which generates an implementation
 //! of the `frieze::Schema` trait for a named struct whose fields are all of
 //! a small fixed scalar set (see [`parse_field_type`]), optionally wrapped
-//! in `Option<T>`. Any other shape produces a compile error.
+//! in `Option<T>` and/or a single layer of `Vec<T>`. Any other shape
+//! produces a compile error.
 //!
 //! The expansion routes every reference to the supporting crates through the
 //! `frieze::__private` module so downstream users only need to depend on the
@@ -17,7 +18,8 @@ use syn::{
 
 /// Derive `frieze::Schema` for a named struct whose fields are scalars
 /// supported by Phase 1 (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`,
-/// `String`), optionally wrapped in `Option<T>` for nullable fields.
+/// `String`), optionally wrapped in `Vec<T>` for array fields and/or
+/// `Option<...>` for nullable fields.
 #[proc_macro_derive(Schema)]
 pub fn derive_schema(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -100,10 +102,17 @@ fn named_fields(
 /// Maps a Rust field type to the (`PropertyType` expression, optional flag)
 /// pair used by the derive expansion.
 ///
-/// Accepts either a directly-supported scalar (see [`property_type_expr`])
-/// or a single layer of `Option<T>` wrapping such a scalar. Nested options
-/// (`Option<Option<T>>`) and options of unsupported types both produce
-/// targeted compile errors.
+/// Accepts:
+///
+/// - a directly-supported scalar (see [`scalar_property_type_expr`]),
+/// - a single layer of `Vec<T>` wrapping such a scalar (array field),
+/// - a single layer of `Option<T>` wrapping a scalar (nullable scalar),
+/// - a single layer of `Option<Vec<T>>` wrapping a scalar (nullable array).
+///
+/// Compile errors are raised for nested `Option` (`Option<Option<T>>`),
+/// nested `Vec` (`Vec<Vec<T>>`), and `Vec<Option<T>>` shapes — the latter
+/// because shape-level optionality cannot be expressed with the current
+/// `Property` representation.
 fn parse_field_type(ty: &Type) -> Result<(proc_macro2::TokenStream, bool), syn::Error> {
     if let Some(inner) = unwrap_option(ty) {
         if unwrap_option(inner).is_some() {
@@ -112,28 +121,61 @@ fn parse_field_type(ty: &Type) -> Result<(proc_macro2::TokenStream, bool), syn::
                 "frieze: nested Option is not supported.",
             ));
         }
-        let pt = property_type_expr(inner).map_err(|_| {
-            syn::Error::new_spanned(
-                ty,
-                format!(
-                    "frieze: unsupported field type `{}` inside Option<...>; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String. Future PRs will add more.",
-                    type_to_display(inner)
-                ),
-            )
+        if let Some(vec_inner) = unwrap_vec(inner) {
+            reject_vec_inner(ty, vec_inner)?;
+            let element = scalar_property_type_expr(vec_inner).map_err(|_| {
+                syn::Error::new_spanned(
+                    ty,
+                    unsupported_inside_message(vec_inner, "Option<Vec<...>>"),
+                )
+            })?;
+            return Ok((array_property_type_expr(element), true));
+        }
+        let pt = scalar_property_type_expr(inner).map_err(|_| {
+            syn::Error::new_spanned(ty, unsupported_inside_message(inner, "Option<...>"))
         })?;
         Ok((pt, true))
+    } else if let Some(vec_inner) = unwrap_vec(ty) {
+        reject_vec_inner(ty, vec_inner)?;
+        let element = scalar_property_type_expr(vec_inner).map_err(|_| {
+            syn::Error::new_spanned(ty, unsupported_inside_message(vec_inner, "Vec<...>"))
+        })?;
+        Ok((array_property_type_expr(element), false))
     } else {
-        let pt = property_type_expr(ty)?;
+        let pt = scalar_property_type_expr(ty)
+            .map_err(|_| syn::Error::new_spanned(ty, unsupported_message(&type_to_display(ty))))?;
         Ok((pt, false))
     }
 }
 
-/// Maps a Rust field type to the matching `frieze_model::PropertyType`,
-/// emitted as a path that resolves through the facade re-export.
+/// Rejects `Vec<Option<...>>` and `Vec<Vec<...>>` with the targeted
+/// error messages used by the macro's UI tests.
+fn reject_vec_inner(outer: &Type, vec_inner: &Type) -> Result<(), syn::Error> {
+    if unwrap_option(vec_inner).is_some() {
+        return Err(syn::Error::new_spanned(
+            outer,
+            "frieze: Vec<Option<T>> is not supported in Phase 1; shape-level optionality requires a Property restructure that will be revisited in a future PR.",
+        ));
+    }
+    if unwrap_vec(vec_inner).is_some() {
+        return Err(syn::Error::new_spanned(
+            outer,
+            "frieze: nested Vec is not supported.",
+        ));
+    }
+    Ok(())
+}
+
+/// Maps a Rust scalar field type to the matching
+/// `frieze_model::PropertyType`, emitted as a path that resolves through
+/// the facade re-export.
 ///
-/// Anything other than the small fixed scalar set listed in the error
-/// message produces a compile error pointing at the field's type.
-fn property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
+/// Anything other than the small fixed scalar set listed in
+/// [`unsupported_message`] produces a compile error. Callers are
+/// responsible for surfacing that error with the context the user typed
+/// (e.g. "inside Option<...>"), since this function only sees the inner
+/// scalar.
+fn scalar_property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
     let rendered = type_to_display(ty);
     match rendered.as_str() {
         "i32" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Int32 }),
@@ -144,49 +186,78 @@ fn property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error>
         "f64" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Double }),
         "String" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::String }),
         "bool" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Boolean }),
-        other => Err(syn::Error::new_spanned(
-            ty,
-            format!(
-                "frieze: unsupported field type `{other}`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String. Future PRs will add more."
-            ),
-        )),
+        _ => Err(syn::Error::new_spanned(ty, unsupported_message(&rendered))),
     }
+}
+
+/// Wraps a scalar `PropertyType` expression in
+/// `PropertyType::Array(Box::new(...))`.
+fn array_property_type_expr(element: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
+    quote! {
+        ::frieze::__private::frieze_model::PropertyType::Array(
+            ::std::boxed::Box::new(#element)
+        )
+    }
+}
+
+/// Standard "unsupported field type" error message, listing the Phase 1
+/// supported shapes.
+fn unsupported_message(rendered: &str) -> String {
+    format!(
+        "frieze: unsupported field type `{rendered}`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Option<T>, Option<Vec<T>> (for any supported scalar T). Future PRs will add more."
+    )
+}
+
+/// Variant of [`unsupported_message`] that names the wrapper containing
+/// the offending inner type (e.g. `Option<...>` or `Vec<...>`).
+fn unsupported_inside_message(inner: &Type, container: &str) -> String {
+    format!(
+        "frieze: unsupported field type `{}` inside {container}; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Option<T>, Option<Vec<T>> (for any supported scalar T). Future PRs will add more.",
+        type_to_display(inner)
+    )
 }
 
 /// If `ty` syntactically names `Option<T>` (via `Option`,
 /// `std::option::Option`, or `::std::option::Option`), returns `T`.
 fn unwrap_option(ty: &Type) -> Option<&Type> {
+    unwrap_single_generic(
+        ty,
+        &[
+            &["Option"],
+            &["std", "option", "Option"],
+            &["core", "option", "Option"],
+        ],
+    )
+}
+
+/// If `ty` syntactically names `Vec<T>` (via `Vec`, `std::vec::Vec`,
+/// `::std::vec::Vec`, or `alloc::vec::Vec`), returns `T`.
+fn unwrap_vec(ty: &Type) -> Option<&Type> {
+    unwrap_single_generic(
+        ty,
+        &[&["Vec"], &["std", "vec", "Vec"], &["alloc", "vec", "Vec"]],
+    )
+}
+
+/// Matches any path in `accepted_paths` against `ty` and, on match,
+/// returns the single type argument inside its angle brackets.
+///
+/// Each accepted path is a list of identifier strings; a path matches if
+/// its identifier sequence equals one of the candidates (leading `::` is
+/// ignored — the matcher works on identifiers only).
+fn unwrap_single_generic<'a>(ty: &'a Type, accepted_paths: &[&[&str]]) -> Option<&'a Type> {
     let path = match ty {
         Type::Path(p) if p.qself.is_none() => &p.path,
         _ => return None,
     };
-
-    // Accept any path whose final segment is `Option`, provided the path
-    // is either bare (`Option`) or prefixed with the canonical
-    // `std::option` / `core::option` modules. This matches the same shapes
-    // `Option<T>`, `std::option::Option<T>`, and `::core::option::Option<T>`.
-    let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
-    let recognised = matches!(
-        segments
-            .iter()
-            .map(|s| s.ident.to_string())
-            .collect::<Vec<_>>()
-            .as_slice(),
-        [last] if last == "Option"
-    ) || matches!(
-        segments
-            .iter()
-            .map(|s| s.ident.to_string())
-            .collect::<Vec<_>>()
-            .as_slice(),
-        [first, second, last]
-            if (first == "std" || first == "core") && second == "option" && last == "Option"
-    );
+    let idents: Vec<String> = path.segments.iter().map(|s| s.ident.to_string()).collect();
+    let recognised = accepted_paths.iter().any(|candidate| {
+        idents.len() == candidate.len() && idents.iter().zip(*candidate).all(|(a, b)| a == b)
+    });
     if !recognised {
         return None;
     }
-
-    let last = segments.last()?;
+    let last = path.segments.last()?;
     let args = match &last.arguments {
         PathArguments::AngleBracketed(a) => a,
         _ => return None,

@@ -11,4 +11,5 @@ pub enum SchemaType {
     Number,
     String,
     Boolean,
+    Array,
 }

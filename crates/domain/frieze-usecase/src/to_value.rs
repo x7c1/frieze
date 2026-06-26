@@ -10,7 +10,8 @@ use serde_yaml::{Mapping, Number, Value};
 /// preserving the canonical output order:
 ///
 /// - top-level keys (schema names): alphabetical (via [`std::collections::BTreeMap`])
-/// - inside one schema: `type`, `format`, `minimum`, `properties`, `required`
+/// - inside one schema: `type`, `items`, `format`, `minimum`,
+///   (`nullable` under `oas-3-0`,) `properties`, `required`
 /// - `properties`: declaration order (via [`IndexMap`])
 /// - `required`: same order as `properties`
 pub fn to_value(schemas: &Schemas) -> Value {
@@ -37,6 +38,7 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     }
     SchemaObject {
         ty: Some(SchemaType::Object),
+        items: None,
         format: None,
         minimum: None,
         nullable: None,
@@ -53,7 +55,21 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
 /// property's `optional` flag; [`schema_object_to_value`] renders that
 /// intent into the version-appropriate YAML shape.
 fn property_to_openapi(property: &Property) -> SchemaObject {
-    let (ty, format, minimum) = match property.ty {
+    let mut schema = property_type_to_openapi(&property.ty);
+    if property.optional {
+        schema.nullable = Some(true);
+    }
+    schema
+}
+
+/// Single mapping from a [`PropertyType`] to the matching schema object,
+/// without consideration of nullability (that intent lives on the
+/// outer `Property` and is applied by [`property_to_openapi`]).
+///
+/// Recurses on [`PropertyType::Array`] so the element schema is rendered
+/// into the `items` slot.
+fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
+    let (schema_ty, format, minimum) = match ty {
         PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
         PropertyType::Int64 => (SchemaType::Integer, Some("int64"), None),
         PropertyType::UInt32 => (SchemaType::Integer, Some("int32"), Some(0.0)),
@@ -62,12 +78,24 @@ fn property_to_openapi(property: &Property) -> SchemaObject {
         PropertyType::Double => (SchemaType::Number, Some("double"), None),
         PropertyType::String => (SchemaType::String, None, None),
         PropertyType::Boolean => (SchemaType::Boolean, None, None),
+        PropertyType::Array(inner) => {
+            return SchemaObject {
+                ty: Some(SchemaType::Array),
+                items: Some(Box::new(property_type_to_openapi(inner))),
+                format: None,
+                minimum: None,
+                nullable: None,
+                properties: None,
+                required: None,
+            };
+        }
     };
     SchemaObject {
-        ty: Some(ty),
+        ty: Some(schema_ty),
+        items: None,
         format: format.map(str::to_owned),
         minimum,
-        nullable: if property.optional { Some(true) } else { None },
+        nullable: None,
         properties: None,
         required: None,
     }
@@ -78,14 +106,23 @@ fn property_to_openapi(property: &Property) -> SchemaObject {
 ///
 /// Key ordering depends on the selected OAS version feature:
 ///
-/// - `oas-3-0`: `type`, `format`, `minimum`, `nullable`, `properties`,
-///   `required`. The nullability intent is emitted as `nullable: true`.
-/// - `oas-3-1`: `type`, `format`, `minimum`, `properties`, `required`.
-///   The nullability intent is folded into `type` as a 2-element sequence
-///   `[<base>, "null"]`. The OAS 3.1 spec drops the `nullable` keyword.
+/// - `oas-3-0`: `type`, `items`, `format`, `minimum`, `nullable`,
+///   `properties`, `required`. The nullability intent is emitted as
+///   `nullable: true`.
+/// - `oas-3-1`: `type`, `items`, `format`, `minimum`, `properties`,
+///   `required`. The nullability intent is folded into `type` as a
+///   2-element sequence `[<base>, "null"]`. The OAS 3.1 spec drops the
+///   `nullable` keyword.
+///
+/// `items` is emitted on array schemas only; the element schema is
+/// rendered through the same `schema_object_to_value` recursively so its
+/// own keys obey the same ordering rules.
 fn schema_object_to_value(schema: &SchemaObject) -> Value {
     let mut map = Mapping::new();
     insert_type(&mut map, schema);
+    if let Some(items) = &schema.items {
+        map.insert(Value::String("items".into()), schema_object_to_value(items));
+    }
     if let Some(format) = &schema.format {
         map.insert(
             Value::String("format".into()),
