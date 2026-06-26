@@ -2,8 +2,8 @@
 //!
 //! Currently exposes `#[derive(Schema)]`, which generates an implementation
 //! of the `frieze::Schema` trait for a named struct whose fields are all of
-//! a small fixed scalar set (see [`property_type_for`]). Any other shape
-//! produces a compile error.
+//! a small fixed scalar set (see [`parse_field_type`]), optionally wrapped
+//! in `Option<T>`. Any other shape produces a compile error.
 //!
 //! The expansion routes every reference to the supporting crates through the
 //! `frieze::__private` module so downstream users only need to depend on the
@@ -11,11 +11,11 @@
 
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Field, Fields, Type};
+use syn::{parse_macro_input, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments, Type};
 
 /// Derive `frieze::Schema` for a named struct whose fields are scalars
 /// supported by Phase 1 (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`,
-/// `String`).
+/// `String`), optionally wrapped in `Option<T>` for nullable fields.
 #[proc_macro_derive(Schema)]
 pub fn derive_schema(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -39,9 +39,9 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
     for field in fields {
         let field_ident = field.ident.as_ref().expect("named field has an identifier");
         let field_name = field_ident.to_string();
-        let property_type_expr = property_type_for(&field.ty)?;
+        let (property_type_expr, optional) = parse_field_type(&field.ty)?;
         property_exprs.push(quote! {
-            ::frieze::__private::frieze_model::Property::new(#field_name, #property_type_expr, false)
+            ::frieze::__private::frieze_model::Property::new(#field_name, #property_type_expr, #optional)
                 .expect("frieze: property name is non-empty and derived from a struct field")
         });
     }
@@ -95,12 +95,43 @@ fn named_fields(
     }
 }
 
+/// Maps a Rust field type to the (`PropertyType` expression, optional flag)
+/// pair used by the derive expansion.
+///
+/// Accepts either a directly-supported scalar (see [`property_type_expr`])
+/// or a single layer of `Option<T>` wrapping such a scalar. Nested options
+/// (`Option<Option<T>>`) and options of unsupported types both produce
+/// targeted compile errors.
+fn parse_field_type(ty: &Type) -> Result<(proc_macro2::TokenStream, bool), syn::Error> {
+    if let Some(inner) = unwrap_option(ty) {
+        if unwrap_option(inner).is_some() {
+            return Err(syn::Error::new_spanned(
+                ty,
+                "frieze: nested Option is not supported.",
+            ));
+        }
+        let pt = property_type_expr(inner).map_err(|_| {
+            syn::Error::new_spanned(
+                ty,
+                format!(
+                    "frieze: unsupported field type `{}` inside Option<...>; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String. Future PRs will add more.",
+                    type_to_display(inner)
+                ),
+            )
+        })?;
+        Ok((pt, true))
+    } else {
+        let pt = property_type_expr(ty)?;
+        Ok((pt, false))
+    }
+}
+
 /// Maps a Rust field type to the matching `frieze_model::PropertyType`,
 /// emitted as a path that resolves through the facade re-export.
 ///
 /// Anything other than the small fixed scalar set listed in the error
 /// message produces a compile error pointing at the field's type.
-fn property_type_for(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
+fn property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> {
     let rendered = type_to_display(ty);
     match rendered.as_str() {
         "i32" => Ok(quote! { ::frieze::__private::frieze_model::PropertyType::Int32 }),
@@ -117,6 +148,53 @@ fn property_type_for(ty: &Type) -> Result<proc_macro2::TokenStream, syn::Error> 
                 "frieze: unsupported field type `{other}`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String. Future PRs will add more."
             ),
         )),
+    }
+}
+
+/// If `ty` syntactically names `Option<T>` (via `Option`,
+/// `std::option::Option`, or `::std::option::Option`), returns `T`.
+fn unwrap_option(ty: &Type) -> Option<&Type> {
+    let path = match ty {
+        Type::Path(p) if p.qself.is_none() => &p.path,
+        _ => return None,
+    };
+
+    // Accept any path whose final segment is `Option`, provided the path
+    // is either bare (`Option`) or prefixed with the canonical
+    // `std::option` / `core::option` modules. This matches the same shapes
+    // `Option<T>`, `std::option::Option<T>`, and `::core::option::Option<T>`.
+    let segments: Vec<&syn::PathSegment> = path.segments.iter().collect();
+    let recognised = matches!(
+        segments
+            .iter()
+            .map(|s| s.ident.to_string())
+            .collect::<Vec<_>>()
+            .as_slice(),
+        [last] if last == "Option"
+    ) || matches!(
+        segments
+            .iter()
+            .map(|s| s.ident.to_string())
+            .collect::<Vec<_>>()
+            .as_slice(),
+        [first, second, last]
+            if (first == "std" || first == "core") && second == "option" && last == "Option"
+    );
+    if !recognised {
+        return None;
+    }
+
+    let last = segments.last()?;
+    let args = match &last.arguments {
+        PathArguments::AngleBracketed(a) => a,
+        _ => return None,
+    };
+    if args.args.len() != 1 {
+        return None;
+    }
+    match args.args.first()? {
+        GenericArgument::Type(inner) => Some(inner),
+        _ => None,
     }
 }
 
