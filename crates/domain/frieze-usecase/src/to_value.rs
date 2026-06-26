@@ -40,6 +40,7 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
             SchemaObject {
                 ty: Some(ty),
                 format,
+                minimum: None,
                 properties: None,
                 required: None,
             },
@@ -49,6 +50,7 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
     SchemaObject {
         ty: Some(SchemaType::Object),
         format: None,
+        minimum: None,
         properties: Some(properties),
         required: Some(required),
     }
@@ -62,6 +64,7 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
         let ty_str = match ty {
             SchemaType::Object => "object",
             SchemaType::Integer => "integer",
+            SchemaType::Number => "number",
             SchemaType::String => "string",
             SchemaType::Boolean => "boolean",
         };

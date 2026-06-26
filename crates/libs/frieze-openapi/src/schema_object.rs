@@ -8,12 +8,26 @@ use crate::schema_type::SchemaType;
 /// A subset of the OpenAPI Schema Object sufficient for Phase 1.
 ///
 /// `properties` uses [`IndexMap`] to preserve declaration order.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+///
+/// Field declaration order matches the canonical YAML output order
+/// (`type`, `format`, `minimum`, `properties`, `required`): `type` first,
+/// then `format`, then numeric constraints, then container fields.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 pub struct SchemaObject {
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub ty: Option<SchemaType>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub format: Option<String>,
+    /// Inclusive lower bound for numeric values. Currently used only to
+    /// encode Rust's unsigned semantics in OAS (`minimum: 0` for `u32` /
+    /// `u64`), since OAS 3.0 has no canonical unsigned representation.
+    ///
+    /// Stored as `f64` so the type can represent fractional bounds in the
+    /// future. Whole-number values are emitted as YAML integers (e.g. `0`
+    /// rather than `0.0`); see `to_value` in `frieze-usecase` for the
+    /// emission detail.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub minimum: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub properties: Option<IndexMap<String, SchemaObject>>,
     #[serde(skip_serializing_if = "Option::is_none")]
