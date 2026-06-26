@@ -2,7 +2,7 @@ use frieze::Schema;
 
 #[derive(Schema)]
 struct S {
-    x: u32,
+    x: u128,
 }
 
 fn main() {}
