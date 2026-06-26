@@ -440,7 +440,7 @@ fn reference_property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, s
     if path.segments.len() > 1 {
         return Err(syn::Error::new_spanned(
             ty,
-            "frieze: qualified paths in field type are not supported yet. \
+            "frieze: qualified paths in field type are not supported. \
              Use a `use` statement to bring the type into scope.",
         ));
     }
@@ -451,8 +451,7 @@ fn reference_property_type_expr(ty: &Type) -> Result<proc_macro2::TokenStream, s
     if !matches!(segment.arguments, PathArguments::None) {
         return Err(syn::Error::new_spanned(
             ty,
-            "frieze: generic type parameters in field type are not supported yet. \
-             Use a concrete type as the field, or wait for Phase 1 #11.",
+            "frieze: generic type parameters in field type are not supported.",
         ));
     }
     let ident = &segment.ident;

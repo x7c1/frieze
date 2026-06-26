@@ -1,4 +1,4 @@
-error: frieze: qualified paths in field type are not supported yet. Use a `use` statement to bring the type into scope.
+error: frieze: qualified paths in field type are not supported. Use a `use` statement to bring the type into scope.
   --> tests/ui/unsupported_qualified_path.rs:11:11
    |
 11 |     user: inner::User,
