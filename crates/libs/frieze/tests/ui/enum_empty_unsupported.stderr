@@ -1,0 +1,5 @@
+error: frieze: enums with no variants cannot be represented as an OAS schema.
+ --> tests/ui/enum_empty_unsupported.rs:4:6
+  |
+4 | enum Empty {}
+  |      ^^^^^

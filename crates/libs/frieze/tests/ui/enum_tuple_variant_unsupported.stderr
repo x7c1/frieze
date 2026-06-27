@@ -1,0 +1,5 @@
+error: frieze: tuple variants are not supported; only unit variants can be expressed as an OAS string enum.
+ --> tests/ui/enum_tuple_variant_unsupported.rs:5:5
+  |
+5 |     Login(i64),
+  |     ^^^^^^^^^^
