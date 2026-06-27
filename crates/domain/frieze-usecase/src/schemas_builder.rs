@@ -61,7 +61,14 @@ fn first_unresolved_reference<'a>(
         PropertyType::Array(inner) | PropertyType::Nullable(inner) => {
             first_unresolved_reference(inner, schemas)
         }
-        _ => None,
+        PropertyType::Int32
+        | PropertyType::Int64
+        | PropertyType::UInt32
+        | PropertyType::UInt64
+        | PropertyType::Float
+        | PropertyType::Double
+        | PropertyType::String
+        | PropertyType::Boolean => None,
     }
 }
 
