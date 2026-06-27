@@ -37,6 +37,23 @@ schema:
 | `Option<U>` (serde default)     | `{allOf: [{$ref: ...}], nullable: true}`      | `{oneOf: [{$ref: ...}, {type: "null"}]}`           |
 | `Maybe<U>`                      | `{allOf: [{$ref: ...}], nullable: true}`      | `{oneOf: [{$ref: ...}, {type: "null"}]}`           |
 
+### `description` on a `$ref` property
+
+A `///` doc comment on a field whose type is another `Schema`-deriving
+struct or enum needs a per-version encoding because `$ref` schemas
+cannot freely carry sibling keys on OAS 3.0:
+
+| Rust shape                  | OAS 3.0                                                          | OAS 3.1                                              |
+|-----------------------------|------------------------------------------------------------------|------------------------------------------------------|
+| `U` (with `///`)            | `{description, allOf: [{$ref: ...}]}`                            | `{$ref: ..., description}`                           |
+| `Option<U>` (with `///`)    | `{description, allOf: [{$ref: ...}], nullable: true}`            | `{description, oneOf: [{$ref: ...}, {type: "null"}]}`|
+
+OAS 3.0 wraps the reference in `allOf` so the description sits on the
+outer schema. OAS 3.1 places the description either next to the `$ref`
+(plain reference) or on the existing `oneOf` wrap (nullable
+reference). Either way, `description` rides on the outermost schema,
+never inside the `allOf` / `oneOf` array.
+
 ### String enums are version-agnostic
 
 A unit-variant enum derives `type: string, enum: [...]`. The shape

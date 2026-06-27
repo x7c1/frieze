@@ -13,9 +13,10 @@ you render it as YAML.
 use frieze::{Maybe, Schema};
 use serde::{Deserialize, Serialize};
 
+/// A registered user of the system.
 #[derive(Schema, Serialize, Deserialize)]
 struct User {
-    // Required + non-nullable.
+    /// The user's id. Required + non-nullable.
     id: i64,
     // Required + nullable: the key must appear, but its value may be
     // `null`. This is the serde default for `Option<T>`.
@@ -39,6 +40,13 @@ let schemas = frieze::schemas()
     .expect("schemas build should succeed");
 println!("{}", frieze::to_yaml(&schemas));
 ```
+
+A `///` doc comment on the struct or on any field becomes the OAS
+`description` for that schema or property — written once in Rust,
+rendered automatically. See
+[Doc comments to `description`](docs/field-shapes.md#doc-comments-to-description)
+for the full mapping (enum-level and per-variant doc-comments are
+composed into the enum schema's `description`).
 
 ## Optionality, in one paragraph
 
