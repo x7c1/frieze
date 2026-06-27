@@ -1,0 +1,50 @@
+//! Same source as `derive_struct_with_option_ref_description_oas_3_0` —
+//! under OAS 3.1 the nullable reference is encoded as
+//! `oneOf: [$ref, {type: null}]` and the description sits on the
+//! `oneOf` wrapper, not inside the array.
+
+#![cfg(feature = "oas-3-1")]
+
+use frieze::Schema;
+
+#[derive(Schema)]
+#[allow(dead_code)]
+struct Image {
+    url: String,
+}
+
+#[derive(Schema)]
+#[allow(dead_code)]
+struct Profile {
+    /// Optional avatar associated with this profile.
+    avatar: Option<Image>,
+}
+
+#[test]
+fn option_ref_with_description_carries_description_on_one_of_wrap_under_oas_3_1() {
+    let s: frieze::Schemas = frieze::schemas()
+        .add::<Profile>()
+        .add::<Image>()
+        .build()
+        .expect("schemas build should succeed for valid input");
+
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    Image:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+    Profile:
+      type: object
+      required:
+        - avatar
+      properties:
+        avatar:
+          description: Optional avatar associated with this profile.
+          oneOf:
+            - $ref: "#/components/schemas/Image"
+            - type: "null"
+    "###);
+}
