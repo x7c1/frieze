@@ -23,12 +23,16 @@ fn variant_bullet_names_use_post_rename_form() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
+    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
     Status:
       type: string
-      description: "Lifecycle state of an entity.\n\n- active: The entity is currently active.\n- inactive_since: The entity is no longer active."
+      description: |-
+        Lifecycle state of an entity.
+
+        - active: The entity is currently active.
+        - inactive_since: The entity is no longer active.
       enum:
-        - active
-        - inactive_since
+      - active
+      - inactive_since
     "#);
 }

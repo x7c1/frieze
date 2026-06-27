@@ -23,13 +23,17 @@ fn missing_variant_docs_are_omitted_from_the_bullet_list() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
+    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
     Status:
       type: string
-      description: "Lifecycle state of an entity.\n\n- Active: The entity is currently active.\n- Inactive: The entity is no longer active."
+      description: |-
+        Lifecycle state of an entity.
+
+        - Active: The entity is currently active.
+        - Inactive: The entity is no longer active.
       enum:
-        - Active
-        - Pending
-        - Inactive
+      - Active
+      - Pending
+      - Inactive
     "#);
 }

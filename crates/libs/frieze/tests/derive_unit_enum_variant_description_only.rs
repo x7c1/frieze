@@ -22,13 +22,15 @@ fn variant_docs_only_render_as_bullet_list_description() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
+    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
     Color:
       type: string
-      description: "- Red: The crimson hue.\n- Blue: The deep blue."
+      description: |-
+        - Red: The crimson hue.
+        - Blue: The deep blue.
       enum:
-        - Red
-        - Green
-        - Blue
+      - Red
+      - Green
+      - Blue
     "#);
 }
