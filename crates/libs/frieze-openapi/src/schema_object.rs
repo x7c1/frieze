@@ -1,16 +1,16 @@
 //! The top-level OpenAPI Schema Object sum supported by Phase 1.
 
 use crate::object_schema::ObjectSchema;
+use crate::string_enum_schema::StringEnumSchema;
 
 /// The kinds of OAS Schema Object that frieze can register under
 /// `#/components/schemas`.
 ///
-/// The variant set determines what shapes a [`crate::ObjectSchema`]'s
-/// surrounding entry can take. Per-property sub-schemas (the values inside
-/// `properties`, `items`, `allOf`, `oneOf`) stay as plain [`ObjectSchema`]
-/// because OAS describes them with the same key set as object-typed
-/// schemas — adding new top-level shapes (e.g. `oneOf` as a discriminated
-/// union later) does not change the per-property emitter.
+/// The variant set determines what shapes a registered schema entry can
+/// take. Per-property sub-schemas (the values inside `properties`,
+/// `items`, `allOf`, `oneOf`) stay as plain [`ObjectSchema`] because OAS
+/// describes them with the same key set as object-typed schemas — adding
+/// new top-level shapes does not change the per-property emitter.
 ///
 /// Matches on this sum are intentionally exhaustive across the crate:
 /// adding a variant should surface a compile error at every emission site.
@@ -21,4 +21,8 @@ pub enum SchemaObject {
     /// per-property shape (`$ref`, scalar `type` + `format`, array,
     /// nullable composition).
     Object(ObjectSchema),
+    /// A `type: string` schema whose `enum` array enumerates the allowed
+    /// values. Derived from a Rust enum whose variants are all unit
+    /// variants.
+    StringEnum(StringEnumSchema),
 }

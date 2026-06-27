@@ -59,6 +59,8 @@ fn first_unresolved_in_schema<'a>(
             }
             None
         }
+        // String-enum schemas carry no property references; nothing to walk.
+        ModelSchema::StringEnum(_) => None,
     }
 }
 

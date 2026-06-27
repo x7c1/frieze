@@ -2,7 +2,7 @@
 //! [`serde_yaml::Value`], via [`frieze_openapi`].
 
 use frieze_model::{Property, PropertyType, Schema, SchemaName, Schemas};
-use frieze_openapi::{ObjectSchema, SchemaObject, SchemaType};
+use frieze_openapi::{ObjectSchema, SchemaObject, SchemaType, StringEnumSchema};
 use indexmap::IndexMap;
 use serde_yaml::{Mapping, Number, Value};
 
@@ -37,6 +37,9 @@ pub fn to_value(schemas: &Schemas) -> Value {
 fn to_openapi(schema: &Schema) -> SchemaObject {
     match schema {
         Schema::Object(object) => SchemaObject::Object(object_schema_from_model(object)),
+        Schema::StringEnum(string_enum) => {
+            SchemaObject::StringEnum(StringEnumSchema::new(string_enum.values.clone()))
+        }
     }
 }
 
@@ -171,7 +174,27 @@ fn nullable_reference_object(name: &SchemaName) -> ObjectSchema {
 fn schema_object_to_value(schema: &SchemaObject) -> Value {
     match schema {
         SchemaObject::Object(object) => object_schema_to_value(object),
+        SchemaObject::StringEnum(string_enum) => string_enum_to_value(string_enum),
     }
+}
+
+/// Serializes a [`StringEnumSchema`] in the canonical key order
+/// (`type, enum`). Variant values are emitted in source order, not
+/// alphabetical — matching what serde produces on the wire and what
+/// the user reads in the Rust source.
+fn string_enum_to_value(schema: &StringEnumSchema) -> Value {
+    let mut map = Mapping::new();
+    map.insert(
+        Value::String("type".into()),
+        schema_type_to_value(SchemaType::String),
+    );
+    let values: Vec<Value> = schema
+        .values
+        .iter()
+        .map(|v| Value::String(v.clone()))
+        .collect();
+    map.insert(Value::String("enum".into()), Value::Sequence(values));
+    Value::Mapping(map)
 }
 
 /// Serializes an [`ObjectSchema`] into a [`Value`] with manually ordered
