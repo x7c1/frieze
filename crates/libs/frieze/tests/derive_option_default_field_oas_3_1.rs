@@ -21,9 +21,12 @@ fn option_default_renders_required_and_nullable_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
     User:
       type: object
+      required:
+        - id
+        - nickname
       properties:
         id:
           type: integer
@@ -32,8 +35,5 @@ fn option_default_renders_required_and_nullable_under_oas_3_1() {
           type:
             - string
             - "null"
-      required:
-        - id
-        - nickname
-    "###);
+    "#);
 }

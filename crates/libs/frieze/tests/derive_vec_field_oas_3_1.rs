@@ -21,9 +21,13 @@ fn vec_field_renders_as_type_array_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
     Tag:
       type: object
+      required:
+        - name
+        - aliases
+        - parent_ids
       properties:
         name:
           type: string
@@ -38,9 +42,5 @@ fn vec_field_renders_as_type_array_under_oas_3_1() {
           items:
             type: integer
             format: int64
-      required:
-        - name
-        - aliases
-        - parent_ids
-    "###);
+    "#);
 }

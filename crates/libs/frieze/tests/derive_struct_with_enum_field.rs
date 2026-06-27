@@ -31,7 +31,7 @@ fn struct_field_of_enum_type_renders_as_ref() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
     Status:
       type: string
       enum:
@@ -39,14 +39,14 @@ fn struct_field_of_enum_type_renders_as_ref() {
         - Inactive
     User:
       type: object
+      required:
+        - id
+        - status
       properties:
         id:
           type: integer
           format: int64
         status:
           $ref: "#/components/schemas/Status"
-      required:
-        - id
-        - status
-    "###);
+    "##);
 }

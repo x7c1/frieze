@@ -25,7 +25,7 @@ fn vec_of_enum_field_renders_as_array_of_refs() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
     Status:
       type: string
       enum:
@@ -33,12 +33,12 @@ fn vec_of_enum_field_renders_as_array_of_refs() {
         - Inactive
     User:
       type: object
+      required:
+        - statuses
       properties:
         statuses:
           type: array
           items:
             $ref: "#/components/schemas/Status"
-      required:
-        - statuses
-    "###);
+    "##);
 }

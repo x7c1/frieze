@@ -1,6 +1,7 @@
 //! A validated string-enum schema: a non-empty name plus a non-empty list
 //! of distinct, non-empty variant values.
 
+use crate::description::normalize_description;
 use crate::error::Error;
 use crate::schema_name::SchemaName;
 
@@ -23,11 +24,19 @@ use crate::schema_name::SchemaName;
 pub struct StringEnumSchema {
     pub name: SchemaName,
     pub values: Vec<String>,
+    /// Free-form description text sourced from the originating Rust
+    /// `///` doc-comment on the enum (optionally with per-variant docs
+    /// composed in by the derive — see the `frieze-macros` crate).
+    /// Empty / whitespace-only inputs are normalized to `None` at the
+    /// [`StringEnumSchema::with_description`] entry point.
+    pub description: Option<String>,
 }
 
 impl StringEnumSchema {
     /// Builds a string-enum schema, rejecting empty names, empty value
-    /// lists, empty value strings, and duplicate values.
+    /// lists, empty value strings, and duplicate values. The description
+    /// is initialized to `None`; use [`StringEnumSchema::with_description`]
+    /// to attach one.
     pub fn new(name: impl Into<String>, values: Vec<String>) -> Result<Self, Error> {
         let name = SchemaName::new(name)?;
         if values.is_empty() {
@@ -46,7 +55,19 @@ impl StringEnumSchema {
             }
             seen.push(value.clone());
         }
-        Ok(Self { name, values })
+        Ok(Self {
+            name,
+            values,
+            description: None,
+        })
+    }
+
+    /// Attaches a top-level description to the schema, normalizing empty
+    /// or whitespace-only input to `None`.
+    #[must_use]
+    pub fn with_description(mut self, description: Option<String>) -> Self {
+        self.description = description.and_then(normalize_description);
+        self
     }
 }
 
@@ -93,5 +114,27 @@ mod tests {
         )
         .unwrap();
         assert_eq!(schema.values, vec!["Active", "Inactive", "Banned"]);
+    }
+
+    #[test]
+    fn description_is_none_by_default() {
+        let schema = StringEnumSchema::new("Status", vec!["Active".into()]).unwrap();
+        assert_eq!(schema.description, None);
+    }
+
+    #[test]
+    fn with_description_attaches_text() {
+        let schema = StringEnumSchema::new("Status", vec!["Active".into()])
+            .unwrap()
+            .with_description(Some("lifecycle state".into()));
+        assert_eq!(schema.description.as_deref(), Some("lifecycle state"));
+    }
+
+    #[test]
+    fn with_description_normalizes_blank_to_none() {
+        let schema = StringEnumSchema::new("Status", vec!["Active".into()])
+            .unwrap()
+            .with_description(Some("\n\n".into()));
+        assert_eq!(schema.description, None);
     }
 }

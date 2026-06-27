@@ -2,6 +2,7 @@
 
 use indexmap::IndexMap;
 
+use crate::description::normalize_description;
 use crate::error::Error;
 use crate::property::Property;
 use crate::property_name::PropertyName;
@@ -23,11 +24,18 @@ use crate::schema_name::SchemaName;
 pub struct ObjectSchema {
     pub name: SchemaName,
     pub properties: IndexMap<PropertyName, Property>,
+    /// Free-form description text sourced from the originating Rust
+    /// `///` doc-comment on the struct. Empty / whitespace-only inputs
+    /// are normalized to `None` at the [`ObjectSchema::with_description`]
+    /// entry point.
+    pub description: Option<String>,
 }
 
 impl ObjectSchema {
     /// Builds an object schema, rejecting empty names, empty property
-    /// lists, and duplicate property names.
+    /// lists, and duplicate property names. The description is
+    /// initialized to `None`; use [`ObjectSchema::with_description`] to
+    /// attach one.
     pub fn new(name: impl Into<String>, properties: Vec<Property>) -> Result<Self, Error> {
         let name = SchemaName::new(name)?;
         if properties.is_empty() {
@@ -47,7 +55,16 @@ impl ObjectSchema {
         Ok(Self {
             name,
             properties: map,
+            description: None,
         })
+    }
+
+    /// Attaches a top-level description to the schema, normalizing empty
+    /// or whitespace-only input to `None`.
+    #[must_use]
+    pub fn with_description(mut self, description: Option<String>) -> Self {
+        self.description = description.and_then(normalize_description);
+        self
     }
 }
 
@@ -91,5 +108,30 @@ mod tests {
         let schema = ObjectSchema::new("User", vec![id, name]).unwrap();
         let keys: Vec<&str> = schema.properties.keys().map(|k| k.as_str()).collect();
         assert_eq!(keys, vec!["id", "name"]);
+    }
+
+    #[test]
+    fn description_is_none_by_default() {
+        let id = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
+        let schema = ObjectSchema::new("User", vec![id]).unwrap();
+        assert_eq!(schema.description, None);
+    }
+
+    #[test]
+    fn with_description_attaches_text() {
+        let id = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
+        let schema = ObjectSchema::new("User", vec![id])
+            .unwrap()
+            .with_description(Some("a registered user".into()));
+        assert_eq!(schema.description.as_deref(), Some("a registered user"));
+    }
+
+    #[test]
+    fn with_description_normalizes_blank_to_none() {
+        let id = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
+        let schema = ObjectSchema::new("User", vec![id])
+            .unwrap()
+            .with_description(Some("   \n  ".into()));
+        assert_eq!(schema.description, None);
     }
 }

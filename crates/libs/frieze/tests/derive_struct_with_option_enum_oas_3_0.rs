@@ -28,7 +28,7 @@ fn option_enum_field_renders_as_nullable_ref_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
     Status:
       type: string
       enum:
@@ -36,12 +36,12 @@ fn option_enum_field_renders_as_nullable_ref_under_oas_3_0() {
         - Inactive
     User:
       type: object
+      required:
+        - status
       properties:
         status:
           allOf:
             - $ref: "#/components/schemas/Status"
           nullable: true
-      required:
-        - status
-    "###);
+    "##);
 }

@@ -53,4 +53,17 @@ impl Schema {
             Schema::StringEnum(e) => &e.name,
         }
     }
+
+    /// Attaches a top-level description to whichever variant this is.
+    ///
+    /// Convenience wrapper over the per-variant `with_description`
+    /// methods so the derive expansion can chain `.with_description(...)`
+    /// without matching on the sum.
+    #[must_use]
+    pub fn with_description(self, description: Option<String>) -> Self {
+        match self {
+            Schema::Object(o) => Schema::Object(o.with_description(description)),
+            Schema::StringEnum(e) => Schema::StringEnum(e.with_description(description)),
+        }
+    }
 }

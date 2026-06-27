@@ -18,9 +18,16 @@ fn numeric_fields_render_with_correct_type_format_minimum() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @"
     Numbers:
       type: object
+      required:
+        - a_i32
+        - b_i64
+        - c_u32
+        - d_u64
+        - e_f32
+        - f_f64
       properties:
         a_i32:
           type: integer
@@ -42,12 +49,5 @@ fn numeric_fields_render_with_correct_type_format_minimum() {
         f_f64:
           type: number
           format: double
-      required:
-        - a_i32
-        - b_i64
-        - c_u32
-        - d_u64
-        - e_f32
-        - f_f64
-    "###);
+    ");
 }

@@ -14,17 +14,17 @@ fn user_struct_minimum() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @"
     User:
       type: object
+      required:
+        - id
+        - name
       properties:
         id:
           type: integer
           format: int64
         name:
           type: string
-      required:
-        - id
-        - name
-    "###);
+    ");
 }

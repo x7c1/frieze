@@ -23,6 +23,8 @@
 //! that is independently useful for serde-driven Rust code (e.g. HTTP
 //! `PATCH` request bodies).
 
+mod description;
+
 mod object_schema;
 pub use object_schema::ObjectSchema;
 

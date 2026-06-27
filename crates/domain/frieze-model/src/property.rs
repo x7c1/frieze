@@ -1,5 +1,6 @@
 //! A validated property attached to a schema.
 
+use crate::description::normalize_description;
 use crate::error::Error;
 use crate::presence::Presence;
 use crate::property_name::PropertyName;
@@ -7,11 +8,14 @@ use crate::property_type::PropertyType;
 
 /// A property attached to a schema, in its validated form.
 ///
-/// A property is the triple (name, presence, type). **Presence** controls
-/// whether the field name is listed under the schema's `required` array;
-/// **nullability** of the value is encoded inside [`PropertyType`] via
-/// [`PropertyType::Nullable`]. The two axes are independent — see
-/// [`Presence`] for the four combinations they enumerate.
+/// A property is the quadruple (name, type, presence, description).
+/// **Presence** controls whether the field name is listed under the
+/// schema's `required` array; **nullability** of the value is encoded
+/// inside [`PropertyType`] via [`PropertyType::Nullable`]. The two axes
+/// are independent — see [`Presence`] for the four combinations they
+/// enumerate. **Description** carries optional free-form text sourced
+/// from the originating Rust `///` doc-comment; it is rendered as the
+/// `description` field of the per-property OAS schema when present.
 ///
 /// Validation happens once, in [`Property::new`]. The fields are `pub`
 /// because the type's contract is its shape, not behavior: callers may read
@@ -32,10 +36,18 @@ pub struct Property {
     /// object. Drives the schema's `required` array; the value-level
     /// nullability is independent and lives inside [`PropertyType`].
     pub presence: Presence,
+    /// Free-form description text sourced from the originating Rust
+    /// `///` doc-comment. Empty / whitespace-only inputs are normalized
+    /// to `None` at the [`Property::with_description`] entry point so
+    /// the renderer never emits an empty `description` key (see the
+    /// empty-container omission rule).
+    pub description: Option<String>,
 }
 
 impl Property {
-    /// Builds a property, rejecting empty names.
+    /// Builds a property, rejecting empty names. The description is
+    /// initialized to `None`; use [`Property::with_description`] to
+    /// attach one.
     pub fn new(
         name: impl Into<String>,
         ty: PropertyType,
@@ -45,7 +57,17 @@ impl Property {
             name: PropertyName::new(name)?,
             ty,
             presence,
+            description: None,
         })
+    }
+
+    /// Attaches a description to the property, normalizing empty or
+    /// whitespace-only input to `None` so the renderer never emits an
+    /// empty `description` key.
+    #[must_use]
+    pub fn with_description(mut self, description: Option<String>) -> Self {
+        self.description = description.and_then(normalize_description);
+        self
     }
 }
 
@@ -65,6 +87,7 @@ mod tests {
         assert_eq!(property.name.as_str(), "id");
         assert_eq!(property.ty, PropertyType::Int64);
         assert_eq!(property.presence, Presence::Required);
+        assert_eq!(property.description, None);
     }
 
     #[test]
@@ -81,5 +104,37 @@ mod tests {
             PropertyType::Nullable(Box::new(PropertyType::String))
         );
         assert_eq!(property.presence, Presence::Optional);
+    }
+
+    #[test]
+    fn with_description_attaches_text() {
+        let property = Property::new("name", PropertyType::String, Presence::Required)
+            .unwrap()
+            .with_description(Some("display name".into()));
+        assert_eq!(property.description.as_deref(), Some("display name"));
+    }
+
+    #[test]
+    fn with_description_normalizes_empty_to_none() {
+        let property = Property::new("name", PropertyType::String, Presence::Required)
+            .unwrap()
+            .with_description(Some(String::new()));
+        assert_eq!(property.description, None);
+    }
+
+    #[test]
+    fn with_description_normalizes_whitespace_only_to_none() {
+        let property = Property::new("name", PropertyType::String, Presence::Required)
+            .unwrap()
+            .with_description(Some("   \n\t  ".into()));
+        assert_eq!(property.description, None);
+    }
+
+    #[test]
+    fn with_description_passes_through_none() {
+        let property = Property::new("name", PropertyType::String, Presence::Required)
+            .unwrap()
+            .with_description(None);
+        assert_eq!(property.description, None);
     }
 }

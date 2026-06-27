@@ -27,23 +27,23 @@ fn option_nested_renders_as_nullable_ref_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
     Profile:
       type: object
+      required:
+        - user
       properties:
         user:
           oneOf:
             - $ref: "#/components/schemas/User"
             - type: "null"
-      required:
-        - user
     User:
       type: object
+      required:
+        - id
       properties:
         id:
           type: integer
           format: int64
-      required:
-        - id
-    "###);
+    "##);
 }
