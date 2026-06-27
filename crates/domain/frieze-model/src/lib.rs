@@ -23,6 +23,9 @@
 //! that is independently useful for serde-driven Rust code (e.g. HTTP
 //! `PATCH` request bodies).
 
+mod object_schema;
+pub use object_schema::ObjectSchema;
+
 mod schema;
 pub use schema::Schema;
 

@@ -1,14 +1,14 @@
 //! Builder that collects [`Schema`] implementations into a validated
 //! [`frieze_model::Schemas`].
 
-use frieze_model::{Error, PropertyType, SchemaName, Schemas};
+use frieze_model::{Error, PropertyType, Schema as ModelSchema, SchemaName, Schemas};
 
 use crate::schema::Schema;
 
 /// In-progress collection of schemas.
 #[derive(Debug, Default)]
 pub struct SchemasBuilder {
-    schemas: Vec<frieze_model::Schema>,
+    schemas: Vec<ModelSchema>,
 }
 
 impl SchemasBuilder {
@@ -33,13 +33,32 @@ impl SchemasBuilder {
     pub fn build(self) -> Result<Schemas, Error> {
         let schemas = Schemas::new(self.schemas)?;
         for schema in schemas.by_name.values() {
-            for property in schema.properties.values() {
-                if let Some(missing) = first_unresolved_reference(&property.ty, &schemas) {
-                    return Err(Error::UnresolvedReference(missing.clone()));
-                }
+            if let Some(missing) = first_unresolved_in_schema(schema, &schemas) {
+                return Err(Error::UnresolvedReference(missing.clone()));
             }
         }
         Ok(schemas)
+    }
+}
+
+/// Walks a single registered [`ModelSchema`] for references and returns
+/// the first one whose target is not registered in `schemas`.
+///
+/// Variants that carry no references (e.g. string enums, when added) walk
+/// nothing and yield `None`.
+fn first_unresolved_in_schema<'a>(
+    schema: &'a ModelSchema,
+    schemas: &Schemas,
+) -> Option<&'a SchemaName> {
+    match schema {
+        ModelSchema::Object(object) => {
+            for property in object.properties.values() {
+                if let Some(missing) = first_unresolved_reference(&property.ty, schemas) {
+                    return Some(missing);
+                }
+            }
+            None
+        }
     }
 }
 
@@ -84,7 +103,7 @@ mod tests {
             "User"
         }
         fn schema() -> frieze_model::Schema {
-            frieze_model::Schema::new(
+            frieze_model::Schema::new_object(
                 "User",
                 vec![
                     Property::new("id", PropertyType::Int64, Presence::Required).unwrap(),
@@ -115,7 +134,7 @@ mod tests {
             "Profile"
         }
         fn schema() -> frieze_model::Schema {
-            frieze_model::Schema::new(
+            frieze_model::Schema::new_object(
                 "Profile",
                 vec![Property::new(
                     "user",

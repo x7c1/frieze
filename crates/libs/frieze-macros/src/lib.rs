@@ -94,7 +94,7 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
                 #schema_name
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
-                ::frieze::__private::frieze_model::Schema::new(
+                ::frieze::__private::frieze_model::Schema::new_object(
                     #schema_name,
                     ::std::vec![ #( #property_exprs ),* ],
                 )

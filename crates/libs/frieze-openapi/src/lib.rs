@@ -23,6 +23,9 @@ compile_error!(
     "frieze: one of features `oas-3-0` or `oas-3-1` must be enabled (default is `oas-3-0`)."
 );
 
+mod object_schema;
+pub use object_schema::ObjectSchema;
+
 mod schema_object;
 pub use schema_object::SchemaObject;
 
