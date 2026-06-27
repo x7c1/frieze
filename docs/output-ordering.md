@@ -7,17 +7,17 @@ maps as unordered.
 
 | Output                       | Order                                |
 |------------------------------|--------------------------------------|
-| `Schema.properties` keys     | Struct field declaration order       |
-| `Schema.required` array      | Same order as `properties`           |
-| `Schema.enum` array          | Variant declaration order            |
-| `#/components/schemas` keys  | Alphabetical by schema name          |
+| Object schema `properties` keys | Struct field declaration order     |
+| Object schema `required` array  | Same order as `properties`         |
+| String-enum schema `enum` array | Variant declaration order (after `rename_all`) |
+| `#/components/schemas` keys     | Alphabetical by schema name        |
 
 `IndexMap` is used internally where insertion order matters; `BTreeMap`
 where alphabetical order is desired.
 
 ## Canonical key order within a schema object
 
-Within a single schema object, keys are emitted in canonical OAS
+Within a single object schema, keys are emitted in canonical OAS
 reading order:
 
 ```
@@ -25,34 +25,34 @@ $ref, type, items, format, minimum, allOf, oneOf, nullable (3.0 only),
 properties, required
 ```
 
-A schema object set to a `$ref` is emitted on its own — sibling keys
+An object schema set to a `$ref` is emitted on its own — sibling keys
 are dropped, matching the OAS rule that `$ref` schemas are treated as
 leaves.
+
+A string-enum schema emits two keys in this order:
+
+```
+type, enum
+```
+
+`type` is the literal string `string`; `enum` is the list of variant
+values in source declaration order. Adding more top-level schema
+kinds in the future appends new canonical key orders here.
 
 ## Empty containers are omitted
 
 Containers that would serialise as empty collections are omitted from
 the output rather than emitted as `[]` or `{}`. The concrete rule today
-covers `Schema.required`: when no fields are required, `required:` is
-absent entirely (no `required: []` line).
+covers an object schema's `required`: when no fields are required,
+`required:` is absent entirely (no `required: []` line).
 
-This rule is enforced on **two independent paths** that must stay in
-sync:
-
-1. The `serde::Serialize` derive on `Schema` uses
-   `#[serde(skip_serializing_if = "Vec::is_empty")]` on the `required`
-   field, so any code path that relies on serde produces the right
-   shape.
-2. The custom YAML emitter (`schema_object_to_value`) does **not** go
-   through serde at all — it walks the `Schema` and constructs YAML
-   nodes manually. It re-applies the same empty-check before adding
-   `required` to the output.
-
-Both paths exist because frieze's primary YAML rendering bypasses
-serde to control key ordering precisely (see [canonical key
-order](#canonical-key-order-within-a-schema-object)). When changing
-this rule, update both paths together — leaving one inconsistent will
-make the output depend on which renderer was invoked.
+YAML rendering goes through the custom emitter
+(`schema_object_to_value` in `frieze-usecase`), which walks the
+sum-typed `SchemaObject` and constructs YAML nodes manually rather
+than through `serde::Serialize`. The emitter applies the empty-check
+before adding `required` to the output. When changing the omission
+rule, update the emitter — there is no parallel serde path to keep in
+sync.
 
 Reason for the rule: `required: []` is technically valid OAS but
 noisy and easy to misread as "no required fields known" vs. "this is
