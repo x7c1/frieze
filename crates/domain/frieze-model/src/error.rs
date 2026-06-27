@@ -19,6 +19,12 @@ pub enum Error {
     EmptyPropertyName,
     #[error("schema `{0}` has no properties")]
     NoProperties(String),
+    #[error("schema `{0}` has no variants")]
+    NoVariants(String),
+    #[error("schema `{schema}` declares duplicate variant value `{value}`")]
+    DuplicateVariantValue { schema: String, value: String },
+    #[error("schema `{0}` declares an empty variant value")]
+    EmptyVariantValue(String),
     #[error("schema `{schema}` declares duplicate property `{property}`")]
     DuplicateProperty { schema: String, property: String },
     #[error("schema `{0}` was added more than once")]

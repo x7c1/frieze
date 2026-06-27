@@ -1,0 +1,5 @@
+error: frieze: `#[serde(rename)]` on a variant is not supported.
+ --> tests/ui/enum_variant_rename_unsupported.rs:7:5
+  |
+7 |     #[serde(rename = "off")]
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^

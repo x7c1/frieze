@@ -1,18 +1,27 @@
 //! Proc-macro derives for frieze.
 //!
-//! Currently exposes `#[derive(Schema)]`, which generates an implementation
-//! of the `frieze::Schema` trait for a named struct whose fields are all
-//! built from a small fixed scalar set, optionally composed with `Vec<T>`,
-//! `Option<T>`, and/or `Maybe<T>` according to the table below. Any other
-//! shape produces a compile error.
+//! `#[derive(Schema)]` generates an implementation of the `frieze::Schema`
+//! trait. Two top-level shapes are supported:
+//!
+//! - **Named struct** — every field type must come from the small fixed
+//!   scalar set, optionally composed with `Vec<T>`, `Option<T>`, and/or
+//!   `Maybe<T>`, or be itself a `Schema`-deriving type (rendered as
+//!   `$ref`). The presence/nullability mapping is documented in the
+//!   table below.
+//! - **Unit-variant enum** — every variant must be a unit variant. The
+//!   derive emits a `type: string, enum: [...]` schema whose values are
+//!   the variant names after applying any container-level
+//!   `#[serde(rename_all = "...")]`. Tuple variants, struct variants,
+//!   empty enums, and `#[serde(rename)]` on individual variants are
+//!   compile errors.
+//!
+//! Any other shape produces a compile error.
 //!
 //! # Rust shape → OAS combination
 //!
-//! The derive maps each field shape to the four presence × nullability
-//! combinations as follows. The decision is driven by syntactic type
-//! recognition plus a single serde attribute (`skip_serializing_if =
-//! "Option::is_none"`); the macro does not interpret any other serde
-//! attribute.
+//! The struct mapping is driven by syntactic type recognition plus a
+//! single serde attribute (`skip_serializing_if = "Option::is_none"`);
+//! the macro does not interpret any other serde attribute on fields.
 //!
 //! | Rust shape                                                       | Presence | Nullability        |
 //! |------------------------------------------------------------------|----------|--------------------|
@@ -47,12 +56,13 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, Attribute, Data, DeriveInput, Field, Fields, GenericArgument, PathArguments,
-    Type,
+    parse_macro_input, Attribute, Data, DataEnum, DeriveInput, Field, Fields, GenericArgument,
+    PathArguments, Type, Variant,
 };
 
-/// Derive `frieze::Schema` for a named struct. See the crate-level docs for
-/// the full mapping from Rust shape to OAS presence × nullability.
+/// Derive `frieze::Schema`. See the crate-level docs for the supported
+/// top-level shapes (named struct, unit-variant enum) and the mapping
+/// table for struct fields.
 #[proc_macro_derive(Schema)]
 pub fn derive_schema(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -62,9 +72,19 @@ pub fn derive_schema(input: TokenStream) -> TokenStream {
 }
 
 fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
-    let ident = &ast.ident;
+    match &ast.data {
+        Data::Struct(_) => expand_struct(&ast),
+        Data::Enum(data) => expand_enum(&ast, data),
+        Data::Union(_) => Err(syn::Error::new_spanned(
+            &ast.ident,
+            "frieze: #[derive(Schema)] does not support unions.",
+        )),
+    }
+}
 
-    let fields = named_fields(&ast)?;
+fn expand_struct(ast: &DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
+    let ident = &ast.ident;
+    let fields = named_fields(ast)?;
     if fields.is_empty() {
         return Err(syn::Error::new_spanned(
             ident,
@@ -94,7 +114,7 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
                 #schema_name
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
-                ::frieze::__private::frieze_model::Schema::new(
+                ::frieze::__private::frieze_model::Schema::new_object(
                     #schema_name,
                     ::std::vec![ #( #property_exprs ),* ],
                 )
@@ -105,23 +125,220 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
     Ok(expanded)
 }
 
+/// Expand `#[derive(Schema)]` on a unit-variant enum into an `impl Schema`
+/// whose `schema()` returns a `StringEnum` variant.
+///
+/// Rejects empty enums, non-unit variants, and variant-level
+/// `#[serde(rename = "...")]`. The container-level
+/// `#[serde(rename_all = "...")]` is read and applied to the variant
+/// names emitted into the `enum` array; an unsupported `rename_all`
+/// value is a compile error pointing at the attribute.
+fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<proc_macro2::TokenStream, syn::Error> {
+    let ident = &ast.ident;
+    if data.variants.is_empty() {
+        return Err(syn::Error::new_spanned(
+            ident,
+            "frieze: enums with no variants cannot be represented as an OAS schema.",
+        ));
+    }
+    let rename_all = parse_rename_all(&ast.attrs)?;
+    let mut values: Vec<String> = Vec::with_capacity(data.variants.len());
+    for variant in &data.variants {
+        validate_variant(variant)?;
+        if let Some(attr) = find_variant_rename(&variant.attrs) {
+            return Err(syn::Error::new_spanned(
+                attr,
+                "frieze: `#[serde(rename)]` on a variant is not supported.",
+            ));
+        }
+        let original = variant.ident.to_string();
+        values.push(rename_all.apply(&original));
+    }
+
+    let schema_name = ident.to_string();
+    let value_literals = values.iter().map(|v| {
+        quote! { ::std::string::String::from(#v) }
+    });
+    let expanded = quote! {
+        impl ::frieze::__private::frieze_usecase::Schema for #ident {
+            fn name() -> &'static str {
+                #schema_name
+            }
+            fn schema() -> ::frieze::__private::frieze_model::Schema {
+                ::frieze::__private::frieze_model::Schema::new_string_enum(
+                    #schema_name,
+                    ::std::vec![ #( #value_literals ),* ],
+                )
+                .expect("frieze: derived enum schema satisfies invariants by construction")
+            }
+        }
+    };
+    Ok(expanded)
+}
+
+/// Reject tuple variants (`Foo(i64)`) and struct variants (`Foo { x: i64 }`).
+/// Only unit variants are allowed for Phase 1; data-carrying variants
+/// belong to the `oneOf` system that has not landed yet.
+fn validate_variant(variant: &Variant) -> Result<(), syn::Error> {
+    match &variant.fields {
+        Fields::Unit => Ok(()),
+        Fields::Unnamed(_) => Err(syn::Error::new_spanned(
+            variant,
+            "frieze: tuple variants are not supported; only unit variants can be expressed as an OAS string enum.",
+        )),
+        Fields::Named(_) => Err(syn::Error::new_spanned(
+            variant,
+            "frieze: struct variants are not supported; only unit variants can be expressed as an OAS string enum.",
+        )),
+    }
+}
+
+/// Returns the first `#[serde(rename = "...")]` attribute on a variant
+/// so the caller can point its compile error at the offending attribute.
+fn find_variant_rename(attrs: &[Attribute]) -> Option<&Attribute> {
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+        let mut found = false;
+        let _ = attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename") && meta.input.peek(syn::Token![=]) {
+                let _ = meta.value().and_then(|v| v.parse::<syn::LitStr>());
+                found = true;
+            }
+            Ok(())
+        });
+        if found {
+            return Some(attr);
+        }
+    }
+    None
+}
+
+/// Serde's container-level `rename_all` modes. Variant-name remapping is
+/// implemented in [`RenameAll::apply`] so the macro reproduces the same
+/// output serde produces at runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RenameAll {
+    None,
+    Lowercase,
+    Uppercase,
+    PascalCase,
+    CamelCase,
+    SnakeCase,
+    ScreamingSnakeCase,
+    KebabCase,
+    ScreamingKebabCase,
+}
+
+impl RenameAll {
+    /// Apply the rule to a variant identifier. Mirrors serde's
+    /// `apply_to_variant` so generated enums match what serde will
+    /// produce on the wire.
+    fn apply(self, variant: &str) -> String {
+        match self {
+            RenameAll::None | RenameAll::PascalCase => variant.to_owned(),
+            RenameAll::Lowercase => variant.to_ascii_lowercase(),
+            RenameAll::Uppercase => variant.to_ascii_uppercase(),
+            RenameAll::CamelCase => {
+                let mut chars = variant.chars();
+                match chars.next() {
+                    Some(first) => {
+                        let mut out = String::with_capacity(variant.len());
+                        out.extend(first.to_lowercase());
+                        out.extend(chars);
+                        out
+                    }
+                    None => String::new(),
+                }
+            }
+            RenameAll::SnakeCase => to_snake(variant),
+            RenameAll::ScreamingSnakeCase => to_snake(variant).to_ascii_uppercase(),
+            RenameAll::KebabCase => to_snake(variant).replace('_', "-"),
+            RenameAll::ScreamingKebabCase => {
+                to_snake(variant).to_ascii_uppercase().replace('_', "-")
+            }
+        }
+    }
+}
+
+/// PascalCase / camelCase → snake_case using serde's variant rule:
+/// insert `_` before every uppercase letter (except at index 0), then
+/// lowercase everything.
+fn to_snake(variant: &str) -> String {
+    let mut out = String::with_capacity(variant.len() + 4);
+    for (i, ch) in variant.char_indices() {
+        if i > 0 && ch.is_ascii_uppercase() {
+            out.push('_');
+        }
+        for lower in ch.to_lowercase() {
+            out.push(lower);
+        }
+    }
+    out
+}
+
+/// Parse the container-level `#[serde(rename_all = "...")]` if present.
+/// Unsupported values surface as a compile error pointing at the
+/// attribute, listing the recognised modes.
+fn parse_rename_all(attrs: &[Attribute]) -> Result<RenameAll, syn::Error> {
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+        let mut found: Option<(String, proc_macro2::Span)> = None;
+        let _ = attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("rename_all") {
+                if let Ok(value) = meta.value() {
+                    if let Ok(lit) = value.parse::<syn::LitStr>() {
+                        found = Some((lit.value(), lit.span()));
+                    }
+                }
+            }
+            Ok(())
+        });
+        if let Some((value, span)) = found {
+            return rename_all_from_str(&value, span, attr);
+        }
+    }
+    Ok(RenameAll::None)
+}
+
+fn rename_all_from_str(
+    value: &str,
+    span: proc_macro2::Span,
+    attr: &Attribute,
+) -> Result<RenameAll, syn::Error> {
+    let mode = match value {
+        "lowercase" => RenameAll::Lowercase,
+        "UPPERCASE" => RenameAll::Uppercase,
+        "PascalCase" => RenameAll::PascalCase,
+        "camelCase" => RenameAll::CamelCase,
+        "snake_case" => RenameAll::SnakeCase,
+        "SCREAMING_SNAKE_CASE" => RenameAll::ScreamingSnakeCase,
+        "kebab-case" => RenameAll::KebabCase,
+        "SCREAMING-KEBAB-CASE" => RenameAll::ScreamingKebabCase,
+        _ => {
+            let _ = span; // anchor the error on the attribute for tooling
+            return Err(syn::Error::new_spanned(
+                attr,
+                format!(
+                    "frieze: unsupported `rename_all` value `{value}`; supported values are \
+                     lowercase, UPPERCASE, PascalCase, camelCase, snake_case, \
+                     SCREAMING_SNAKE_CASE, kebab-case, SCREAMING-KEBAB-CASE."
+                ),
+            ));
+        }
+    };
+    Ok(mode)
+}
+
 fn named_fields(
     ast: &DeriveInput,
 ) -> Result<&syn::punctuated::Punctuated<Field, syn::Token![,]>, syn::Error> {
     let data_struct = match &ast.data {
         Data::Struct(s) => s,
-        Data::Enum(_) => {
-            return Err(syn::Error::new_spanned(
-                &ast.ident,
-                "frieze: #[derive(Schema)] does not support enums in Phase 1. Future PRs will add support.",
-            ));
-        }
-        Data::Union(_) => {
-            return Err(syn::Error::new_spanned(
-                &ast.ident,
-                "frieze: #[derive(Schema)] does not support unions.",
-            ));
-        }
+        Data::Enum(_) | Data::Union(_) => unreachable!("dispatched in `expand`"),
     };
     match &data_struct.fields {
         Fields::Named(named) => Ok(&named.named),

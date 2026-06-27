@@ -37,6 +37,15 @@ schema:
 | `Option<U>` (serde default)     | `{allOf: [{$ref: ...}], nullable: true}`      | `{oneOf: [{$ref: ...}, {type: "null"}]}`           |
 | `Maybe<U>`                      | `{allOf: [{$ref: ...}], nullable: true}`      | `{oneOf: [{$ref: ...}, {type: "null"}]}`           |
 
+### String enums are version-agnostic
+
+A unit-variant enum derives `type: string, enum: [...]`. The shape
+is identical under both `oas-3-0` and `oas-3-1` — neither involves
+nullability nor `$ref` siblings, so no per-version wrap is needed.
+A nullable enum reference (`Option<EnumType>` field) reuses the same
+nullable-reference wrap as a nullable nested-struct reference; see
+the table above.
+
 ### Why the difference
 
 - OAS 3.0 uses a dedicated `nullable: true` keyword. Combined with the

@@ -1,5 +1,0 @@
-error: frieze: #[derive(Schema)] does not support enums in Phase 1. Future PRs will add support.
- --> tests/ui/enum_not_supported.rs:4:6
-  |
-4 | enum E {
-  |      ^

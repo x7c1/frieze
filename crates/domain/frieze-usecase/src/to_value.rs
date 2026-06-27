@@ -2,7 +2,7 @@
 //! [`serde_yaml::Value`], via [`frieze_openapi`].
 
 use frieze_model::{Property, PropertyType, Schema, SchemaName, Schemas};
-use frieze_openapi::{SchemaObject, SchemaType};
+use frieze_openapi::{ObjectSchema, SchemaObject, SchemaType, StringEnumSchema};
 use indexmap::IndexMap;
 use serde_yaml::{Mapping, Number, Value};
 
@@ -29,36 +29,49 @@ pub fn to_value(schemas: &Schemas) -> Value {
 
 /// Boundary conversion: validated domain schema -> plain OAS schema object.
 ///
-/// The `required` array is built from each property's [`Property::presence`]
-/// — and only that. Value-level nullability lives on the type tree
-/// ([`PropertyType::Nullable`]) and is rendered independently by
-/// [`property_to_openapi`].
+/// Each [`Schema`] variant maps to the matching [`SchemaObject`] variant.
+/// For [`Schema::Object`], the `required` array is built from each
+/// property's [`Property::presence`] — and only that. Value-level
+/// nullability lives on the type tree ([`PropertyType::Nullable`]) and is
+/// rendered independently by [`property_type_to_object_schema`].
 fn to_openapi(schema: &Schema) -> SchemaObject {
-    let mut properties: IndexMap<String, SchemaObject> = IndexMap::new();
+    match schema {
+        Schema::Object(object) => SchemaObject::Object(object_schema_from_model(object)),
+        Schema::StringEnum(string_enum) => {
+            SchemaObject::StringEnum(StringEnumSchema::new(string_enum.values.clone()))
+        }
+    }
+}
+
+fn object_schema_from_model(schema: &frieze_model::ObjectSchema) -> ObjectSchema {
+    let mut properties: IndexMap<String, ObjectSchema> = IndexMap::new();
     let mut required: Vec<String> = Vec::with_capacity(schema.properties.len());
     for (name, property) in &schema.properties {
-        properties.insert(name.as_str().to_string(), property_to_openapi(property));
+        properties.insert(
+            name.as_str().to_string(),
+            property_to_object_schema(property),
+        );
         if property.presence.is_required() {
             required.push(name.as_str().to_string());
         }
     }
-    SchemaObject {
+    ObjectSchema {
         ty: Some(SchemaType::Object),
         properties: Some(properties),
         required,
-        ..SchemaObject::empty()
+        ..ObjectSchema::empty()
     }
 }
 
-/// Single mapping from a [`Property`] to the OAS schema object that
+/// Single mapping from a [`Property`] to the OAS object schema that
 /// represents it. The property's presence is consumed up at
-/// [`to_openapi`] (for the `required` array); only the type tree affects
-/// the per-property schema object emitted here.
-fn property_to_openapi(property: &Property) -> SchemaObject {
-    property_type_to_openapi(&property.ty)
+/// [`object_schema_from_model`] (for the `required` array); only the type
+/// tree affects the per-property schema emitted here.
+fn property_to_object_schema(property: &Property) -> ObjectSchema {
+    property_type_to_object_schema(&property.ty)
 }
 
-/// Single mapping from a [`PropertyType`] to the matching schema object.
+/// Single mapping from a [`PropertyType`] to the matching object schema.
 ///
 /// Recurses on [`PropertyType::Array`] so the element schema is rendered
 /// into the `items` slot, and on [`PropertyType::Nullable`] so the
@@ -72,7 +85,7 @@ fn property_to_openapi(property: &Property) -> SchemaObject {
 /// "nullable reference" shape ([`nullable_reference_object`]) rather than
 /// attempting to attach `nullable: true` directly to the `$ref` (which is
 /// invalid OAS).
-fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
+fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
     let (schema_ty, format, minimum) = match ty {
         PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
         PropertyType::Int64 => (SchemaType::Integer, Some("int64"), None),
@@ -83,10 +96,10 @@ fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
         PropertyType::String => (SchemaType::String, None, None),
         PropertyType::Boolean => (SchemaType::Boolean, None, None),
         PropertyType::Array(inner) => {
-            return SchemaObject {
+            return ObjectSchema {
                 ty: Some(SchemaType::Array),
-                items: Some(Box::new(property_type_to_openapi(inner))),
-                ..SchemaObject::empty()
+                items: Some(Box::new(property_type_to_object_schema(inner))),
+                ..ObjectSchema::empty()
             };
         }
         PropertyType::Nullable(inner) => {
@@ -96,7 +109,7 @@ fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
             if let PropertyType::Reference(name) = inner.as_ref() {
                 return nullable_reference_object(name);
             }
-            let mut inner_schema = property_type_to_openapi(inner);
+            let mut inner_schema = property_type_to_object_schema(inner);
             inner_schema.nullable = Some(true);
             return inner_schema;
         }
@@ -104,24 +117,24 @@ fn property_type_to_openapi(ty: &PropertyType) -> SchemaObject {
             return reference_object(name);
         }
     };
-    SchemaObject {
+    ObjectSchema {
         ty: Some(schema_ty),
         format: format.map(str::to_owned),
         minimum,
-        ..SchemaObject::empty()
+        ..ObjectSchema::empty()
     }
 }
 
-/// Builds a pure `$ref` schema object pointing at
+/// Builds a pure `$ref` object schema pointing at
 /// `#/components/schemas/<name>`.
-fn reference_object(name: &SchemaName) -> SchemaObject {
-    SchemaObject {
+fn reference_object(name: &SchemaName) -> ObjectSchema {
+    ObjectSchema {
         reference: Some(format!("#/components/schemas/{}", name.as_str())),
-        ..SchemaObject::empty()
+        ..ObjectSchema::empty()
     }
 }
 
-/// Builds the OAS-version-specific "nullable reference" schema object.
+/// Builds the OAS-version-specific "nullable reference" object schema.
 ///
 /// - OAS 3.0: `allOf: [{$ref}], nullable: true`. The `allOf` wrap is the
 ///   idiomatic 3.0 escape hatch for siblings on a referencing schema.
@@ -131,33 +144,61 @@ fn reference_object(name: &SchemaName) -> SchemaObject {
 /// The `$ref` element is always first; the null sibling is second. This
 /// is purely for snapshot stability.
 #[cfg(feature = "oas-3-0")]
-fn nullable_reference_object(name: &SchemaName) -> SchemaObject {
-    SchemaObject {
+fn nullable_reference_object(name: &SchemaName) -> ObjectSchema {
+    ObjectSchema {
         all_of: Some(vec![reference_object(name)]),
         nullable: Some(true),
-        ..SchemaObject::empty()
+        ..ObjectSchema::empty()
     }
 }
 
 #[cfg(feature = "oas-3-1")]
-fn nullable_reference_object(name: &SchemaName) -> SchemaObject {
-    SchemaObject {
+fn nullable_reference_object(name: &SchemaName) -> ObjectSchema {
+    ObjectSchema {
         one_of: Some(vec![
             reference_object(name),
-            SchemaObject {
+            ObjectSchema {
                 // `type: "null"` is emitted as a quoted string by the
                 // renderer to preserve the user-visible scalar form. See
                 // `schema_type_to_value` / `insert_type`.
                 ty: Some(SchemaType::Null),
-                ..SchemaObject::empty()
+                ..ObjectSchema::empty()
             },
         ]),
-        ..SchemaObject::empty()
+        ..ObjectSchema::empty()
     }
 }
 
-/// Serializes a [`SchemaObject`] into a [`Value`] with manually ordered keys
-/// so that the YAML output is stable.
+/// Serializes a [`SchemaObject`] into a [`Value`] by dispatching on the
+/// sum and delegating to the variant-specific emitter.
+fn schema_object_to_value(schema: &SchemaObject) -> Value {
+    match schema {
+        SchemaObject::Object(object) => object_schema_to_value(object),
+        SchemaObject::StringEnum(string_enum) => string_enum_to_value(string_enum),
+    }
+}
+
+/// Serializes a [`StringEnumSchema`] in the canonical key order
+/// (`type, enum`). Variant values are emitted in source order, not
+/// alphabetical — matching what serde produces on the wire and what
+/// the user reads in the Rust source.
+fn string_enum_to_value(schema: &StringEnumSchema) -> Value {
+    let mut map = Mapping::new();
+    map.insert(
+        Value::String("type".into()),
+        schema_type_to_value(SchemaType::String),
+    );
+    let values: Vec<Value> = schema
+        .values
+        .iter()
+        .map(|v| Value::String(v.clone()))
+        .collect();
+    map.insert(Value::String("enum".into()), Value::Sequence(values));
+    Value::Mapping(map)
+}
+
+/// Serializes an [`ObjectSchema`] into a [`Value`] with manually ordered
+/// keys so that the YAML output is stable.
 ///
 /// Key ordering depends on the selected OAS version feature:
 ///
@@ -173,13 +214,13 @@ fn nullable_reference_object(name: &SchemaName) -> SchemaObject {
 ///   spec drops the `nullable` keyword.
 ///
 /// `items` is emitted on array schemas only; the element schema is
-/// rendered through the same `schema_object_to_value` recursively so its
+/// rendered through the same `object_schema_to_value` recursively so its
 /// own keys obey the same ordering rules (and so a nullable item gets
 /// its `nullable` marker at the items level, not the array level).
 ///
 /// When `$ref` is present, no other keys are emitted: OAS treats a
 /// `$ref` schema as a leaf and discards sibling keys.
-fn schema_object_to_value(schema: &SchemaObject) -> Value {
+fn object_schema_to_value(schema: &ObjectSchema) -> Value {
     let mut map = Mapping::new();
     if let Some(reference) = &schema.reference {
         map.insert(
@@ -190,7 +231,7 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
     }
     insert_type(&mut map, schema);
     if let Some(items) = &schema.items {
-        map.insert(Value::String("items".into()), schema_object_to_value(items));
+        map.insert(Value::String("items".into()), object_schema_to_value(items));
     }
     if let Some(format) = &schema.format {
         map.insert(
@@ -204,20 +245,20 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
     if let Some(all_of) = &schema.all_of {
         map.insert(
             Value::String("allOf".into()),
-            Value::Sequence(all_of.iter().map(schema_object_to_value).collect()),
+            Value::Sequence(all_of.iter().map(object_schema_to_value).collect()),
         );
     }
     if let Some(one_of) = &schema.one_of {
         map.insert(
             Value::String("oneOf".into()),
-            Value::Sequence(one_of.iter().map(schema_object_to_value).collect()),
+            Value::Sequence(one_of.iter().map(object_schema_to_value).collect()),
         );
     }
     insert_nullable(&mut map, schema);
     if let Some(properties) = &schema.properties {
         let mut inner = Mapping::new();
         for (name, child) in properties {
-            inner.insert(Value::String(name.clone()), schema_object_to_value(child));
+            inner.insert(Value::String(name.clone()), object_schema_to_value(child));
         }
         map.insert(Value::String("properties".into()), Value::Mapping(inner));
     }
@@ -242,14 +283,14 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
 /// unquoted `null` in YAML resolves to the null value, not the string
 /// `"null"`.
 #[cfg(feature = "oas-3-0")]
-fn insert_type(map: &mut Mapping, schema: &SchemaObject) {
+fn insert_type(map: &mut Mapping, schema: &ObjectSchema) {
     if let Some(ty) = schema.ty {
         map.insert(Value::String("type".into()), schema_type_to_value(ty));
     }
 }
 
 #[cfg(feature = "oas-3-1")]
-fn insert_type(map: &mut Mapping, schema: &SchemaObject) {
+fn insert_type(map: &mut Mapping, schema: &ObjectSchema) {
     if let Some(ty) = schema.ty {
         let base = schema_type_to_value(ty);
         let value = if schema.nullable == Some(true) {
@@ -267,14 +308,14 @@ fn insert_type(map: &mut Mapping, schema: &SchemaObject) {
 /// `oas-3-1`, the nullability marker is folded into `type` (see
 /// [`insert_type`]) and this function emits nothing.
 #[cfg(feature = "oas-3-0")]
-fn insert_nullable(map: &mut Mapping, schema: &SchemaObject) {
+fn insert_nullable(map: &mut Mapping, schema: &ObjectSchema) {
     if schema.nullable == Some(true) {
         map.insert(Value::String("nullable".into()), Value::Bool(true));
     }
 }
 
 #[cfg(feature = "oas-3-1")]
-fn insert_nullable(_map: &mut Mapping, _schema: &SchemaObject) {
+fn insert_nullable(_map: &mut Mapping, _schema: &ObjectSchema) {
     // OAS 3.1 has no `nullable` keyword; the intent is encoded in `type`.
 }
 
@@ -290,7 +331,7 @@ fn schema_type_to_value(ty: SchemaType) -> Value {
 /// that round-trips losslessly through `i64` (the OAS-idiomatic
 /// `minimum: 0` rather than `0.0`), and as a float otherwise.
 ///
-/// `SchemaObject.minimum` is typed as `f64` so the API can carry fractional
+/// `ObjectSchema.minimum` is typed as `f64` so the API can carry fractional
 /// bounds in the future, but the only values Phase 1 produces are integer
 /// constants (0 for `u32` / `u64`), which should render as integers.
 fn minimum_to_value(minimum: f64) -> Value {
@@ -316,7 +357,7 @@ mod tests {
             "User"
         }
         fn schema() -> frieze_model::Schema {
-            frieze_model::Schema::new(
+            frieze_model::Schema::new_object(
                 "User",
                 vec![
                     Property::new("id", PropertyType::Int64, Presence::Required).unwrap(),

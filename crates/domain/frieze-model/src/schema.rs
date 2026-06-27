@@ -1,95 +1,56 @@
-//! A validated schema with a non-empty name and at least one property.
-
-use indexmap::IndexMap;
+//! The top-level [`Schema`] sum stored in [`crate::Schemas`].
 
 use crate::error::Error;
+use crate::object_schema::ObjectSchema;
 use crate::property::Property;
-use crate::property_name::PropertyName;
 use crate::schema_name::SchemaName;
+use crate::string_enum_schema::StringEnumSchema;
 
-/// A schema in its validated form: a non-empty name plus at least one property,
-/// with no duplicate property names.
+/// A validated domain schema.
 ///
-/// Properties are stored in declaration order (the order passed to
-/// [`Schema::new`]).
-///
-/// Validation happens once, in [`Schema::new`]. The fields are `pub` because
-/// the type's contract is its shape, not behavior: callers may read or
-/// (re-)assign fields directly. Maintaining the documented invariants on a
-/// value built via struct-literal or post-construction mutation is the
-/// caller's responsibility — the constructor is the only place that checks
-/// them.
+/// The sum determines what shape a registered schema entry can take.
+/// Variants are added as new top-level kinds are supported by the
+/// derive — Phase 1 covers object schemas and unit-variant enum
+/// schemas; richer enum shapes (data-carrying variants, `oneOf`) will
+/// arrive as further variants. Matches on this sum are intentionally
+/// exhaustive across the workspace so adding a variant surfaces a
+/// compile error at every consumption site.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Schema {
-    pub name: SchemaName,
-    pub properties: IndexMap<PropertyName, Property>,
+pub enum Schema {
+    /// A standard ("object-typed") schema with at least one property.
+    Object(ObjectSchema),
+    /// A `type: string, enum: [...]` schema derived from a Rust enum
+    /// whose variants are all unit variants.
+    StringEnum(StringEnumSchema),
 }
 
 impl Schema {
-    /// Builds a schema, rejecting empty names, empty property lists, and
-    /// duplicate property names.
-    pub fn new(name: impl Into<String>, properties: Vec<Property>) -> Result<Self, Error> {
-        let name = SchemaName::new(name)?;
-        if properties.is_empty() {
-            return Err(Error::NoProperties(name.into_string()));
+    /// Builds an object-typed schema, rejecting empty names, empty
+    /// property lists, and duplicate property names.
+    ///
+    /// Convenience wrapper around [`ObjectSchema::new`] that returns the
+    /// surrounding [`Schema::Object`] variant directly so callers do not
+    /// need to import [`ObjectSchema`] just to wrap.
+    pub fn new_object(name: impl Into<String>, properties: Vec<Property>) -> Result<Self, Error> {
+        ObjectSchema::new(name, properties).map(Schema::Object)
+    }
+
+    /// Builds a string-enum schema, rejecting empty names, empty value
+    /// lists, empty value strings, and duplicate values.
+    ///
+    /// Convenience wrapper around [`StringEnumSchema::new`] that returns
+    /// the surrounding [`Schema::StringEnum`] variant directly so callers
+    /// do not need to import [`StringEnumSchema`] just to wrap.
+    pub fn new_string_enum(name: impl Into<String>, values: Vec<String>) -> Result<Self, Error> {
+        StringEnumSchema::new(name, values).map(Schema::StringEnum)
+    }
+
+    /// The name under which this schema is registered in
+    /// [`crate::Schemas`].
+    pub fn name(&self) -> &SchemaName {
+        match self {
+            Schema::Object(o) => &o.name,
+            Schema::StringEnum(e) => &e.name,
         }
-        let mut map: IndexMap<PropertyName, Property> = IndexMap::with_capacity(properties.len());
-        for property in properties {
-            let key = property.name.clone();
-            if map.contains_key(&key) {
-                return Err(Error::DuplicateProperty {
-                    schema: name.into_string(),
-                    property: key.as_str().to_string(),
-                });
-            }
-            map.insert(key, property);
-        }
-        Ok(Self {
-            name,
-            properties: map,
-        })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::presence::Presence;
-    use crate::property_type::PropertyType;
-
-    #[test]
-    fn rejects_empty_name() {
-        let property = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
-        let err = Schema::new("", vec![property]).unwrap_err();
-        assert_eq!(err, Error::EmptySchemaName);
-    }
-
-    #[test]
-    fn rejects_no_properties() {
-        let err = Schema::new("User", vec![]).unwrap_err();
-        assert_eq!(err, Error::NoProperties("User".into()));
-    }
-
-    #[test]
-    fn rejects_duplicate_properties() {
-        let a = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
-        let b = Property::new("id", PropertyType::String, Presence::Required).unwrap();
-        let err = Schema::new("User", vec![a, b]).unwrap_err();
-        assert_eq!(
-            err,
-            Error::DuplicateProperty {
-                schema: "User".into(),
-                property: "id".into()
-            }
-        );
-    }
-
-    #[test]
-    fn preserves_declaration_order() {
-        let id = Property::new("id", PropertyType::Int64, Presence::Required).unwrap();
-        let name = Property::new("name", PropertyType::String, Presence::Required).unwrap();
-        let schema = Schema::new("User", vec![id, name]).unwrap();
-        let keys: Vec<&str> = schema.properties.keys().map(|k| k.as_str()).collect();
-        assert_eq!(keys, vec!["id", "name"]);
     }
 }

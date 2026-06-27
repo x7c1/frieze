@@ -28,7 +28,7 @@ impl Schemas {
     pub fn new(schemas: Vec<Schema>) -> Result<Self, Error> {
         let mut by_name: BTreeMap<SchemaName, Schema> = BTreeMap::new();
         for schema in schemas {
-            let key = schema.name.clone();
+            let key = schema.name().clone();
             if by_name.contains_key(&key) {
                 return Err(Error::DuplicateSchema(key));
             }
@@ -46,7 +46,7 @@ mod tests {
     use crate::property_type::PropertyType;
 
     fn user_schema() -> Schema {
-        Schema::new(
+        Schema::new_object(
             "User",
             vec![Property::new("id", PropertyType::Int64, Presence::Required).unwrap()],
         )
@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn iterates_alphabetically() {
-        let a = Schema::new(
+        let a = Schema::new_object(
             "Album",
             vec![Property::new("id", PropertyType::Int64, Presence::Required).unwrap()],
         )

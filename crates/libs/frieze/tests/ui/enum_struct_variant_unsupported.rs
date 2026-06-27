@@ -1,9 +1,9 @@
 use frieze::Schema;
 
 #[derive(Schema)]
-enum E {
-    A,
-    B,
+enum Event {
+    Login { user_id: i64 },
+    Logout,
 }
 
 fn main() {}
