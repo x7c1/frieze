@@ -1,0 +1,5 @@
+error: frieze: enum `Event` has data-carrying variants but no `#[serde(tag = "...")]` attribute. Add an internal tag to declare the discriminator property, e.g. `#[serde(tag = "kind")]`. Choose a tag name that does not conflict with any field of the inner structs (commonly `type`, `kind`, `label`, `event_type`).
+  --> tests/ui/enum_data_carrying_without_tag.rs:18:6
+   |
+18 | enum Event {
+   |      ^^^^^

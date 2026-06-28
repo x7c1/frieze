@@ -1,0 +1,5 @@
+error: frieze: struct variants (variant `Login` has named fields) are not supported. Define a named struct and use a newtype variant: #[derive(Schema)] struct LoginData { ... }; enum Event { Login(LoginData), ... }.
+ --> tests/ui/enum_struct_variant.rs:8:5
+  |
+8 |     Login { user_id: i64 },
+  |     ^^^^^^^^^^^^^^^^^^^^^^

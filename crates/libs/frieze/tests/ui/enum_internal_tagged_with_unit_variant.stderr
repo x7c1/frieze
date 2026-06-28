@@ -1,0 +1,5 @@
+error: frieze: enum `Payload` has `#[serde(tag = "kind")]` but contains a unit variant `Foo`. internal-tagged enums require every variant to be a newtype wrapping a Schema-implementing struct; unit variants would serialize to `{"kind": "Foo"}`, indistinguishable on the wire from an empty struct variant. Either split unit variants into a separate enum (emitted as `{type: string, enum: [...]}`), or give the unit variant a payload as a named struct.
+  --> tests/ui/enum_internal_tagged_with_unit_variant.rs:16:5
+   |
+16 |     Foo,
+   |     ^^^

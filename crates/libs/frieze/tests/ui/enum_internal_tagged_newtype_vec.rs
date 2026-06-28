@@ -1,12 +1,12 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+// E-2b: newtype inner is a `Vec<T>` wrapper, not a struct.
 #[derive(Schema, Serialize, Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "kind")]
 #[allow(dead_code)]
-enum Status {
-    Active,
-    Inactive,
+enum Payload {
+    Counts(Vec<i64>),
 }
 
 fn main() {}

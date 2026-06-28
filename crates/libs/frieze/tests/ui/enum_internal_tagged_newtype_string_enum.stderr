@@ -1,0 +1,17 @@
+error[E0277]: frieze: internal-tagged enum variants require their inner type to be a struct schema, but `Status` is not
+  --> tests/ui/enum_internal_tagged_newtype_string_enum.rs:19:10
+   |
+19 |     Mode(Status),
+   |          ^^^^^^ this type does not implement `IsStructSchema`
+   |
+help: the trait `frieze::__private::frieze_usecase::schema::IsStructSchema` is not implemented for `Status`
+  --> tests/ui/enum_internal_tagged_newtype_string_enum.rs:10:1
+   |
+10 | enum Status {
+   | ^^^^^^^^^^^
+   = note: wrap `Status` in a struct with `#[derive(Schema)]` and use the wrapping struct as the newtype variant inner: `struct StatusData { value: Status }`, then `enum YourEnum { ... (StatusData), ... }`
+note: required by a bound in `_frieze_assert_struct_schema`
+  --> tests/ui/enum_internal_tagged_newtype_string_enum.rs:19:5
+   |
+19 |     Mode(Status),
+   |     ^^^^ required by this bound in `_frieze_assert_struct_schema`
