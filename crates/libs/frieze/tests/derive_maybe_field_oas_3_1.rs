@@ -20,9 +20,11 @@ fn maybe_field_renders_optional_and_type_null_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
     Profile:
       type: object
+      required:
+        - id
       properties:
         id:
           type: integer
@@ -31,7 +33,5 @@ fn maybe_field_renders_optional_and_type_null_under_oas_3_1() {
           type:
             - string
             - "null"
-      required:
-        - id
-    "###);
+    "#);
 }

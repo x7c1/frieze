@@ -14,16 +14,16 @@ fn bool_field_renders_as_type_boolean() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @"
     Flag:
       type: object
+      required:
+        - enabled
+        - label
       properties:
         enabled:
           type: boolean
         label:
           type: string
-      required:
-        - enabled
-        - label
-    "###);
+    ");
 }

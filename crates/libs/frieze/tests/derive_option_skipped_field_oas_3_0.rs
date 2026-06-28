@@ -25,16 +25,16 @@ fn option_with_skip_serializing_if_renders_optional_non_nullable_under_oas_3_0()
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @"
     User:
       type: object
+      required:
+        - id
       properties:
         id:
           type: integer
           format: int64
         nickname:
           type: string
-      required:
-        - id
-    "###);
+    ");
 }

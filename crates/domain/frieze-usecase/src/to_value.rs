@@ -10,9 +10,9 @@ use serde_yaml::{Mapping, Number, Value};
 /// preserving the canonical output order:
 ///
 /// - top-level keys (schema names): alphabetical (via [`std::collections::BTreeMap`])
-/// - inside one schema: `$ref`, `type`, `items`, `format`, `minimum`,
-///   `allOf`, `oneOf`, (`nullable` under `oas-3-0`,) `properties`,
-///   `required`
+/// - inside one schema: `$ref`, `type`, `description`, `format`,
+///   `minimum`, `items`, `required`, `properties`, `allOf`, `oneOf`,
+///   (`nullable` under `oas-3-0`,) `enum`
 /// - `properties`: declaration order (via [`IndexMap`])
 /// - `required`: same order as `properties`
 pub fn to_value(schemas: &Schemas) -> Value {
@@ -37,9 +37,10 @@ pub fn to_value(schemas: &Schemas) -> Value {
 fn to_openapi(schema: &Schema) -> SchemaObject {
     match schema {
         Schema::Object(object) => SchemaObject::Object(object_schema_from_model(object)),
-        Schema::StringEnum(string_enum) => {
-            SchemaObject::StringEnum(StringEnumSchema::new(string_enum.values.clone()))
-        }
+        Schema::StringEnum(string_enum) => SchemaObject::StringEnum(
+            StringEnumSchema::new(string_enum.values.clone())
+                .with_description(string_enum.description.clone()),
+        ),
     }
 }
 
@@ -57,6 +58,7 @@ fn object_schema_from_model(schema: &frieze_model::ObjectSchema) -> ObjectSchema
     }
     ObjectSchema {
         ty: Some(SchemaType::Object),
+        description: schema.description.clone(),
         properties: Some(properties),
         required,
         ..ObjectSchema::empty()
@@ -65,10 +67,76 @@ fn object_schema_from_model(schema: &frieze_model::ObjectSchema) -> ObjectSchema
 
 /// Single mapping from a [`Property`] to the OAS object schema that
 /// represents it. The property's presence is consumed up at
-/// [`object_schema_from_model`] (for the `required` array); only the type
-/// tree affects the per-property schema emitted here.
+/// [`object_schema_from_model`] (for the `required` array); the property
+/// description is attached here at whatever position the type tree
+/// dictates — for plain scalar / array properties this is the sibling
+/// `description` key on the emitted schema; for a `Reference`-typed
+/// property the wrap rules in [`property_type_to_object_schema`] place
+/// the description on the outer wrapper.
 fn property_to_object_schema(property: &Property) -> ObjectSchema {
-    property_type_to_object_schema(&property.ty)
+    attach_description(
+        property_type_to_object_schema(&property.ty),
+        property.description.as_deref(),
+    )
+}
+
+/// Attaches a property-level description to the object schema returned
+/// by [`property_type_to_object_schema`], honouring the four-case
+/// `(description, nullable)` matrix against `$ref` siblings:
+///
+/// |              | not nullable                 | nullable                                  |
+/// |--------------|------------------------------|-------------------------------------------|
+/// | no descr.    | bare `$ref` (no change)      | `{allOf: [{$ref}], nullable: true}` (3.0) / `{oneOf: [{$ref}, {null}]}` (3.1) |
+/// | with descr.  | OAS 3.0: `{description, allOf: [{$ref}]}` / OAS 3.1: `{$ref, description}` | description attaches to the existing wrap |
+///
+/// The "nullable" cases hand us a schema whose `reference` is already
+/// `None` (the reference now lives inside `all_of` / `one_of`), so the
+/// description simply rides on the outer wrapper. The "not nullable +
+/// description + reference" case differs between OAS versions: under
+/// 3.0 we have to wrap because `$ref` siblings are ignored on the wire,
+/// but under 3.1 a sibling `description` is valid so the renderer emits
+/// it next to the `$ref`.
+fn attach_description(schema: ObjectSchema, description: Option<&str>) -> ObjectSchema {
+    let description = match description {
+        Some(d) if !d.is_empty() => d.to_string(),
+        _ => return schema,
+    };
+    match (schema.reference.is_some(), is_oas_3_0()) {
+        // Bare `$ref` + description under OAS 3.0 — siblings are
+        // silently ignored, so we wrap the reference in `allOf` and
+        // put the description on the outer schema.
+        (true, true) => ObjectSchema {
+            description: Some(description),
+            all_of: Some(vec![schema]),
+            ..ObjectSchema::empty()
+        },
+        // Bare `$ref` + description under OAS 3.1 — sibling keys are
+        // permitted, so we keep the `$ref` schema and attach the
+        // description directly. The renderer emits both siblings.
+        (true, false) => {
+            let mut out = schema;
+            out.description = Some(description);
+            out
+        }
+        // Non-`$ref` schema (scalar, array, `allOf` wrap for
+        // `Option<Reference>` under 3.0, `oneOf` wrap under 3.1) —
+        // description attaches directly.
+        (false, _) => {
+            let mut out = schema;
+            out.description = Some(description);
+            out
+        }
+    }
+}
+
+#[cfg(feature = "oas-3-0")]
+const fn is_oas_3_0() -> bool {
+    true
+}
+
+#[cfg(feature = "oas-3-1")]
+const fn is_oas_3_0() -> bool {
+    false
 }
 
 /// Single mapping from a [`PropertyType`] to the matching object schema.
@@ -179,7 +247,8 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
 }
 
 /// Serializes a [`StringEnumSchema`] in the canonical key order
-/// (`type, enum`). Variant values are emitted in source order, not
+/// (`type, description, enum`). `description` is emitted only when
+/// present. Variant values are emitted in source order, not
 /// alphabetical — matching what serde produces on the wire and what
 /// the user reads in the Rust source.
 fn string_enum_to_value(schema: &StringEnumSchema) -> Value {
@@ -188,6 +257,12 @@ fn string_enum_to_value(schema: &StringEnumSchema) -> Value {
         Value::String("type".into()),
         schema_type_to_value(SchemaType::String),
     );
+    if let Some(description) = &schema.description {
+        map.insert(
+            Value::String("description".into()),
+            Value::String(description.clone()),
+        );
+    }
     let values: Vec<Value> = schema
         .values
         .iter()
@@ -200,26 +275,38 @@ fn string_enum_to_value(schema: &StringEnumSchema) -> Value {
 /// Serializes an [`ObjectSchema`] into a [`Value`] with manually ordered
 /// keys so that the YAML output is stable.
 ///
-/// Key ordering depends on the selected OAS version feature:
+/// Canonical key order (single global rule; each schema kind emits the
+/// subset of keys that apply):
 ///
-/// - `oas-3-0`: `$ref`, `type`, `items`, `format`, `minimum`, `allOf`,
-///   `oneOf`, `nullable`, `properties`, `required`. The nullability
-///   intent for scalars is emitted as `nullable: true`; the nullability
-///   intent for references is emitted via `allOf` + `nullable`.
-/// - `oas-3-1`: `$ref`, `type`, `items`, `format`, `minimum`, `allOf`,
-///   `oneOf`, `properties`, `required`. The nullability intent for
-///   scalars is folded into `type` as a 2-element sequence
-///   `[<base>, "null"]`; the nullability intent for references is
-///   emitted via `oneOf` with a `{type: "null"}` sibling. The OAS 3.1
-///   spec drops the `nullable` keyword.
+/// ```text
+/// $ref, type, description, format, minimum, items, required,
+/// properties, allOf, oneOf, nullable, enum
+/// ```
+///
+/// Per-version differences:
+///
+/// - `oas-3-0`: a nullable scalar emits a `nullable: true` key.
+///   A nullable reference is wrapped in `allOf` with `nullable: true`
+///   on the wrapper.
+/// - `oas-3-1`: a nullable scalar folds the `null` intent into `type`
+///   as a 2-element sequence `[<base>, "null"]`; the `nullable` key is
+///   never emitted. A nullable reference is rendered as `oneOf` with a
+///   `{type: "null"}` sibling.
 ///
 /// `items` is emitted on array schemas only; the element schema is
 /// rendered through the same `object_schema_to_value` recursively so its
 /// own keys obey the same ordering rules (and so a nullable item gets
 /// its `nullable` marker at the items level, not the array level).
 ///
-/// When `$ref` is present, no other keys are emitted: OAS treats a
-/// `$ref` schema as a leaf and discards sibling keys.
+/// When `$ref` is present:
+///
+/// - under `oas-3-0`, no other keys are emitted — the spec says siblings
+///   of `$ref` are ignored on the wire, so we strip them at emission to
+///   keep the output unambiguous.
+/// - under `oas-3-1`, a sibling `description` is allowed and is emitted
+///   next to the `$ref`. Other sibling fields are still dropped — the
+///   conversion layer is responsible for producing a wrapper schema if
+///   they need to be expressed.
 fn object_schema_to_value(schema: &ObjectSchema) -> Value {
     let mut map = Mapping::new();
     if let Some(reference) = &schema.reference {
@@ -227,11 +314,15 @@ fn object_schema_to_value(schema: &ObjectSchema) -> Value {
             Value::String("$ref".into()),
             Value::String(reference.clone()),
         );
+        insert_reference_siblings(&mut map, schema);
         return Value::Mapping(map);
     }
     insert_type(&mut map, schema);
-    if let Some(items) = &schema.items {
-        map.insert(Value::String("items".into()), object_schema_to_value(items));
+    if let Some(description) = &schema.description {
+        map.insert(
+            Value::String("description".into()),
+            Value::String(description.clone()),
+        );
     }
     if let Some(format) = &schema.format {
         map.insert(
@@ -241,6 +332,24 @@ fn object_schema_to_value(schema: &ObjectSchema) -> Value {
     }
     if let Some(minimum) = schema.minimum {
         map.insert(Value::String("minimum".into()), minimum_to_value(minimum));
+    }
+    if let Some(items) = &schema.items {
+        map.insert(Value::String("items".into()), object_schema_to_value(items));
+    }
+    if !schema.required.is_empty() {
+        let items: Vec<Value> = schema
+            .required
+            .iter()
+            .map(|name| Value::String(name.clone()))
+            .collect();
+        map.insert(Value::String("required".into()), Value::Sequence(items));
+    }
+    if let Some(properties) = &schema.properties {
+        let mut inner = Mapping::new();
+        for (name, child) in properties {
+            inner.insert(Value::String(name.clone()), object_schema_to_value(child));
+        }
+        map.insert(Value::String("properties".into()), Value::Mapping(inner));
     }
     if let Some(all_of) = &schema.all_of {
         map.insert(
@@ -255,22 +364,28 @@ fn object_schema_to_value(schema: &ObjectSchema) -> Value {
         );
     }
     insert_nullable(&mut map, schema);
-    if let Some(properties) = &schema.properties {
-        let mut inner = Mapping::new();
-        for (name, child) in properties {
-            inner.insert(Value::String(name.clone()), object_schema_to_value(child));
-        }
-        map.insert(Value::String("properties".into()), Value::Mapping(inner));
-    }
-    if !schema.required.is_empty() {
-        let items: Vec<Value> = schema
-            .required
-            .iter()
-            .map(|name| Value::String(name.clone()))
-            .collect();
-        map.insert(Value::String("required".into()), Value::Sequence(items));
-    }
     Value::Mapping(map)
+}
+
+/// Emits the sibling keys allowed next to `$ref` on the active OAS
+/// version. Under 3.0 nothing is emitted (siblings are spec-ignored);
+/// under 3.1, `description` is allowed as a sibling and is emitted in
+/// the canonical post-`$ref` position.
+#[cfg(feature = "oas-3-0")]
+fn insert_reference_siblings(_map: &mut Mapping, _schema: &ObjectSchema) {
+    // OAS 3.0: `$ref` siblings are ignored on the wire. Any sibling
+    // intent (e.g. a `description` next to a reference) must have been
+    // re-shaped into an `allOf` wrap upstream; nothing to emit here.
+}
+
+#[cfg(feature = "oas-3-1")]
+fn insert_reference_siblings(map: &mut Mapping, schema: &ObjectSchema) {
+    if let Some(description) = &schema.description {
+        map.insert(
+            Value::String("description".into()),
+            Value::String(description.clone()),
+        );
+    }
 }
 
 /// Emits the `type` key.
@@ -378,7 +493,7 @@ mod tests {
             .and_then(Value::as_mapping)
             .unwrap();
         let keys: Vec<&str> = user.keys().filter_map(|k| k.as_str()).collect();
-        assert_eq!(keys, vec!["type", "properties", "required"]);
+        assert_eq!(keys, vec!["type", "required", "properties"]);
 
         let properties = user
             .get(Value::String("properties".into()))

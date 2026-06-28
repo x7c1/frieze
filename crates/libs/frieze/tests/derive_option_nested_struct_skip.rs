@@ -28,7 +28,7 @@ fn option_nested_with_skip_renders_plain_ref_and_optional_presence() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
     Profile:
       type: object
       properties:
@@ -36,11 +36,11 @@ fn option_nested_with_skip_renders_plain_ref_and_optional_presence() {
           $ref: "#/components/schemas/User"
     User:
       type: object
+      required:
+        - id
       properties:
         id:
           type: integer
           format: int64
-      required:
-        - id
-    "###);
+    "##);
 }

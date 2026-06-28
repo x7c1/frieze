@@ -34,28 +34,28 @@ fn two_level_nested_renders_all_three() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
     Profile:
       type: object
+      required:
+        - user
       properties:
         user:
           $ref: "#/components/schemas/User"
-      required:
-        - user
     User:
       type: object
+      required:
+        - id
       properties:
         id:
           type: integer
           format: int64
-      required:
-        - id
     Workspace:
       type: object
+      required:
+        - owner
       properties:
         owner:
           $ref: "#/components/schemas/Profile"
-      required:
-        - owner
-    "###);
+    "##);
 }

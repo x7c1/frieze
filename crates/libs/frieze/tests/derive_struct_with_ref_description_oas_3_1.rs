@@ -1,9 +1,8 @@
-//! `Option<User>` (serde default — no `skip_serializing_if`) maps to
-//! branch ② (required + nullable). Under OAS 3.0, a nullable reference
-//! is expressed with `allOf` + `nullable: true` because the spec
-//! disallows sibling keys on a `$ref` schema.
+//! Same source as `derive_struct_with_ref_description_oas_3_0` but the
+//! OAS 3.1 build allows `$ref` to carry sibling keys directly — the
+//! `description` sits next to the `$ref` with no wrap.
 
-#![cfg(feature = "oas-3-0")]
+#![cfg(feature = "oas-3-1")]
 
 use frieze::Schema;
 
@@ -16,27 +15,27 @@ struct User {
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Profile {
-    user: Option<User>,
+    /// The user account this profile belongs to.
+    user: User,
 }
 
 #[test]
-fn option_nested_renders_as_nullable_ref_under_oas_3_0() {
+fn ref_field_with_description_emits_sibling_under_oas_3_1() {
     let s: frieze::Schemas = frieze::schemas()
         .add::<Profile>()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
     Profile:
       type: object
       required:
         - user
       properties:
         user:
-          allOf:
-            - $ref: "#/components/schemas/User"
-          nullable: true
+          $ref: "#/components/schemas/User"
+          description: The user account this profile belongs to.
     User:
       type: object
       required:
@@ -45,5 +44,5 @@ fn option_nested_renders_as_nullable_ref_under_oas_3_0() {
         id:
           type: integer
           format: int64
-    "##);
+    "###);
 }

@@ -27,9 +27,11 @@ fn maybe_field_renders_optional_and_nullable_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @"
     Profile:
       type: object
+      required:
+        - id
       properties:
         id:
           type: integer
@@ -37,9 +39,7 @@ fn maybe_field_renders_optional_and_nullable_under_oas_3_0() {
         avatar_url:
           type: string
           nullable: true
-      required:
-        - id
-    "###);
+    ");
 }
 
 #[test]
