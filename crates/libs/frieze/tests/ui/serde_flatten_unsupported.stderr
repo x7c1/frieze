@@ -1,0 +1,5 @@
+error: frieze: `#[serde(flatten)]` on a field is not supported.
+  --> tests/ui/serde_flatten_unsupported.rs:13:13
+   |
+13 |     #[serde(flatten)]
+   |             ^^^^^^^

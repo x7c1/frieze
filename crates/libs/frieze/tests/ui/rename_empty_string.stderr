@@ -1,0 +1,5 @@
+error: frieze: `#[serde(rename = "")]` is not supported. The wire name must be a non-empty string.
+ --> tests/ui/rename_empty_string.rs:7:22
+  |
+7 |     #[serde(rename = "")]
+  |                      ^^

@@ -1,0 +1,5 @@
+error: frieze: `#[serde(tag)]` (internally-tagged enums) is not supported.
+ --> tests/ui/serde_tag_unsupported.rs:5:9
+  |
+5 | #[serde(tag = "kind")]
+  |         ^^^^^^^^^^^^

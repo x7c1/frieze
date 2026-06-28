@@ -1,0 +1,5 @@
+error: frieze: `#[serde(alias)]` produces a deserialize-only acceptance list that a single OAS schema cannot encode.
+ --> tests/ui/serde_alias_unsupported.rs:7:13
+  |
+7 |     #[serde(alias = "user_id")]
+  |             ^^^^^^^^^^^^^^^^^

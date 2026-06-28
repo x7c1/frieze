@@ -10,18 +10,26 @@
 //!   table below.
 //! - **Unit-variant enum** — every variant must be a unit variant. The
 //!   derive emits a `type: string, enum: [...]` schema whose values are
-//!   the variant names after applying any container-level
-//!   `#[serde(rename_all = "...")]`. Tuple variants, struct variants,
-//!   empty enums, and `#[serde(rename)]` on individual variants are
-//!   compile errors.
+//!   each variant's wire name, computed from the variant identifier
+//!   with any container-level `#[serde(rename_all = "...")]` applied
+//!   first and any variant-level `#[serde(rename = "literal")]`
+//!   overriding it. Tuple variants, struct variants, and empty enums
+//!   are compile errors.
 //!
 //! Any other shape produces a compile error.
 //!
 //! # Rust shape → OAS combination
 //!
 //! The struct mapping is driven by syntactic type recognition plus a
-//! single serde attribute (`skip_serializing_if = "Option::is_none"`);
-//! the macro does not interpret any other serde attribute on fields.
+//! small fixed set of serde attributes the macro reads: `rename`,
+//! `rename_all`, `default`, and `skip_serializing_if`. Any other
+//! `#[serde(...)]` entry that frieze cannot faithfully encode into a
+//! single OAS schema (`alias`, `flatten`, `tag`, `content`, `untagged`,
+//! `transparent`, `rename_all_fields`, `with` / `serialize_with` /
+//! `deserialize_with`, `from` / `try_from` / `into`, `skip` /
+//! `skip_serializing` / `skip_deserializing`, `other`, and the
+//! direction-split `rename(serialize = ..., deserialize = ...)` /
+//! `rename_all(...)` forms) is a compile error.
 //!
 //! | Rust shape                                                       | Presence | Nullability        |
 //! |------------------------------------------------------------------|----------|--------------------|
@@ -53,11 +61,13 @@
 //! `frieze::__private` module so downstream users only need to depend on the
 //! `frieze` facade crate.
 
+use std::collections::BTreeMap;
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
     parse_macro_input, Attribute, Data, DataEnum, DeriveInput, Field, Fields, GenericArgument,
-    PathArguments, Type, Variant,
+    Ident, PathArguments, Type, Variant,
 };
 
 /// Derive `frieze::Schema`. See the crate-level docs for the supported
@@ -84,6 +94,9 @@ fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
 
 fn expand_struct(ast: &DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
     let ident = &ast.ident;
+    let container_scan = scan_serde_attrs(&ast.attrs, SerdePosition::StructContainer)?;
+    let container_rule = rename_all_from_scan(&container_scan)?;
+
     let fields = named_fields(ast)?;
     if fields.is_empty() {
         return Err(syn::Error::new_spanned(
@@ -93,21 +106,37 @@ fn expand_struct(ast: &DeriveInput) -> Result<proc_macro2::TokenStream, syn::Err
     }
 
     let mut property_exprs = Vec::with_capacity(fields.len());
+    let mut wire_entries: Vec<(Ident, String, WireSource)> = Vec::with_capacity(fields.len());
     for field in fields {
-        let field_ident = field.ident.as_ref().expect("named field has an identifier");
-        let field_name = field_ident.to_string();
-        let (property_type_expr, presence_expr) = parse_field(field)?;
+        let field_ident = field
+            .ident
+            .as_ref()
+            .expect("named field has an identifier")
+            .clone();
+        let field_scan = scan_serde_attrs(&field.attrs, SerdePosition::StructField)?;
+        let individual = field_scan.rename.as_ref().map(|(s, sp)| (s.as_str(), *sp));
+        let (wire, source) = wire_name(
+            &field_ident,
+            individual,
+            container_rule,
+            RenameTarget::Field,
+        )?;
+        let (property_type_expr, presence_expr) = parse_field(field, &field_scan)?;
         let field_description_expr = description_token(&parse_doc_attrs(&field.attrs));
+        let wire_lit = wire.clone();
         property_exprs.push(quote! {
             ::frieze::__private::frieze_model::Property::new(
-                #field_name,
+                #wire_lit,
                 #property_type_expr,
                 #presence_expr,
             )
-            .expect("frieze: property name is non-empty and derived from a struct field")
+            .expect("frieze: property name is non-empty by construction")
             .with_description(#field_description_expr)
         });
+        wire_entries.push((field_ident, wire, source));
     }
+
+    check_unique_wire_names(&wire_entries, "field")?;
 
     let schema_name = ident.to_string();
     let struct_description_expr = description_token(&parse_doc_attrs(&ast.attrs));
@@ -132,11 +161,12 @@ fn expand_struct(ast: &DeriveInput) -> Result<proc_macro2::TokenStream, syn::Err
 /// Expand `#[derive(Schema)]` on a unit-variant enum into an `impl Schema`
 /// whose `schema()` returns a `StringEnum` variant.
 ///
-/// Rejects empty enums, non-unit variants, and variant-level
-/// `#[serde(rename = "...")]`. The container-level
-/// `#[serde(rename_all = "...")]` is read and applied to the variant
-/// names emitted into the `enum` array; an unsupported `rename_all`
-/// value is a compile error pointing at the attribute.
+/// Rejects empty enums and non-unit variants. The container-level
+/// `#[serde(rename_all = "...")]` is applied to each variant's wire
+/// name, and a variant-level `#[serde(rename = "literal")]` overrides
+/// the container rule. Wire-name collisions across variants (whether
+/// from literal `rename` or from a `rename_all` collapse) raise a
+/// compile error.
 fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<proc_macro2::TokenStream, syn::Error> {
     let ident = &ast.ident;
     if data.variants.is_empty() {
@@ -145,23 +175,33 @@ fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<proc_macro2::TokenS
             "frieze: enums with no variants cannot be represented as an OAS schema.",
         ));
     }
-    let rename_all = parse_rename_all(&ast.attrs)?;
+    let container_scan = scan_serde_attrs(&ast.attrs, SerdePosition::EnumContainer)?;
+    let container_rule = rename_all_from_scan(&container_scan)?;
+
     let mut values: Vec<String> = Vec::with_capacity(data.variants.len());
     let mut variant_descriptions: Vec<(String, Option<String>)> =
         Vec::with_capacity(data.variants.len());
+    let mut wire_entries: Vec<(Ident, String, WireSource)> =
+        Vec::with_capacity(data.variants.len());
     for variant in &data.variants {
         validate_variant(variant)?;
-        if let Some(attr) = find_variant_rename(&variant.attrs) {
-            return Err(syn::Error::new_spanned(
-                attr,
-                "frieze: `#[serde(rename)]` on a variant is not supported.",
-            ));
-        }
-        let original = variant.ident.to_string();
-        let renamed = rename_all.apply(&original);
-        values.push(renamed.clone());
-        variant_descriptions.push((renamed, parse_doc_attrs(&variant.attrs)));
+        let variant_scan = scan_serde_attrs(&variant.attrs, SerdePosition::EnumVariant)?;
+        let individual = variant_scan
+            .rename
+            .as_ref()
+            .map(|(s, sp)| (s.as_str(), *sp));
+        let (wire, source) = wire_name(
+            &variant.ident,
+            individual,
+            container_rule,
+            RenameTarget::Variant,
+        )?;
+        values.push(wire.clone());
+        variant_descriptions.push((wire.clone(), parse_doc_attrs(&variant.attrs)));
+        wire_entries.push((variant.ident.clone(), wire, source));
     }
+
+    check_unique_wire_names(&wire_entries, "variant")?;
 
     let schema_name = ident.to_string();
     let value_literals = values.iter().map(|v| {
@@ -205,28 +245,6 @@ fn validate_variant(variant: &Variant) -> Result<(), syn::Error> {
     }
 }
 
-/// Returns the first `#[serde(rename = "...")]` attribute on a variant
-/// so the caller can point its compile error at the offending attribute.
-fn find_variant_rename(attrs: &[Attribute]) -> Option<&Attribute> {
-    for attr in attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-        let mut found = false;
-        let _ = attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("rename") && meta.input.peek(syn::Token![=]) {
-                let _ = meta.value().and_then(|v| v.parse::<syn::LitStr>());
-                found = true;
-            }
-            Ok(())
-        });
-        if found {
-            return Some(attr);
-        }
-    }
-    None
-}
-
 /// Serde's container-level `rename_all` modes. Variant-name remapping is
 /// implemented in [`RenameAll::apply`] so the macro reproduces the same
 /// output serde produces at runtime.
@@ -243,11 +261,31 @@ enum RenameAll {
     ScreamingKebabCase,
 }
 
+/// Site at which a `rename_all` rule is applied. Serde uses different
+/// rules for struct fields (canonical input shape: `snake_case`) and
+/// enum variants (canonical input shape: `PascalCase`), so the same
+/// mode produces different output depending on the site.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RenameTarget {
+    Field,
+    Variant,
+}
+
 impl RenameAll {
-    /// Apply the rule to a variant identifier. Mirrors serde's
-    /// `apply_to_variant` so generated enums match what serde will
-    /// produce on the wire.
-    fn apply(self, variant: &str) -> String {
+    /// Apply the rule to an identifier. Mirrors serde's
+    /// `apply_to_field` / `apply_to_variant` so the generated names
+    /// match what serde will produce on the wire — picking the right
+    /// branch from `target`.
+    fn apply(self, name: &str, target: RenameTarget) -> String {
+        match target {
+            RenameTarget::Field => self.apply_to_field(name),
+            RenameTarget::Variant => self.apply_to_variant(name),
+        }
+    }
+
+    /// Variant rule: canonical input is `PascalCase`. Mirrors serde's
+    /// `RenameRule::apply_to_variant`.
+    fn apply_to_variant(self, variant: &str) -> String {
         match self {
             RenameAll::None | RenameAll::PascalCase => variant.to_owned(),
             RenameAll::Lowercase => variant.to_ascii_lowercase(),
@@ -264,12 +302,39 @@ impl RenameAll {
                     None => String::new(),
                 }
             }
-            RenameAll::SnakeCase => to_snake(variant),
-            RenameAll::ScreamingSnakeCase => to_snake(variant).to_ascii_uppercase(),
-            RenameAll::KebabCase => to_snake(variant).replace('_', "-"),
-            RenameAll::ScreamingKebabCase => {
-                to_snake(variant).to_ascii_uppercase().replace('_', "-")
+            RenameAll::SnakeCase => pascal_or_camel_to_snake(variant),
+            RenameAll::ScreamingSnakeCase => pascal_or_camel_to_snake(variant).to_ascii_uppercase(),
+            RenameAll::KebabCase => pascal_or_camel_to_snake(variant).replace('_', "-"),
+            RenameAll::ScreamingKebabCase => pascal_or_camel_to_snake(variant)
+                .to_ascii_uppercase()
+                .replace('_', "-"),
+        }
+    }
+
+    /// Field rule: canonical input is `snake_case`. Mirrors serde's
+    /// `RenameRule::apply_to_field`. The PascalCase / CamelCase
+    /// branches collapse `_<letter>` boundaries by capitalising the
+    /// following letter.
+    fn apply_to_field(self, field: &str) -> String {
+        match self {
+            RenameAll::None | RenameAll::Lowercase | RenameAll::SnakeCase => field.to_owned(),
+            RenameAll::Uppercase | RenameAll::ScreamingSnakeCase => field.to_ascii_uppercase(),
+            RenameAll::PascalCase => snake_to_pascal(field),
+            RenameAll::CamelCase => {
+                let pascal = snake_to_pascal(field);
+                let mut chars = pascal.chars();
+                match chars.next() {
+                    Some(first) => {
+                        let mut out = String::with_capacity(pascal.len());
+                        out.extend(first.to_lowercase());
+                        out.extend(chars);
+                        out
+                    }
+                    None => String::new(),
+                }
             }
+            RenameAll::KebabCase => field.replace('_', "-"),
+            RenameAll::ScreamingKebabCase => field.to_ascii_uppercase().replace('_', "-"),
         }
     }
 }
@@ -277,7 +342,7 @@ impl RenameAll {
 /// PascalCase / camelCase → snake_case using serde's variant rule:
 /// insert `_` before every uppercase letter (except at index 0), then
 /// lowercase everything.
-fn to_snake(variant: &str) -> String {
+fn pascal_or_camel_to_snake(variant: &str) -> String {
     let mut out = String::with_capacity(variant.len() + 4);
     for (i, ch) in variant.char_indices() {
         if i > 0 && ch.is_ascii_uppercase() {
@@ -290,37 +355,40 @@ fn to_snake(variant: &str) -> String {
     out
 }
 
-/// Parse the container-level `#[serde(rename_all = "...")]` if present.
-/// Unsupported values surface as a compile error pointing at the
-/// attribute, listing the recognised modes.
-fn parse_rename_all(attrs: &[Attribute]) -> Result<RenameAll, syn::Error> {
-    for attr in attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-        let mut found: Option<(String, proc_macro2::Span)> = None;
-        let _ = attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("rename_all") {
-                if let Ok(value) = meta.value() {
-                    if let Ok(lit) = value.parse::<syn::LitStr>() {
-                        found = Some((lit.value(), lit.span()));
-                    }
-                }
+/// snake_case → PascalCase using serde's field rule: capitalise the
+/// first character and every character following an `_`, dropping the
+/// `_` separators.
+fn snake_to_pascal(field: &str) -> String {
+    let mut out = String::with_capacity(field.len());
+    let mut capitalise_next = true;
+    for ch in field.chars() {
+        if ch == '_' {
+            capitalise_next = true;
+        } else if capitalise_next {
+            for upper in ch.to_uppercase() {
+                out.push(upper);
             }
-            Ok(())
-        });
-        if let Some((value, span)) = found {
-            return rename_all_from_str(&value, span, attr);
+            capitalise_next = false;
+        } else {
+            out.push(ch);
         }
     }
-    Ok(RenameAll::None)
+    out
 }
 
-fn rename_all_from_str(
-    value: &str,
-    span: proc_macro2::Span,
-    attr: &Attribute,
-) -> Result<RenameAll, syn::Error> {
+/// Translate the `rename_all` literal captured by [`scan_serde_attrs`]
+/// into a [`RenameAll`] mode. Returns `RenameAll::None` when no
+/// `rename_all` attribute is present, and a compile error when the
+/// literal isn't one of the eight recognised modes — the error points
+/// at the literal so the highlight lands on what the user typed.
+fn rename_all_from_scan(scan: &SerdeScan) -> Result<RenameAll, syn::Error> {
+    match &scan.rename_all {
+        Some((value, span)) => rename_all_from_str(value, *span),
+        None => Ok(RenameAll::None),
+    }
+}
+
+fn rename_all_from_str(value: &str, span: proc_macro2::Span) -> Result<RenameAll, syn::Error> {
     let mode = match value {
         "lowercase" => RenameAll::Lowercase,
         "UPPERCASE" => RenameAll::Uppercase,
@@ -331,9 +399,8 @@ fn rename_all_from_str(
         "kebab-case" => RenameAll::KebabCase,
         "SCREAMING-KEBAB-CASE" => RenameAll::ScreamingKebabCase,
         _ => {
-            let _ = span; // anchor the error on the attribute for tooling
-            return Err(syn::Error::new_spanned(
-                attr,
+            return Err(syn::Error::new(
+                span,
                 format!(
                     "frieze: unsupported `rename_all` value `{value}`; supported values are \
                      lowercase, UPPERCASE, PascalCase, camelCase, snake_case, \
@@ -372,8 +439,13 @@ fn named_fields(
 /// Recognises (in order): `Maybe<T>`, `Option<T>` (with serde
 /// `skip_serializing_if` attribute discrimination), `Vec<T>`, scalar
 /// types. See the crate-level docs for the full table.
+///
+/// The serde attribute scan is performed by the caller (in
+/// [`expand_struct`]) so the wire-name calculation and the DEFER
+/// rejection share a single attribute walk.
 fn parse_field(
     field: &Field,
+    scan: &SerdeScan,
 ) -> Result<(proc_macro2::TokenStream, proc_macro2::TokenStream), syn::Error> {
     let ty = &field.ty;
 
@@ -391,7 +463,7 @@ fn parse_field(
                 "frieze: nested Maybe is not supported.",
             ));
         }
-        validate_maybe_serde_attrs(field)?;
+        validate_maybe_serde_attrs(field, scan)?;
         let element = inner_to_property_type_expr(inner, ty, "Maybe<...>")?;
         Ok((nullable_property_type_expr(element), presence_optional()))
     } else if let Some(inner) = unwrap_option(ty) {
@@ -419,7 +491,7 @@ fn parse_field(
         let scalar = scalar_property_type_expr(inner).map_err(|_| {
             syn::Error::new_spanned(ty, unsupported_inside_message(inner, "Option<...>"))
         })?;
-        if has_skip_serializing_if_option_is_none(&field.attrs) {
+        if is_option_skip_predicate(scan) {
             // Branch ③: optional, non-nullable.
             Ok((scalar, presence_optional()))
         } else {
@@ -521,43 +593,17 @@ fn inner_to_property_type_expr(
 /// wire — a silent runtime breakage. The check enforces them at compile
 /// time so users get a clear, actionable diagnostic.
 ///
-/// `default = "..."` with a custom path is rejected: serde must call
-/// `Maybe::default()` (which yields `Maybe::Missing`); a custom default
-/// would defeat the three-state mapping. The `skip_serializing_if` value
-/// is matched by exact string against `"Maybe::is_missing"`.
-fn validate_maybe_serde_attrs(field: &Field) -> Result<(), syn::Error> {
-    let mut has_default_bare = false;
-    let mut has_skip_serializing_if_maybe = false;
-    for attr in &field.attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-        // Best-effort parse: serde carries attribute forms we don't
-        // recognise. Ignore parse failures and only look at the two
-        // pieces we care about.
-        let _ = attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("default") {
-                // Bare `default` has no `=` value waiting; anything else
-                // (e.g. `default = "..."`) is rejected — consume the
-                // value to keep nested-meta parsing well-formed.
-                if meta.input.peek(syn::Token![=]) {
-                    let _ = meta.value().and_then(|v| v.parse::<syn::LitStr>());
-                } else {
-                    has_default_bare = true;
-                }
-            } else if meta.path.is_ident("skip_serializing_if") {
-                if let Ok(value) = meta.value() {
-                    if let Ok(lit) = value.parse::<syn::LitStr>() {
-                        if lit.value() == "Maybe::is_missing" {
-                            has_skip_serializing_if_maybe = true;
-                        }
-                    }
-                }
-            }
-            Ok(())
-        });
-    }
-    if has_default_bare && has_skip_serializing_if_maybe {
+/// `default = "..."` with a custom path does not satisfy the pair:
+/// serde must call `Maybe::default()` (which yields `Maybe::Missing`); a
+/// custom default would defeat the three-state mapping. The
+/// `skip_serializing_if` value is matched by exact string against
+/// `"Maybe::is_missing"`.
+///
+/// The two attributes themselves are extracted by [`scan_serde_attrs`];
+/// this validator only inspects the resulting [`SerdeScan`] so a single
+/// pass covers both DEFER rejection and the `Maybe<T>` gate.
+fn validate_maybe_serde_attrs(field: &Field, scan: &SerdeScan) -> Result<(), syn::Error> {
+    if has_maybe_attribute_pair(scan) {
         return Ok(());
     }
     let field_name = field
@@ -573,42 +619,6 @@ fn validate_maybe_serde_attrs(field: &Field) -> Result<(), syn::Error> {
         )
     };
     Err(syn::Error::new_spanned(&field.ty, msg))
-}
-
-/// Returns `true` if any `#[serde(...)]` attribute on the field contains
-/// `skip_serializing_if = "Option::is_none"`.
-///
-/// The check is strictly syntactic — the right-hand side must be the
-/// literal string `"Option::is_none"`. Other helper names (custom
-/// predicates) do not switch the property into branch ③.
-fn has_skip_serializing_if_option_is_none(attrs: &[Attribute]) -> bool {
-    for attr in attrs {
-        if !attr.path().is_ident("serde") {
-            continue;
-        }
-        let mut matched = false;
-        // Best-effort parse: serde may carry attribute forms we don't
-        // recognise (e.g. lone idents like `default`), and `parse_nested_meta`
-        // returns `Ok` for those when the callback accepts them. We only
-        // care about the one name-value pair we look for and ignore the
-        // result either way.
-        let _ = attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("skip_serializing_if") {
-                if let Ok(value) = meta.value() {
-                    if let Ok(lit) = value.parse::<syn::LitStr>() {
-                        if lit.value() == "Option::is_none" {
-                            matched = true;
-                        }
-                    }
-                }
-            }
-            Ok(())
-        });
-        if matched {
-            return true;
-        }
-    }
-    false
 }
 
 /// Maps a Rust scalar field type to the matching
@@ -934,6 +944,340 @@ fn compose_enum_description(
     }
 }
 
+/// Position context for [`scan_serde_attrs`]. Currently unused for
+/// branching — every position rejects the same DEFER attribute set —
+/// but kept so future changes can vary the diagnostic per site without
+/// reshuffling call sites.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SerdePosition {
+    StructContainer,
+    StructField,
+    EnumContainer,
+    EnumVariant,
+}
+
+/// A single, deduplicated pass over the `#[serde(...)]` attributes on
+/// one Rust item.
+///
+/// Walks every meta entry once and either:
+///
+/// - records a SUPPORT value into one of the fields, or
+/// - rejects an unsupported (DEFER) form with a compile error, or
+/// - silently skips an attribute frieze does not interpret (e.g.
+///   `crate = "..."`) after consuming its value so the walker can
+///   continue.
+///
+/// Returning a single struct rather than scattering one-purpose readers
+/// across the macro keeps every diagnostic for a given site routed
+/// through a single entry point, which matters most for DEFER rejects:
+/// any code path that touches user attributes goes through this scan,
+/// so an unsupported attribute cannot slip past one branch and be
+/// silently honored by another.
+#[derive(Debug, Default)]
+struct SerdeScan {
+    /// `#[serde(rename = "literal")]`, if present. Direction-split forms
+    /// `#[serde(rename(serialize = ..., deserialize = ...))]` produce an
+    /// error during scanning and therefore never reach this field.
+    rename: Option<(String, proc_macro2::Span)>,
+    /// `#[serde(rename_all = "literal")]`, if present. Same
+    /// direction-split rejection as `rename`.
+    rename_all: Option<(String, proc_macro2::Span)>,
+    /// `true` when the field carries the bare `#[serde(default)]`.
+    /// Custom-default forms like `#[serde(default = "path")]` are
+    /// consumed but do **not** set this flag — the `Maybe<T>` gate
+    /// requires the bare form.
+    default_bare: bool,
+    /// The literal string of the `skip_serializing_if = "..."`
+    /// attribute, if present. The two values currently recognised by
+    /// frieze are `"Option::is_none"` (switches an `Option<T>` field to
+    /// optional / non-nullable) and `"Maybe::is_missing"` (part of the
+    /// required `Maybe<T>` attribute pair). Other predicates are stored
+    /// verbatim but have no effect on the generated schema.
+    skip_serializing_if: Option<String>,
+}
+
+const DIRECTION_SPLIT_RENAME_MSG: &str = "frieze: `#[serde(rename(serialize = ..., deserialize = ...))]` produces different wire names for serialize and deserialize. A single OAS schema cannot represent both. Use a symmetric `#[serde(rename = \"...\")]` instead, or split the type into request- and response-shaped variants.";
+
+const DIRECTION_SPLIT_RENAME_ALL_MSG: &str = "frieze: `#[serde(rename_all(serialize = ..., deserialize = ...))]` produces different wire names for serialize and deserialize. A single OAS schema cannot represent both. Use a symmetric `#[serde(rename_all = \"...\")]` instead, or split the type into request- and response-shaped variants.";
+
+const EMPTY_RENAME_MSG: &str =
+    "frieze: `#[serde(rename = \"\")]` is not supported. The wire name must be a non-empty string.";
+
+/// Walk every `#[serde(...)]` attribute and classify each nested meta
+/// entry into the [`SerdeScan`] record. DEFER attributes raise a compile
+/// error here so a single scan covers both data extraction and the
+/// unsupported-attribute check.
+///
+/// The `position` argument is currently informational — every Rust site
+/// rejects the same DEFER set — but kept so future versions can tighten
+/// the rules per site without rerouting calls.
+fn scan_serde_attrs(
+    attrs: &[Attribute],
+    _position: SerdePosition,
+) -> Result<SerdeScan, syn::Error> {
+    let mut scan = SerdeScan::default();
+    for attr in attrs {
+        if !attr.path().is_ident("serde") {
+            continue;
+        }
+        attr.parse_nested_meta(|meta| {
+            let name = match meta.path.get_ident() {
+                Some(i) => i.to_string(),
+                None => {
+                    // Qualified meta paths inside `#[serde(...)]` are not
+                    // standard, but consume any value form so the walker
+                    // can advance.
+                    consume_meta_value(&meta)?;
+                    return Ok(());
+                }
+            };
+            match name.as_str() {
+                "rename" => {
+                    if meta.input.peek(syn::token::Paren) {
+                        return Err(meta.error(DIRECTION_SPLIT_RENAME_MSG));
+                    }
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    if scan.rename.is_none() {
+                        scan.rename = Some((lit.value(), lit.span()));
+                    }
+                }
+                "rename_all" => {
+                    if meta.input.peek(syn::token::Paren) {
+                        return Err(meta.error(DIRECTION_SPLIT_RENAME_ALL_MSG));
+                    }
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    if scan.rename_all.is_none() {
+                        scan.rename_all = Some((lit.value(), lit.span()));
+                    }
+                }
+                "default" => {
+                    if meta.input.peek(syn::Token![=]) {
+                        // `default = "path"`: consume and ignore. The
+                        // bare form is the only one the `Maybe<T>` gate
+                        // accepts, so a custom default is effectively
+                        // not bare.
+                        let _: syn::LitStr = meta.value()?.parse()?;
+                    } else {
+                        scan.default_bare = true;
+                    }
+                }
+                "skip_serializing_if" => {
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    scan.skip_serializing_if = Some(lit.value());
+                }
+                "alias" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(alias)]` produces a deserialize-only acceptance list that a single OAS schema cannot encode."));
+                }
+                "flatten" => {
+                    return Err(meta.error("frieze: `#[serde(flatten)]` on a field is not supported."));
+                }
+                "tag" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(tag)]` (internally-tagged enums) is not supported."));
+                }
+                "content" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(content)]` is not supported."));
+                }
+                "untagged" => {
+                    return Err(meta.error("frieze: `#[serde(untagged)]` enums are not supported."));
+                }
+                "transparent" => {
+                    return Err(meta.error("frieze: `#[serde(transparent)]` on a container is not supported."));
+                }
+                "other" => {
+                    return Err(meta.error("frieze: `#[serde(other)]` on a variant is not supported."));
+                }
+                "rename_all_fields" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(rename_all_fields)]` is not supported."));
+                }
+                "skip" => {
+                    return Err(meta.error("frieze: `#[serde(skip)]` is not supported."));
+                }
+                "skip_serializing" => {
+                    return Err(meta.error("frieze: `#[serde(skip_serializing)]` is not supported."));
+                }
+                "skip_deserializing" => {
+                    return Err(meta.error("frieze: `#[serde(skip_deserializing)]` is not supported."));
+                }
+                "with" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(with)]` is not supported."));
+                }
+                "serialize_with" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(serialize_with)]` is not supported."));
+                }
+                "deserialize_with" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(deserialize_with)]` is not supported."));
+                }
+                "from" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(from)]` is not supported."));
+                }
+                "try_from" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(try_from)]` is not supported."));
+                }
+                "into" => {
+                    let _: syn::LitStr = meta.value()?.parse()?;
+                    return Err(meta.error("frieze: `#[serde(into)]` is not supported."));
+                }
+                _ => {
+                    // Unknown to frieze. Consume the value (if any) so
+                    // the walker can move past this entry and silently
+                    // skip — serde may grow more attributes that have
+                    // no schema impact, and we don't want to break user
+                    // code over them.
+                    consume_meta_value(&meta)?;
+                }
+            }
+            Ok(())
+        })?;
+    }
+    Ok(scan)
+}
+
+/// Drain whatever follows a meta path so [`parse_nested_meta`] can
+/// advance to the next comma-separated entry. Handles three shapes:
+///
+/// - `name = <expr>` — parse and discard the right-hand side.
+/// - `name(<tokens>)` — parse and discard the parenthesised body.
+/// - `name` alone — nothing to consume; return `Ok` immediately.
+fn consume_meta_value(meta: &syn::meta::ParseNestedMeta<'_>) -> Result<(), syn::Error> {
+    if meta.input.peek(syn::Token![=]) {
+        let _: syn::Expr = meta.value()?.parse()?;
+    } else if meta.input.peek(syn::token::Paren) {
+        let content;
+        syn::parenthesized!(content in meta.input);
+        let _: proc_macro2::TokenStream = content.parse()?;
+    }
+    Ok(())
+}
+
+/// How a wire name was derived. Carried alongside the wire name so the
+/// uniqueness check can report which input produced each conflicting
+/// name.
+#[derive(Debug, Clone)]
+enum WireSource {
+    /// The Rust identifier was used verbatim (no `rename`, no applicable
+    /// `rename_all`).
+    Identifier,
+    /// An individual `#[serde(rename = "literal")]` produced the name.
+    Individual,
+    /// The container-level `#[serde(rename_all = "<mode>")]` produced
+    /// the name; the mode string is kept so the diagnostic can quote it.
+    RenameAll(&'static str),
+}
+
+impl WireSource {
+    fn describe(&self) -> String {
+        match self {
+            WireSource::Identifier => "the Rust identifier".to_string(),
+            WireSource::Individual => "`#[serde(rename = \"...\")]`".to_string(),
+            WireSource::RenameAll(mode) => format!("`#[serde(rename_all = \"{mode}\")]`"),
+        }
+    }
+}
+
+/// Compute the wire name for one field or variant, applying the
+/// precedence rule (individual `rename` > container `rename_all` > Rust
+/// identifier).
+///
+/// Returns the wire name plus a [`WireSource`] tag for the uniqueness
+/// check's diagnostic. Empty results — either an explicit `rename = ""`
+/// or a `rename_all` rule that produces an empty string — are rejected
+/// with [`EMPTY_RENAME_MSG`] anchored at the identifier's span.
+fn wire_name(
+    rust_ident: &Ident,
+    individual: Option<(&str, proc_macro2::Span)>,
+    container_rule: RenameAll,
+    target: RenameTarget,
+) -> Result<(String, WireSource), syn::Error> {
+    if let Some((value, span)) = individual {
+        if value.is_empty() {
+            return Err(syn::Error::new(span, EMPTY_RENAME_MSG));
+        }
+        return Ok((value.to_string(), WireSource::Individual));
+    }
+    let ident_str = rust_ident.to_string();
+    let converted = container_rule.apply(&ident_str, target);
+    if converted.is_empty() {
+        // In practice unreachable — Rust identifiers are never empty —
+        // but kept defensive in case a future rule synthesises a name.
+        return Err(syn::Error::new(rust_ident.span(), EMPTY_RENAME_MSG));
+    }
+    let source = match container_rule {
+        RenameAll::None => WireSource::Identifier,
+        other => WireSource::RenameAll(rename_all_label(other)),
+    };
+    Ok((converted, source))
+}
+
+/// Human-readable label for a `RenameAll` mode, used in collision
+/// diagnostics so the message shows the exact attribute the user wrote.
+fn rename_all_label(rule: RenameAll) -> &'static str {
+    match rule {
+        RenameAll::None => "",
+        RenameAll::Lowercase => "lowercase",
+        RenameAll::Uppercase => "UPPERCASE",
+        RenameAll::PascalCase => "PascalCase",
+        RenameAll::CamelCase => "camelCase",
+        RenameAll::SnakeCase => "snake_case",
+        RenameAll::ScreamingSnakeCase => "SCREAMING_SNAKE_CASE",
+        RenameAll::KebabCase => "kebab-case",
+        RenameAll::ScreamingKebabCase => "SCREAMING-KEBAB-CASE",
+    }
+}
+
+/// Detect wire-name collisions across a struct's fields or an enum's
+/// variants. The error message names both the second site (where the
+/// span points) and the first site, including how each name was
+/// produced, so the user can see at a glance whether the conflict comes
+/// from a literal collision, a `rename_all` collapse, or both.
+///
+/// `kind` is the noun used in the message — `"field"` for struct fields,
+/// `"variant"` for enum variants — so a single helper covers both
+/// shapes.
+fn check_unique_wire_names(
+    entries: &[(Ident, String, WireSource)],
+    kind: &str,
+) -> Result<(), syn::Error> {
+    let mut seen: BTreeMap<&str, (&Ident, &WireSource)> = BTreeMap::new();
+    for (ident, wire, source) in entries {
+        if let Some((prev_ident, prev_source)) = seen.get(wire.as_str()) {
+            let msg = format!(
+                "frieze: {kind} `{}` renames to {wire:?} via {}, which conflicts with {kind} `{}` (also renames to {wire:?} via {}). Each {kind} must have a unique wire name.",
+                ident,
+                source.describe(),
+                prev_ident,
+                prev_source.describe(),
+            );
+            return Err(syn::Error::new_spanned(ident, msg));
+        }
+        seen.insert(wire.as_str(), (ident, source));
+    }
+    Ok(())
+}
+
+/// Returns `true` when the scanned attributes carry
+/// `#[serde(skip_serializing_if = "Option::is_none")]`. Replaces the
+/// older one-purpose attribute walker; the value comes from the central
+/// scan so DEFER attributes can't slip past on the same field.
+fn is_option_skip_predicate(scan: &SerdeScan) -> bool {
+    scan.skip_serializing_if.as_deref() == Some("Option::is_none")
+}
+
+/// Returns `true` when the field carries the `Maybe<T>` attribute pair
+/// (`#[serde(default, skip_serializing_if = "Maybe::is_missing")]`).
+/// Drives [`validate_maybe_serde_attrs`].
+fn has_maybe_attribute_pair(scan: &SerdeScan) -> bool {
+    scan.default_bare && scan.skip_serializing_if.as_deref() == Some("Maybe::is_missing")
+}
+
 #[cfg(test)]
 mod doc_tests {
     use super::*;
@@ -1075,5 +1419,141 @@ mod doc_tests {
     fn compose_enum_description_none_when_neither_present() {
         let variants = vec![("Active".to_string(), None)];
         assert_eq!(compose_enum_description(None, &variants), None);
+    }
+
+    // --- wire-name calculation -------------------------------------
+
+    fn ident(s: &str) -> Ident {
+        syn::Ident::new(s, proc_macro2::Span::call_site())
+    }
+
+    #[test]
+    fn wire_name_uses_individual_rename_over_container_rule() {
+        let id = ident("user_id");
+        let (wire, source) = wire_name(
+            &id,
+            Some(("external_id", id.span())),
+            RenameAll::CamelCase,
+            RenameTarget::Field,
+        )
+        .unwrap();
+        assert_eq!(wire, "external_id");
+        assert!(matches!(source, WireSource::Individual));
+    }
+
+    #[test]
+    fn wire_name_falls_back_to_container_rule() {
+        let id = ident("user_id");
+        let (wire, source) =
+            wire_name(&id, None, RenameAll::CamelCase, RenameTarget::Field).unwrap();
+        assert_eq!(wire, "userId");
+        assert!(matches!(source, WireSource::RenameAll("camelCase")));
+    }
+
+    #[test]
+    fn wire_name_uses_identifier_when_no_rule_applies() {
+        let id = ident("user_id");
+        let (wire, source) = wire_name(&id, None, RenameAll::None, RenameTarget::Field).unwrap();
+        assert_eq!(wire, "user_id");
+        assert!(matches!(source, WireSource::Identifier));
+    }
+
+    #[test]
+    fn wire_name_rejects_empty_individual_rename() {
+        let id = ident("user_id");
+        let err = wire_name(
+            &id,
+            Some(("", id.span())),
+            RenameAll::None,
+            RenameTarget::Field,
+        )
+        .unwrap_err();
+        assert!(err.to_string().contains("non-empty"));
+    }
+
+    // --- rename_all field / variant divergence ---------------------
+
+    #[test]
+    fn rename_all_camel_case_collapses_snake_field_to_camel() {
+        assert_eq!(
+            RenameAll::CamelCase.apply("user_id", RenameTarget::Field),
+            "userId"
+        );
+        assert_eq!(
+            RenameAll::CamelCase.apply("display_name", RenameTarget::Field),
+            "displayName"
+        );
+    }
+
+    #[test]
+    fn rename_all_camel_case_lowercases_variant_first_letter() {
+        assert_eq!(
+            RenameAll::CamelCase.apply("InactiveSince", RenameTarget::Variant),
+            "inactiveSince"
+        );
+    }
+
+    #[test]
+    fn rename_all_snake_case_is_noop_for_already_snake_fields() {
+        assert_eq!(
+            RenameAll::SnakeCase.apply("user_id", RenameTarget::Field),
+            "user_id"
+        );
+    }
+
+    #[test]
+    fn rename_all_snake_case_inserts_underscores_in_pascal_variants() {
+        assert_eq!(
+            RenameAll::SnakeCase.apply("InactiveSince", RenameTarget::Variant),
+            "inactive_since"
+        );
+    }
+
+    #[test]
+    fn rename_all_pascal_case_collapses_snake_field_to_pascal() {
+        assert_eq!(
+            RenameAll::PascalCase.apply("user_id", RenameTarget::Field),
+            "UserId"
+        );
+    }
+
+    #[test]
+    fn rename_all_kebab_case_replaces_underscores_in_fields() {
+        assert_eq!(
+            RenameAll::KebabCase.apply("user_id", RenameTarget::Field),
+            "user-id"
+        );
+    }
+
+    // --- uniqueness check -------------------------------------------
+
+    #[test]
+    fn check_unique_wire_names_passes_for_distinct_names() {
+        let entries = vec![
+            (
+                ident("user_id"),
+                "userId".to_string(),
+                WireSource::RenameAll("camelCase"),
+            ),
+            (
+                ident("display_name"),
+                "displayName".to_string(),
+                WireSource::RenameAll("camelCase"),
+            ),
+        ];
+        check_unique_wire_names(&entries, "field").unwrap();
+    }
+
+    #[test]
+    fn check_unique_wire_names_rejects_collision() {
+        let entries = vec![
+            (ident("user_id"), "id".to_string(), WireSource::Individual),
+            (ident("id"), "id".to_string(), WireSource::Identifier),
+        ];
+        let err = check_unique_wire_names(&entries, "field").unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("field `id`"));
+        assert!(msg.contains("conflicts with field `user_id`"));
+        assert!(msg.contains("unique wire name"));
     }
 }

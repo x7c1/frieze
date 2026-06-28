@@ -10,3 +10,7 @@
 
 # OS / editor
 .DS_Store
+
+# insta — pending snapshots (kept transient; intentional updates land
+# in the inline `assert_*_snapshot!` macro literal directly).
+*.pending-snap
