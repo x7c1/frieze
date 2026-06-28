@@ -63,6 +63,20 @@ A nullable enum reference (`Option<EnumType>` field) reuses the same
 nullable-reference wrap as a nullable nested-struct reference; see
 the table above.
 
+### Internally-tagged enums are version-agnostic
+
+An internally-tagged enum (`#[serde(tag = "...")]` with every variant
+a newtype of a `Schema`-implementing struct) derives a `oneOf` schema
+with a top-level `discriminator: {propertyName: <tag>}` block. The
+shape is identical under both `oas-3-0` and `oas-3-1`. A nullable
+`oneOf` reference (`Option<EnumType>` field) reuses the same
+nullable-reference wrap as a nullable nested-struct reference; see
+the table above.
+
+The `discriminator.mapping` block is deliberately omitted (see
+[Internally-tagged enums](field-shapes.md#internally-tagged-enums) in
+`field-shapes.md` for the rationale).
+
 ### Why the difference
 
 - OAS 3.0 uses a dedicated `nullable: true` keyword. Combined with the

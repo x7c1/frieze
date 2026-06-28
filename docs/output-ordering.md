@@ -10,7 +10,8 @@ maps as unordered.
 | Object schema `properties` keys | Struct field declaration order (each key is the field's wire name after `rename` / `rename_all`) |
 | Object schema `required` array  | Same order as `properties`         |
 | String-enum schema `enum` array | Variant declaration order (each value is the variant's wire name after `rename` / `rename_all`) |
-| Variants in an enum-level `description` bullet list | Variant declaration order, using the same wire name as the `enum` array entry |
+| OneOf schema `oneOf` array      | Variant declaration order (each arm carries the variant's wire name as the synthesized tag constraint) |
+| Variants in an enum-level `description` bullet list | Variant declaration order, using the same wire name as the `enum` array / `oneOf` arm |
 | `#/components/schemas` keys     | Alphabetical by schema name        |
 
 Renaming changes the **key text** in `properties` / `required` / `enum`
@@ -30,7 +31,7 @@ that apply.
 
 ```
 $ref, type, description, format, minimum, items, required,
-properties, allOf, oneOf, nullable (3.0 only), enum
+properties, allOf, oneOf, discriminator, nullable (3.0 only), enum
 ```
 
 Per-kind visibility:
@@ -41,6 +42,7 @@ Per-kind visibility:
 - **wrapper schema** (the schema that wraps a `$ref` in `allOf` /
   `oneOf`): `description, allOf, oneOf, nullable`
 - **string-enum schema**: `type, description, enum`
+- **oneOf schema** (internally-tagged enum): `description, oneOf, discriminator`
 
 ### Design rationale
 
