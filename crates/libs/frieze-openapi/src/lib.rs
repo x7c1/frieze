@@ -29,6 +29,9 @@ pub use object_schema::ObjectSchema;
 mod string_enum_schema;
 pub use string_enum_schema::StringEnumSchema;
 
+mod one_of_schema;
+pub use one_of_schema::{OneOfSchema, OneOfVariant};
+
 mod schema_object;
 pub use schema_object::SchemaObject;
 

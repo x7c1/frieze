@@ -31,4 +31,16 @@ pub enum Error {
     DuplicateSchema(SchemaName),
     #[error("schema `{0}` is referenced but not registered")]
     UnresolvedReference(SchemaName),
+    #[error("oneOf schema `{0}` declares an empty discriminator tag")]
+    EmptyOneOfTag(String),
+    #[error(
+        "oneOf schema `{schema}` variant `{variant}` references `{inner}`, \
+         which is not a struct schema; internal-tagged variants require \
+         their inner type to be a struct"
+    )]
+    OneOfVariantInnerNotStruct {
+        schema: String,
+        variant: String,
+        inner: SchemaName,
+    },
 }
