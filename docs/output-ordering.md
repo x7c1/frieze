@@ -7,11 +7,17 @@ maps as unordered.
 
 | Output                       | Order                                |
 |------------------------------|--------------------------------------|
-| Object schema `properties` keys | Struct field declaration order     |
+| Object schema `properties` keys | Struct field declaration order (each key is the field's wire name after `rename` / `rename_all`) |
 | Object schema `required` array  | Same order as `properties`         |
-| String-enum schema `enum` array | Variant declaration order (after `rename_all`) |
-| Variants in an enum-level `description` bullet list | Variant declaration order (after `rename_all`), matching the `enum` array |
+| String-enum schema `enum` array | Variant declaration order (each value is the variant's wire name after `rename` / `rename_all`) |
+| Variants in an enum-level `description` bullet list | Variant declaration order, using the same wire name as the `enum` array entry |
 | `#/components/schemas` keys     | Alphabetical by schema name        |
+
+Renaming changes the **key text** in `properties` / `required` / `enum`
+but never the order — declaration order is the single source of order
+truth for fields and variants alike. The
+[Wire names](field-shapes.md#wire-names-rename-and-rename_all) section
+of `field-shapes.md` defines how each wire name is derived.
 
 `IndexMap` is used internally where insertion order matters; `BTreeMap`
 where alphabetical order is desired.

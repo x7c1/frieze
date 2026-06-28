@@ -1,0 +1,5 @@
+error: frieze: `#[serde(untagged)]` enums are not supported.
+ --> tests/ui/serde_untagged_unsupported.rs:5:9
+  |
+5 | #[serde(untagged)]
+  |         ^^^^^^^^

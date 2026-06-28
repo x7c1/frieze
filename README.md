@@ -48,6 +48,15 @@ rendered automatically. See
 for the full mapping (enum-level and per-variant doc-comments are
 composed into the enum schema's `description`).
 
+`#[serde(rename = "literal")]` on a field or variant and
+`#[serde(rename_all = "<mode>")]` on a struct or enum container are
+honoured so that the schema's `properties` keys, `required` entries,
+and `enum` values match the names serde will produce on the wire. The
+precedence rule, the uniqueness check, and the list of serde
+attributes frieze cannot encode into a single OAS schema (and
+therefore rejects at compile time) are documented under
+[Wire names](docs/field-shapes.md#wire-names-rename-and-rename_all).
+
 ## Optionality, in one paragraph
 
 OpenAPI separates two concepts that Rust users often conflate:

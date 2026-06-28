@@ -1,0 +1,15 @@
+error: frieze: variant `USER` renames to "user" via `#[serde(rename_all = "lowercase")]`, which conflicts with variant `User` (also renames to "user" via `#[serde(rename_all = "lowercase")]`). Each variant must have a unique wire name.
+  --> tests/ui/rename_all_field_collision.rs:13:5
+   |
+13 |     USER,
+   |     ^^^^
+
+warning: unreachable pattern
+  --> tests/ui/rename_all_field_collision.rs:13:5
+   |
+12 |     User,
+   |     ---- matches all the relevant values
+13 |     USER,
+   |     ^^^^ no value can reach this
+   |
+   = note: `#[warn(unreachable_patterns)]` (part of `#[warn(unused)]`) on by default

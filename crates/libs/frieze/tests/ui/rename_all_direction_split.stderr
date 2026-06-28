@@ -1,0 +1,5 @@
+error: frieze: `#[serde(rename_all(serialize = ..., deserialize = ...))]` produces different wire names for serialize and deserialize. A single OAS schema cannot represent both. Use a symmetric `#[serde(rename_all = "...")]` instead, or split the type into request- and response-shaped variants.
+ --> tests/ui/rename_all_direction_split.rs:5:9
+  |
+5 | #[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
+  |         ^^^^^^^^^^
