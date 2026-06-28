@@ -59,11 +59,20 @@ pub(crate) struct SerdeScan {
     /// required `Maybe<T>` attribute pair). Other predicates are stored
     /// verbatim but have no effect on the generated schema.
     pub(crate) skip_serializing_if: Option<String>,
+    /// `#[serde(tag = "literal")]` on an enum container, if present.
+    /// Drives the internal-tagged `oneOf` expansion in
+    /// [`crate::expand_enum`]; absent on struct sites, where the
+    /// attribute has no serde meaning.
+    pub(crate) tag: Option<(String, proc_macro2::Span)>,
 }
 
 const DIRECTION_SPLIT_RENAME_MSG: &str = "frieze: `#[serde(rename(serialize = ..., deserialize = ...))]` produces different wire names for serialize and deserialize. A single OAS schema cannot represent both. Use a symmetric `#[serde(rename = \"...\")]` instead, or split the type into request- and response-shaped variants.";
 
 const DIRECTION_SPLIT_RENAME_ALL_MSG: &str = "frieze: `#[serde(rename_all(serialize = ..., deserialize = ...))]` produces different wire names for serialize and deserialize. A single OAS schema cannot represent both. Use a symmetric `#[serde(rename_all = \"...\")]` instead, or split the type into request- and response-shaped variants.";
+
+const UNTAGGED_MSG: &str = "frieze: `#[serde(untagged)]` enums are not supported. Use an internal tag instead: `#[serde(tag = \"kind\")]`.";
+
+const ADJACENT_TAGGING_MSG: &str = "frieze: adjacent tagging (`#[serde(tag = \"...\", content = \"...\")]`) is not supported. Use an internal tag without `content` instead: `#[serde(tag = \"kind\")]`.";
 
 /// Walk every `#[serde(...)]` attribute and classify each nested meta
 /// entry into the [`SerdeScan`] record. DEFER attributes raise a compile
@@ -135,15 +144,17 @@ pub(crate) fn scan_serde_attrs(
                     return Err(meta.error("frieze: `#[serde(flatten)]` on a field is not supported."));
                 }
                 "tag" => {
-                    let _: syn::LitStr = meta.value()?.parse()?;
-                    return Err(meta.error("frieze: `#[serde(tag)]` (internally-tagged enums) is not supported."));
+                    let lit: syn::LitStr = meta.value()?.parse()?;
+                    if scan.tag.is_none() {
+                        scan.tag = Some((lit.value(), lit.span()));
+                    }
                 }
                 "content" => {
                     let _: syn::LitStr = meta.value()?.parse()?;
-                    return Err(meta.error("frieze: `#[serde(content)]` is not supported."));
+                    return Err(meta.error(ADJACENT_TAGGING_MSG));
                 }
                 "untagged" => {
-                    return Err(meta.error("frieze: `#[serde(untagged)]` enums are not supported."));
+                    return Err(meta.error(UNTAGGED_MSG));
                 }
                 "transparent" => {
                     return Err(meta.error("frieze: `#[serde(transparent)]` on a container is not supported."));
