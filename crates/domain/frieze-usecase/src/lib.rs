@@ -23,7 +23,7 @@ compile_error!(
 );
 
 mod schema;
-pub use schema::Schema;
+pub use schema::{IsStructSchema, Schema};
 
 mod schemas_builder;
 pub use schemas_builder::SchemasBuilder;
