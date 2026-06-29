@@ -29,7 +29,35 @@ pub enum Error {
     DuplicateProperty { schema: String, property: String },
     #[error("schema `{0}` was added more than once")]
     DuplicateSchema(SchemaName),
-    #[error("schema `{0}` is referenced but not registered")]
+    /// A `$ref` resolution failure detected by
+    /// [`crate::Schemas`]-consuming code (typically
+    /// `frieze_usecase::SchemasBuilder::build`).
+    ///
+    /// Reachable only through the low-level API: code that uses
+    /// `#[derive(Schema)]` together with `SchemasBuilder::add` /
+    /// `SchemasBuilder::push_unique` never triggers this error
+    /// because the derived [`Schema::register_into`] walks each field
+    /// type and registers transitive dependencies automatically.
+    ///
+    /// Two situations still raise the error:
+    ///
+    /// 1. A hand-written `impl Schema` whose `schema()` body contains
+    ///    a `$ref` to another type, but that does not override
+    ///    `register_into` to register the referenced type — the
+    ///    default `register_into` is non-recursive.
+    /// 2. A `Schemas` constructed directly from `Schemas::new(vec![...])`
+    ///    with manually-assembled `Schema` values whose references do
+    ///    not match any entry in the same `Vec`.
+    ///
+    /// Recovery is the same in both cases: register the missing type
+    /// (`SchemasBuilder::add::<MissingType>()`), or override
+    /// `register_into` on the manual `impl Schema` to call
+    /// `<MissingType as Schema>::register_into(builder)`.
+    #[error(
+        "schema `{0}` is referenced but not registered (add it via \
+         `SchemasBuilder::add::<...>()`, or override `register_into` \
+         on the manual `impl Schema` to walk the referenced types)"
+    )]
     UnresolvedReference(SchemaName),
     #[error("oneOf schema `{0}` declares an empty discriminator tag")]
     EmptyOneOfTag(String),

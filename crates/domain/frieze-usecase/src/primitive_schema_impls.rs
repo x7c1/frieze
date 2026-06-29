@@ -28,6 +28,7 @@
 use frieze_model::{PropertyType, Schema as ModelSchema};
 
 use crate::schema::Schema;
+use crate::schemas_builder::SchemasBuilder;
 
 const PRIMITIVE_SCALAR_INVARIANT_MSG: &str =
     "frieze: primitive scalar satisfies the leaf-PropertyType invariant by construction";
@@ -41,6 +42,16 @@ macro_rules! impl_primitive_schema {
             fn schema() -> ModelSchema {
                 ModelSchema::new_scalar(PropertyType::$variant)
                     .expect(PRIMITIVE_SCALAR_INVARIANT_MSG)
+            }
+            fn register_into(_builder: &mut SchemasBuilder) {
+                // Primitive scalars are inlined at the boundary
+                // conversion in `to_value` and never registered as
+                // standalone entries under `#/components/schemas`. The
+                // override stays a no-op so transitive
+                // `register_into` calls from derived schemas can be
+                // emitted uniformly (`<#ty as Schema>::register_into`)
+                // without the macro special-casing primitive field
+                // types.
             }
         }
     };

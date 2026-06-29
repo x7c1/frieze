@@ -56,6 +56,7 @@ use syn::spanned::Spanned;
 use syn::{DataEnum, DeriveInput, Fields, GenericParam, Generics, Ident, Type, Variant};
 
 use crate::doc::{compose_enum_description, description_token, parse_doc_attrs};
+use crate::register::register_into_body;
 use crate::rename::{
     check_unique_wire_names, rename_all_from_scan, wire_name, RenameAll, RenameTarget, WireSource,
 };
@@ -250,6 +251,9 @@ fn expand_string_enum(
     push_schema_bound(&mut impl_generics_storage);
     let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
     let name_body = composed_name_body(generics, &base_name);
+    // Unit-only enums have no inner types to recurse into; the body
+    // collapses to the idempotent guard plus a single `push_unique`.
+    let register_body = register_into_body(&[]);
 
     let expanded = quote! {
         impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
@@ -263,6 +267,11 @@ fn expand_string_enum(
                 )
                 .expect("frieze: derived enum schema satisfies invariants by construction")
                 .with_description(#composed_description_expr)
+            }
+            fn register_into(
+                builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
+            ) {
+                #register_body
             }
         }
         // Marker impl: an enum-derived `Schema` is registrable on a
@@ -429,6 +438,12 @@ fn expand_one_of(
         (quote! {}, quote! { #( #struct_bound_checks )* })
     };
 
+    // Each `oneOf` variant carries an inner struct type; the derived
+    // `register_into` recurses into every one so adding the enum root
+    // pulls all variant-inner schemas in transitively.
+    let variant_inner_types: Vec<&Type> = inner_entries.iter().map(|(_, ty, _, _)| ty).collect();
+    let register_body = register_into_body(&variant_inner_types);
+
     let expanded = quote! {
         impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
             fn name() -> ::std::string::String {
@@ -445,6 +460,11 @@ fn expand_one_of(
                 )
                 .expect("frieze: derived oneOf schema satisfies invariants by construction")
                 .with_description(#composed_description_expr)
+            }
+            fn register_into(
+                builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
+            ) {
+                #register_body
             }
         }
         // Marker impl: an enum-derived `Schema` is registrable on a

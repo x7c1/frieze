@@ -28,6 +28,7 @@ use syn::{DeriveInput, GenericParam, Ident};
 
 use crate::doc::{description_token, parse_doc_attrs};
 use crate::field::{named_fields, parse_field};
+use crate::register::register_into_body;
 use crate::rename::{
     check_unique_wire_names, rename_all_from_scan, wire_name, RenameTarget, WireSource,
 };
@@ -52,6 +53,7 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
 
     let mut property_exprs = Vec::with_capacity(fields.len());
     let mut wire_entries: Vec<(Ident, String, WireSource)> = Vec::with_capacity(fields.len());
+    let field_types: Vec<&syn::Type> = fields.iter().map(|f| &f.ty).collect();
     for field in fields {
         let field_ident = field
             .ident
@@ -102,6 +104,7 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
     let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
 
     let name_body = composed_name_body(&ast.generics, &base_name);
+    let register_body = register_into_body(&field_types);
 
     let expanded = quote! {
         impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
@@ -115,6 +118,11 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
                 )
                 .expect("frieze: derived schema satisfies invariants by construction")
                 .with_description(#struct_description_expr)
+            }
+            fn register_into(
+                builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
+            ) {
+                #register_body
             }
         }
         // Marker impl: a struct-derived `Schema` is a struct schema.
