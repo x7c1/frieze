@@ -286,6 +286,36 @@ reports the missing target by its composed name:
 Err(UnresolvedReference(SchemaName("User_Page")))
 ```
 
+### Primitive arguments are inlined, not referenced
+
+Generic derive output cannot determine at expansion time whether a
+type parameter is a primitive, so the inner field reference is always
+emitted as `PropertyType::Reference(<T as Schema>::name())`. After
+monomorphisation, a primitive `T` (e.g. `i64`) yields a reference
+named after the primitive (`Int64`). Primitives implement `Schema` so
+they can appear as generic arguments but **not** `IsRegistrable`, so
+they cannot be added to `Schemas` and never appear under
+`#/components/schemas`.
+
+To keep this consistent, primitive references are **inlined as their
+scalar shape at the leaf position** in the OAS output, and the
+build-time reference walk treats primitive names as already resolved.
+For `Container<i64>`:
+
+```yaml
+Int64_Container:
+  type: object
+  required: [value]
+  properties:
+    value: { type: integer, format: int64 }   # inlined, not $ref: Int64
+```
+
+No `components/schemas/Int64` entry is emitted, no
+`Schemas::add::<i64>()` call is needed, and
+`Schemas::add::<Container<i64>>().build()` succeeds standalone. The
+same inline treatment applies to all eight primitive scalars (`Int32`,
+`Int64`, `UInt32`, `UInt64`, `Float`, `Double`, `Boolean`, `String`).
+
 ### Owned-wrapper composition
 
 `Box<T>`, `Rc<T>`, and `Arc<T>` are

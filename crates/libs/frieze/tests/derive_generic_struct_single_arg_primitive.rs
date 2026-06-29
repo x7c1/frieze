@@ -1,18 +1,18 @@
-//! Schema name composition for a single-argument generic struct
-//! instantiated with a primitive: `Container<i64>` produces
-//! `Int64_Container`, following the suffix-form rule
-//! `<Arg>_<Base>`.
+//! Schema name composition and end-to-end registration for a
+//! single-argument generic struct instantiated with a primitive scalar:
+//! `Container<i64>` produces `Int64_Container`, and the inner `value: T`
+//! field renders inline as the scalar shape
+//! (`{type: integer, format: int64}`) instead of as a `$ref` to a
+//! non-existent `Int64` component.
 //!
-//! The full `Schemas::add::<Container<i64>>().build()` flow is not
-//! exercised here because the emitted property reference is
-//! `$ref: Int64`, and primitives cannot be registered on a
-//! `SchemasBuilder` (the `IsRegistrable` marker rejects
-//! `Schemas::add::<i64>()`). Resolving primitive-scalar references to
-//! inline `PropertyType`s would let `Container<i64>` round-trip through
-//! `Schemas` end-to-end; that is left as a follow-up.
+//! Generic derive output cannot know at expansion time whether `T` is a
+//! primitive, so it emits `PropertyType::Reference(<T as Schema>::name())`
+//! unconditionally. The boundary conversion in `frieze-usecase` looks
+//! the reference name up against the primitive-name table and inlines
+//! the scalar shape at the leaf position. The OAS document therefore
+//! contains no `components/schemas/Int64` entry and no dangling `$ref`.
 //!
-//! `Container<User>` (user-type instantiation) is exercised end-to-end
-//! by `derive_generic_struct_single_arg_user.rs`.
+//! Identical output under `oas-3-0` and `oas-3-1`.
 
 use frieze::Schema;
 
@@ -35,4 +35,59 @@ fn container_string_name_uses_suffix_form() {
 #[test]
 fn container_bool_name_uses_suffix_form() {
     assert_eq!(<Container<bool> as Schema>::name(), "Boolean_Container");
+}
+
+#[test]
+fn container_i64_inlines_primitive_value() {
+    let s: frieze::Schemas = frieze::schemas()
+        .add::<Container<i64>>()
+        .build()
+        .expect("schemas build succeeds without a registered `Int64`");
+
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
+    Int64_Container:
+      type: object
+      required:
+        - value
+      properties:
+        value:
+          type: integer
+          format: int64
+    "##);
+}
+
+#[test]
+fn container_string_inlines_primitive_value() {
+    let s: frieze::Schemas = frieze::schemas()
+        .add::<Container<String>>()
+        .build()
+        .expect("schemas build succeeds without a registered `String`");
+
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
+    String_Container:
+      type: object
+      required:
+        - value
+      properties:
+        value:
+          type: string
+    "##);
+}
+
+#[test]
+fn container_bool_inlines_primitive_value() {
+    let s: frieze::Schemas = frieze::schemas()
+        .add::<Container<bool>>()
+        .build()
+        .expect("schemas build succeeds without a registered `Boolean`");
+
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
+    Boolean_Container:
+      type: object
+      required:
+        - value
+      properties:
+        value:
+          type: boolean
+    "##);
 }
