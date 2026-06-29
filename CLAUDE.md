@@ -54,16 +54,23 @@ upon — refer to them by their crate-specific roles instead.
 
 ## Build / Test matrix
 
-Both feature gates must remain green:
+Both OAS feature gates must remain green, both with and without the
+opt-in `inventory` feature:
 
 ```
-cargo build  --workspace --no-default-features --features oas-3-0
-cargo test   --workspace --no-default-features --features oas-3-0
-cargo build  --workspace --no-default-features --features oas-3-1
-cargo test   --workspace --no-default-features --features oas-3-1
 cargo fmt --all -- --check
+cargo build  --workspace --no-default-features --features oas-3-0
+cargo build  --workspace --no-default-features --features oas-3-1
+cargo build  --workspace --no-default-features --features oas-3-0,inventory
+cargo build  --workspace --no-default-features --features oas-3-1,inventory
 cargo clippy --workspace --all-targets --no-default-features --features oas-3-0 -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features --features oas-3-1 -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features oas-3-0,inventory -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features --features oas-3-1,inventory -- -D warnings
+cargo test   --workspace --no-default-features --features oas-3-0
+cargo test   --workspace --no-default-features --features oas-3-1
+cargo test   --workspace --no-default-features --features oas-3-0,inventory
+cargo test   --workspace --no-default-features --features oas-3-1,inventory
 ```
 
 ## Branch and PR conventions

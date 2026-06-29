@@ -28,7 +28,7 @@ use syn::{DeriveInput, GenericParam, Ident};
 
 use crate::doc::{description_token, parse_doc_attrs};
 use crate::field::{named_fields, parse_field};
-use crate::register::register_into_body;
+use crate::register::{inventory_submit_token, register_into_body};
 use crate::rename::{
     check_unique_wire_names, rename_all_from_scan, wire_name, RenameTarget, WireSource,
 };
@@ -105,6 +105,11 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
 
     let name_body = composed_name_body(&ast.generics, &base_name);
     let register_body = register_into_body(&field_types);
+    // Non-generic struct: emit one `inventory::submit!` site so the
+    // type appears as a root in `Schemas::builder().from_inventory()`.
+    // Generic structs produce an empty token stream — see
+    // `inventory_submit_token` for the rationale.
+    let inventory_submit = inventory_submit_token(ident, &ast.generics);
 
     let expanded = quote! {
         impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
@@ -134,6 +139,8 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
         // `Schemas` collection. Primitive scalars never receive this
         // impl, so `Schemas::add::<i64>()` is rejected at compile time.
         impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
+
+        #inventory_submit
     };
     Ok(expanded)
 }

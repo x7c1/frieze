@@ -56,7 +56,7 @@ use syn::spanned::Spanned;
 use syn::{DataEnum, DeriveInput, Fields, GenericParam, Generics, Ident, Type, Variant};
 
 use crate::doc::{compose_enum_description, description_token, parse_doc_attrs};
-use crate::register::register_into_body;
+use crate::register::{inventory_submit_token, register_into_body};
 use crate::rename::{
     check_unique_wire_names, rename_all_from_scan, wire_name, RenameAll, RenameTarget, WireSource,
 };
@@ -254,6 +254,10 @@ fn expand_string_enum(
     // Unit-only enums have no inner types to recurse into; the body
     // collapses to the idempotent guard plus a single `push_unique`.
     let register_body = register_into_body(&[]);
+    // Non-generic enum: emit one `inventory::submit!` site. Generic
+    // enums (`enum E<T> { ... }`) produce an empty stream — see
+    // `inventory_submit_token` for the rationale.
+    let inventory_submit = inventory_submit_token(ident, generics);
 
     let expanded = quote! {
         impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
@@ -277,6 +281,8 @@ fn expand_string_enum(
         // Marker impl: an enum-derived `Schema` is registrable on a
         // `Schemas` collection.
         impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
+
+        #inventory_submit
     };
     Ok(expanded)
 }
@@ -443,6 +449,9 @@ fn expand_one_of(
     // pulls all variant-inner schemas in transitively.
     let variant_inner_types: Vec<&Type> = inner_entries.iter().map(|(_, ty, _, _)| ty).collect();
     let register_body = register_into_body(&variant_inner_types);
+    // Non-generic oneOf enum: emit one `inventory::submit!` site.
+    // Generic oneOf enums produce an empty stream.
+    let inventory_submit = inventory_submit_token(ident, generics);
 
     let expanded = quote! {
         impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
@@ -472,6 +481,7 @@ fn expand_one_of(
         impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
 
         #outer_bound_checks
+        #inventory_submit
     };
     Ok(expanded)
 }

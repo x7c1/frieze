@@ -78,6 +78,35 @@ The two encode nullability differently (`nullable: true` vs
 [`docs/oas-versions.md`](docs/oas-versions.md) for the full encoding
 table and the version-specific shapes for nullable references.
 
+## Auto-collection via `inventory`
+
+Enable the `inventory` Cargo feature to opt into
+`Schemas::builder().from_inventory()`:
+
+```toml
+frieze = { version = "...", features = ["inventory"] }
+```
+
+With the feature on, every non-generic `#[derive(Schema)]` type is
+collected automatically:
+
+```rust
+let schemas = frieze::schemas()
+    .from_inventory()
+    .add::<Box<MyOtherType>>() // chain explicit roots if needed
+    .build()?;
+```
+
+Generic types (`Page<T>`) are not auto-collected — Rust's `static`
+cannot hold generic types, so the derive does not emit an inventory
+entry for them. They are still registered transitively when a
+non-generic root's field references the concrete instantiation
+(`struct Foo { page: Page<Bar> }` walks into `Page<Bar>` from `Foo`).
+
+`inventory` aggregates per binary, so every test in a given test
+binary observes the same submission set. Tests that need an isolated
+schemas set should reach for the explicit `add::<T>()` path.
+
 ## Documentation
 
 | File                                                       | Topic                                            |

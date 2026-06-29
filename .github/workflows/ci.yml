@@ -24,18 +24,35 @@ jobs:
       # `oas-3-0` and `oas-3-1` are mutually exclusive (see
       # `frieze-openapi`'s `compile_error!` guards); each feature set is
       # checked in its own step.
+      #
+      # The `inventory` feature is additive and opt-in; we exercise it
+      # in tandem with each OAS version so the opt-in
+      # `Schemas::from_inventory()` path stays green alongside the
+      # default-off path.
       - name: cargo clippy (oas-3-0)
         run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-0 -- -D warnings
       - name: cargo clippy (oas-3-1)
         run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-1 -- -D warnings
+      - name: cargo clippy (oas-3-0 + inventory)
+        run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-0,inventory -- -D warnings
+      - name: cargo clippy (oas-3-1 + inventory)
+        run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-1,inventory -- -D warnings
       - name: cargo build (oas-3-0)
         run: cargo build --workspace --no-default-features --features oas-3-0
       - name: cargo build (oas-3-1)
         run: cargo build --workspace --no-default-features --features oas-3-1
+      - name: cargo build (oas-3-0 + inventory)
+        run: cargo build --workspace --no-default-features --features oas-3-0,inventory
+      - name: cargo build (oas-3-1 + inventory)
+        run: cargo build --workspace --no-default-features --features oas-3-1,inventory
       - name: cargo test (oas-3-0)
         run: cargo test --workspace --no-default-features --features oas-3-0
       - name: cargo test (oas-3-1)
         run: cargo test --workspace --no-default-features --features oas-3-1
+      - name: cargo test (oas-3-0 + inventory)
+        run: cargo test --workspace --no-default-features --features oas-3-0,inventory
+      - name: cargo test (oas-3-1 + inventory)
+        run: cargo test --workspace --no-default-features --features oas-3-1,inventory
 
   validate-title:
     name: validate-title
