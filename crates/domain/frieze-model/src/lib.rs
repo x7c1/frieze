@@ -34,6 +34,9 @@ pub use string_enum_schema::StringEnumSchema;
 mod one_of_schema;
 pub use one_of_schema::{OneOfSchema, OneOfVariant};
 
+mod scalar_schema;
+pub use scalar_schema::ScalarSchema;
+
 mod schema;
 pub use schema::Schema;
 

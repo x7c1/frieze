@@ -66,8 +66,8 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
     let struct_description_expr = description_token(&parse_doc_attrs(&ast.attrs));
     let expanded = quote! {
         impl ::frieze::__private::frieze_usecase::Schema for #ident {
-            fn name() -> &'static str {
-                #schema_name
+            fn name() -> ::std::string::String {
+                ::std::string::String::from(#schema_name)
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
                 ::frieze::__private::frieze_model::Schema::new_object(
@@ -83,6 +83,10 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
         // referencing an enum-derived type is rejected at compile time
         // by the bound check emitted in `expand_enum`.
         impl ::frieze::__private::frieze_usecase::IsStructSchema for #ident {}
+        // Marker impl: a struct-derived `Schema` is registrable on a
+        // `Schemas` collection. Primitive scalars never receive this
+        // impl, so `Schemas::add::<i64>()` is rejected at compile time.
+        impl ::frieze::__private::frieze_usecase::IsRegistrable for #ident {}
     };
     Ok(expanded)
 }

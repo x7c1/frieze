@@ -17,10 +17,18 @@ use serde_yaml::{Mapping, Number, Value};
 ///   (`nullable` under `oas-3-0`,) `enum`
 /// - `properties`: declaration order (via [`IndexMap`])
 /// - `required`: same order as `properties`
+///
+/// [`Schema::Scalar`] entries are defensively skipped: scalar schemas
+/// are never emitted under `#/components/schemas`. The primary guard
+/// against scalar registration is the `IsRegistrable` marker trait
+/// (compile-time); this skip is the secondary guard at the boundary
+/// conversion layer.
 pub fn to_value(schemas: &Schemas) -> Value {
     let mut top = Mapping::new();
     for (name, schema) in &schemas.by_name {
-        let openapi = to_openapi(schema);
+        let Some(openapi) = to_openapi(schema) else {
+            continue;
+        };
         top.insert(
             Value::String(name.as_str().to_string()),
             schema_object_to_value(&openapi),
@@ -36,14 +44,20 @@ pub fn to_value(schemas: &Schemas) -> Value {
 /// property's [`Property::presence`] — and only that. Value-level
 /// nullability lives on the type tree ([`PropertyType::Nullable`]) and is
 /// rendered independently by [`property_type_to_object_schema`].
-fn to_openapi(schema: &Schema) -> SchemaObject {
+///
+/// Returns `None` for [`Schema::Scalar`] — scalar schemas are never
+/// emitted under `#/components/schemas`. The primary guard is the
+/// `IsRegistrable` marker trait (compile-time); this `None` arm is the
+/// defensive secondary guard at the boundary.
+fn to_openapi(schema: &Schema) -> Option<SchemaObject> {
     match schema {
-        Schema::Object(object) => SchemaObject::Object(object_schema_from_model(object)),
-        Schema::StringEnum(string_enum) => SchemaObject::StringEnum(
+        Schema::Object(object) => Some(SchemaObject::Object(object_schema_from_model(object))),
+        Schema::StringEnum(string_enum) => Some(SchemaObject::StringEnum(
             StringEnumSchema::new(string_enum.values.clone())
                 .with_description(string_enum.description.clone()),
-        ),
-        Schema::OneOf(one_of) => SchemaObject::OneOf(one_of_from_model(one_of)),
+        )),
+        Schema::OneOf(one_of) => Some(SchemaObject::OneOf(one_of_from_model(one_of))),
+        Schema::Scalar(_) => None,
     }
 }
 
@@ -575,15 +589,15 @@ fn minimum_to_value(minimum: f64) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::Schema as SchemaTrait;
+    use crate::schema::{IsRegistrable, Schema as SchemaTrait};
     use crate::schemas_builder::SchemasBuilder;
     use frieze_model::{Presence, Property, PropertyType};
 
     struct DummyUser;
 
     impl SchemaTrait for DummyUser {
-        fn name() -> &'static str {
-            "User"
+        fn name() -> String {
+            "User".to_string()
         }
         fn schema() -> frieze_model::Schema {
             frieze_model::Schema::new_object(
@@ -596,6 +610,7 @@ mod tests {
             .unwrap()
         }
     }
+    impl IsRegistrable for DummyUser {}
 
     #[test]
     fn preserves_property_order() {

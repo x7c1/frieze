@@ -25,10 +25,20 @@ pub struct Schemas {
 impl Schemas {
     /// Builds a collection from a sequence of schemas, rejecting duplicate
     /// schema names.
+    ///
+    /// [`Schema::Scalar`] entries are silently filtered: scalar schemas
+    /// have no registration name (see [`Schema::name`]) and are never
+    /// emitted under `#/components/schemas`. The primary guard against
+    /// scalar registration is the `IsRegistrable` marker trait in
+    /// `frieze-usecase` (compile-time); this filter is the defensive
+    /// secondary guard at the domain layer.
     pub fn new(schemas: Vec<Schema>) -> Result<Self, Error> {
         let mut by_name: BTreeMap<SchemaName, Schema> = BTreeMap::new();
         for schema in schemas {
-            let key = schema.name().clone();
+            let key = match schema.name() {
+                Some(name) => name.clone(),
+                None => continue,
+            };
             if by_name.contains_key(&key) {
                 return Err(Error::DuplicateSchema(key));
             }

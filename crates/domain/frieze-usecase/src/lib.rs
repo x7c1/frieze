@@ -23,7 +23,10 @@ compile_error!(
 );
 
 mod schema;
-pub use schema::{IsStructSchema, Schema};
+pub use schema::{IsRegistrable, IsStructSchema, Schema};
+
+mod primitive_schema_impls;
+mod wrapper_impls;
 
 mod schemas_builder;
 pub use schemas_builder::SchemasBuilder;
