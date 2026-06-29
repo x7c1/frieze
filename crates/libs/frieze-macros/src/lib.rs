@@ -1,31 +1,41 @@
 //! Proc-macro derives for frieze.
 //!
 //! `#[derive(Schema)]` generates an implementation of the `frieze::Schema`
-//! trait. Two top-level shapes are supported:
+//! trait. Three top-level shapes are supported:
 //!
 //! - **Named struct** — every field type must come from the small fixed
 //!   scalar set, optionally composed with `Vec<T>`, `Option<T>`, and/or
 //!   `Maybe<T>`, or be itself a `Schema`-deriving type (rendered as
 //!   `$ref`). The presence/nullability mapping is documented in the
-//!   table below.
+//!   table below. Struct derives additionally `impl IsStructSchema`
+//!   so they can appear as the inner of an internally-tagged enum
+//!   variant.
 //! - **Unit-variant enum** — every variant must be a unit variant. The
 //!   derive emits a `type: string, enum: [...]` schema whose values are
 //!   each variant's wire name, computed from the variant identifier
 //!   with any container-level `#[serde(rename_all = "...")]` applied
 //!   first and any variant-level `#[serde(rename = "literal")]`
-//!   overriding it. Tuple variants, struct variants, and empty enums
-//!   are compile errors.
+//!   overriding it.
+//! - **Internally-tagged enum** (`#[serde(tag = "...")]`) — every
+//!   variant must be a newtype wrapping a `Schema`-implementing
+//!   struct. The derive emits a `oneOf` schema where each arm is an
+//!   `allOf` of the inner struct's `$ref` and a synthesized object
+//!   constraining the discriminator property to the variant's wire
+//!   name; the enclosing schema carries
+//!   `discriminator: {propertyName: <tag>}` (no `mapping` block).
 //!
-//! Any other shape produces a compile error.
+//! Any other shape produces a compile error — see the field-shapes
+//! spec for the full table of accepted and rejected forms.
 //!
 //! # Rust shape → OAS combination
 //!
 //! The struct mapping is driven by syntactic type recognition plus a
 //! small fixed set of serde attributes the macro reads: `rename`,
-//! `rename_all`, `default`, and `skip_serializing_if`. Any other
-//! `#[serde(...)]` entry that frieze cannot faithfully encode into a
-//! single OAS schema (`alias`, `flatten`, `tag`, `content`, `untagged`,
-//! `transparent`, `rename_all_fields`, `with` / `serialize_with` /
+//! `rename_all`, `default`, `skip_serializing_if`, and (for enum
+//! containers) `tag`. Any other `#[serde(...)]` entry that frieze
+//! cannot faithfully encode into a single OAS schema (`alias`,
+//! `flatten`, `content`, `untagged`, `transparent`,
+//! `rename_all_fields`, `with` / `serialize_with` /
 //! `deserialize_with`, `from` / `try_from` / `into`, `skip` /
 //! `skip_serializing` / `skip_deserializing`, `other`, and the
 //! direction-split `rename(serialize = ..., deserialize = ...)` /

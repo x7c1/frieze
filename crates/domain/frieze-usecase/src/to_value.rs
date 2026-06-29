@@ -2,7 +2,9 @@
 //! [`serde_yaml::Value`], via [`frieze_openapi`].
 
 use frieze_model::{Property, PropertyType, Schema, SchemaName, Schemas};
-use frieze_openapi::{ObjectSchema, SchemaObject, SchemaType, StringEnumSchema};
+use frieze_openapi::{
+    ObjectSchema, OneOfSchema, OneOfVariant, SchemaObject, SchemaType, StringEnumSchema,
+};
 use indexmap::IndexMap;
 use serde_yaml::{Mapping, Number, Value};
 
@@ -41,7 +43,27 @@ fn to_openapi(schema: &Schema) -> SchemaObject {
             StringEnumSchema::new(string_enum.values.clone())
                 .with_description(string_enum.description.clone()),
         ),
+        Schema::OneOf(one_of) => SchemaObject::OneOf(one_of_from_model(one_of)),
     }
+}
+
+/// Boundary conversion for a [`frieze_model::OneOfSchema`].
+///
+/// The macro side has already composed any per-variant docs into the
+/// enum-level description (mirroring the unit-variant enum's behaviour),
+/// so the rendering side only consumes the variant's `wire_name` and
+/// `inner` reference. The `inner_reference` is pre-formatted here so the
+/// emitter does not need to know the JSON-pointer convention.
+fn one_of_from_model(one_of: &frieze_model::OneOfSchema) -> OneOfSchema {
+    let variants: Vec<OneOfVariant> = one_of
+        .variants
+        .iter()
+        .map(|variant| OneOfVariant {
+            wire_name: variant.wire_name.clone(),
+            inner_reference: format!("#/components/schemas/{}", variant.inner.as_str()),
+        })
+        .collect();
+    OneOfSchema::new(one_of.tag.clone(), variants).with_description(one_of.description.clone())
 }
 
 fn object_schema_from_model(schema: &frieze_model::ObjectSchema) -> ObjectSchema {
@@ -243,7 +265,99 @@ fn schema_object_to_value(schema: &SchemaObject) -> Value {
     match schema {
         SchemaObject::Object(object) => object_schema_to_value(object),
         SchemaObject::StringEnum(string_enum) => string_enum_to_value(string_enum),
+        SchemaObject::OneOf(one_of) => one_of_to_value(one_of),
     }
+}
+
+/// Serializes a [`OneOfSchema`] into a [`Value`] in the canonical key
+/// order `description, oneOf, discriminator` (with `description` emitted
+/// only when present).
+///
+/// Each `oneOf` arm is an `allOf` of two siblings:
+///
+/// 1. a `$ref` to the variant's inner struct schema,
+/// 2. a synthetic object schema constraining the discriminator
+///    property to the variant's wire name (`required: [<tag>]`,
+///    `properties.<tag>: {type: string, enum: [<wire_name>]}`).
+///
+/// The synthesized arm 2 is what makes tag dispatch strict on the wire:
+/// without it, a reader could accept the wrong tag value and still
+/// pass-validate against the inner schema alone.
+///
+/// The `discriminator` block carries only `propertyName`. The optional
+/// `mapping` block is deliberately omitted — a mapping that pointed at
+/// `inner_reference` (e.g. `LoginData`) would lead a reader to validate
+/// the payload against the inner schema alone, bypassing the
+/// `enum: [<wire_name>]` constraint frieze synthesises in the `allOf`.
+/// Omitting `mapping` makes readers shape-match across the arms and
+/// keeps the tag-value constraint strict.
+fn one_of_to_value(schema: &OneOfSchema) -> Value {
+    let mut map = Mapping::new();
+    if let Some(description) = &schema.description {
+        map.insert(
+            Value::String("description".into()),
+            Value::String(description.clone()),
+        );
+    }
+    let arms: Vec<Value> = schema
+        .variants
+        .iter()
+        .map(|variant| one_of_arm_to_value(&schema.tag, variant))
+        .collect();
+    map.insert(Value::String("oneOf".into()), Value::Sequence(arms));
+    let mut discriminator = Mapping::new();
+    discriminator.insert(
+        Value::String("propertyName".into()),
+        Value::String(schema.tag.clone()),
+    );
+    map.insert(
+        Value::String("discriminator".into()),
+        Value::Mapping(discriminator),
+    );
+    Value::Mapping(map)
+}
+
+/// Builds one `oneOf` arm — an `allOf` of `[{$ref}, {synthetic tag object}]`.
+fn one_of_arm_to_value(tag: &str, variant: &OneOfVariant) -> Value {
+    let mut inner_ref = Mapping::new();
+    inner_ref.insert(
+        Value::String("$ref".into()),
+        Value::String(variant.inner_reference.clone()),
+    );
+
+    let mut tag_property = Mapping::new();
+    tag_property.insert(
+        Value::String("type".into()),
+        schema_type_to_value(SchemaType::String),
+    );
+    tag_property.insert(
+        Value::String("enum".into()),
+        Value::Sequence(vec![Value::String(variant.wire_name.clone())]),
+    );
+
+    let mut tag_properties = Mapping::new();
+    tag_properties.insert(Value::String(tag.into()), Value::Mapping(tag_property));
+
+    let mut tag_object = Mapping::new();
+    tag_object.insert(
+        Value::String("type".into()),
+        schema_type_to_value(SchemaType::Object),
+    );
+    tag_object.insert(
+        Value::String("required".into()),
+        Value::Sequence(vec![Value::String(tag.into())]),
+    );
+    tag_object.insert(
+        Value::String("properties".into()),
+        Value::Mapping(tag_properties),
+    );
+
+    let mut arm = Mapping::new();
+    arm.insert(
+        Value::String("allOf".into()),
+        Value::Sequence(vec![Value::Mapping(inner_ref), Value::Mapping(tag_object)]),
+    );
+    Value::Mapping(arm)
 }
 
 /// Serializes a [`StringEnumSchema`] in the canonical key order

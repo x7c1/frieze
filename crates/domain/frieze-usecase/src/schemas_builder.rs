@@ -26,19 +26,62 @@ impl SchemasBuilder {
     /// **and** that every `$ref` resolves to a registered schema.
     ///
     /// References are gathered by walking each property's type tree
-    /// (recursing into `Array(...)` and `Nullable(...)`). The first ref
-    /// that points at a schema not in the collection produces
+    /// (recursing into `Array(...)` and `Nullable(...)`) and each
+    /// `oneOf` variant's inner reference. The first ref that points at
+    /// a schema not in the collection produces
     /// [`Error::UnresolvedReference`], in declaration order — the same
     /// fail-fast UX as [`Error::DuplicateSchema`].
+    ///
+    /// In addition, each `oneOf` variant's inner reference must point at
+    /// a struct schema (`Schema::Object`); pointing at another enum
+    /// schema (`Schema::StringEnum` or `Schema::OneOf`) is rejected
+    /// with [`Error::OneOfVariantInnerNotStruct`] because the
+    /// synthesized tag field must merge into an object body, not into a
+    /// scalar-shaped or already-discriminated value.
     pub fn build(self) -> Result<Schemas, Error> {
         let schemas = Schemas::new(self.schemas)?;
         for schema in schemas.by_name.values() {
             if let Some(missing) = first_unresolved_in_schema(schema, &schemas) {
                 return Err(Error::UnresolvedReference(missing.clone()));
             }
+            check_one_of_variants_target_struct_schemas(schema, &schemas)?;
         }
         Ok(schemas)
     }
+}
+
+/// Confirms each `oneOf` variant's inner reference resolves to a
+/// [`ModelSchema::Object`]. Pointing a oneOf arm at a string-enum or
+/// another oneOf would break the internal-tagged shape — the synthesized
+/// tag field has nothing to merge into.
+fn check_one_of_variants_target_struct_schemas(
+    schema: &ModelSchema,
+    schemas: &Schemas,
+) -> Result<(), Error> {
+    let one_of = match schema {
+        ModelSchema::OneOf(o) => o,
+        ModelSchema::Object(_) | ModelSchema::StringEnum(_) => return Ok(()),
+    };
+    for variant in &one_of.variants {
+        let target = match schemas.by_name.get(&variant.inner) {
+            Some(t) => t,
+            // Missing references are already caught by
+            // `first_unresolved_in_schema`; defensive `continue` so this
+            // helper does not double-report.
+            None => continue,
+        };
+        match target {
+            ModelSchema::Object(_) => {}
+            ModelSchema::StringEnum(_) | ModelSchema::OneOf(_) => {
+                return Err(Error::OneOfVariantInnerNotStruct {
+                    schema: one_of.name.as_str().to_string(),
+                    variant: variant.wire_name.clone(),
+                    inner: variant.inner.clone(),
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Walks a single registered [`ModelSchema`] for references and returns
@@ -61,6 +104,14 @@ fn first_unresolved_in_schema<'a>(
         }
         // String-enum schemas carry no property references; nothing to walk.
         ModelSchema::StringEnum(_) => None,
+        ModelSchema::OneOf(one_of) => {
+            for variant in &one_of.variants {
+                if !schemas.by_name.contains_key(&variant.inner) {
+                    return Some(&variant.inner);
+                }
+            }
+            None
+        }
     }
 }
 

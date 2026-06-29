@@ -1,0 +1,5 @@
+error: frieze: enum `Status` is unit-only and does not need `#[serde(tag = "type")]`. Remove the attribute to emit it as a string enum (`{type: string, enum: [...]}`). frieze reserves `#[serde(tag = "...")]` for enums whose variants carry data.
+  --> tests/ui/enum_unit_only_with_explicit_tag.rs:11:6
+   |
+11 | enum Status {
+   |      ^^^^^^

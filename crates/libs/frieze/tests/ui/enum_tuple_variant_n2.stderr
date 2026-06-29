@@ -1,0 +1,5 @@
+error: frieze: tuple variants with multiple fields (variant `Point` has 2) are not supported. Define a named newtype struct: #[derive(Schema)] struct Point { ... }; enum Bad { Point(Point), ... }.
+ --> tests/ui/enum_tuple_variant_n2.rs:9:5
+  |
+9 |     Point(i32, i32),
+  |     ^^^^^^^^^^^^^^^

@@ -1,6 +1,7 @@
 //! The top-level OpenAPI Schema Object sum supported by Phase 1.
 
 use crate::object_schema::ObjectSchema;
+use crate::one_of_schema::OneOfSchema;
 use crate::string_enum_schema::StringEnumSchema;
 
 /// The kinds of OAS Schema Object that frieze can register under
@@ -25,4 +26,9 @@ pub enum SchemaObject {
     /// values. Derived from a Rust enum whose variants are all unit
     /// variants.
     StringEnum(StringEnumSchema),
+    /// A `oneOf` schema with a top-level `discriminator` block, derived
+    /// from an internally-tagged Rust enum (one whose every variant is
+    /// a newtype wrapping a `Schema`-implementing struct, declared with
+    /// `#[serde(tag = "...")]`).
+    OneOf(OneOfSchema),
 }

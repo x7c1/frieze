@@ -78,6 +78,11 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
                 .with_description(#struct_description_expr)
             }
         }
+        // Marker impl: a struct-derived `Schema` is a struct schema.
+        // Enums never receive this impl, so a `oneOf` newtype variant
+        // referencing an enum-derived type is rejected at compile time
+        // by the bound check emitted in `expand_enum`.
+        impl ::frieze::__private::frieze_usecase::IsStructSchema for #ident {}
     };
     Ok(expanded)
 }
