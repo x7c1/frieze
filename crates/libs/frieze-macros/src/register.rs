@@ -17,7 +17,7 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::Type;
+use syn::{Ident, Type};
 
 use crate::ty::{unwrap_maybe, unwrap_option, unwrap_vec};
 
@@ -66,5 +66,41 @@ pub(crate) fn register_into_body(inner_types: &[&Type]) -> TokenStream {
         }
         builder.push_unique(<Self as ::frieze::__private::frieze_usecase::Schema>::schema());
         #( #calls )*
+    }
+}
+
+/// Emit the `inventory::submit!` site for a non-generic `#[derive(Schema)]`
+/// input.
+///
+/// The submission is unconditional from the macro's perspective: the
+/// facade's `__private::inventory_submit!` wrapper decides whether the
+/// emitted call has runtime effect (under `#[cfg(feature = "inventory")]`,
+/// it expands to a real `inventory::submit!`; otherwise to nothing).
+/// Splitting the feature gate to the facade keeps `frieze-macros` from
+/// having to know the consumer crate's feature state, which it has no
+/// way to learn at proc-macro expansion time.
+///
+/// Generic inputs (`generics.params` non-empty) get `TokenStream::new()`
+/// instead: `inventory::submit!` lowers to a `static` initializer and
+/// Rust `static`s cannot hold generic types. Generic instances are
+/// still picked up transitively at runtime when a non-generic root's
+/// field walk reaches the concrete instantiation
+/// (`<Page<Bar> as Schema>::register_into`), so dropping the explicit
+/// submission for generic inputs loses no coverage.
+pub(crate) fn inventory_submit_token(type_ident: &Ident, generics: &syn::Generics) -> TokenStream {
+    // Lifetime and const-generic parameters are rejected up-front by
+    // the struct / enum expanders, so by the time this helper runs the
+    // only parameters that can survive are type parameters. A
+    // non-empty `params` therefore unambiguously means the input is
+    // generic, which `inventory` cannot accept.
+    if !generics.params.is_empty() {
+        return TokenStream::new();
+    }
+    let type_name = type_ident.to_string();
+    quote! {
+        ::frieze::__private::inventory_submit! {
+            #type_name,
+            <#type_ident as ::frieze::__private::frieze_usecase::Schema>::register_into
+        }
     }
 }

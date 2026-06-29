@@ -31,6 +31,11 @@ mod wrapper_impls;
 mod schemas_builder;
 pub use schemas_builder::SchemasBuilder;
 
+#[cfg(feature = "inventory")]
+mod inventory;
+#[cfg(feature = "inventory")]
+pub use inventory::SchemaRoot;
+
 mod to_value;
 pub use to_value::to_value;
 

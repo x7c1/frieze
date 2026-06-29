@@ -10,9 +10,15 @@ description = "Use cases for frieze: Schema trait, builder, and OAS boundary con
 default = ["oas-3-0"]
 oas-3-0 = ["frieze-openapi/oas-3-0"]
 oas-3-1 = ["frieze-openapi/oas-3-1"]
+# Opt-in `inventory`-based collection: enables
+# `SchemasBuilder::from_inventory()` and the `SchemaRoot` submission
+# channel that the derive macro's expansion targets via the facade's
+# `__private::inventory_submit!` wrapper.
+inventory = ["dep:inventory"]
 
 [dependencies]
 frieze-model.workspace = true
 frieze-openapi.workspace = true
 indexmap.workspace = true
+inventory = { workspace = true, optional = true }
 serde_yaml.workspace = true

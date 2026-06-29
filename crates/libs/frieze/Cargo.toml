@@ -10,12 +10,18 @@ description = "Generate OpenAPI Schema Objects from Rust types via proc-macros."
 default = ["oas-3-0"]
 oas-3-0 = ["frieze-openapi/oas-3-0", "frieze-usecase/oas-3-0"]
 oas-3-1 = ["frieze-openapi/oas-3-1", "frieze-usecase/oas-3-1"]
+# Opt-in `inventory`-based collection. Enables
+# `Schemas::builder().from_inventory()` and turns the derive macro's
+# `inventory_submit!` token into a real `inventory::submit!` site.
+# Without this feature the same derive expansion is a no-op submission.
+inventory = ["dep:inventory", "frieze-usecase/inventory"]
 
 [dependencies]
 frieze-model.workspace = true
 frieze-usecase.workspace = true
 frieze-openapi.workspace = true
 frieze-macros.workspace = true
+inventory = { workspace = true, optional = true }
 
 [dev-dependencies]
 insta.workspace = true
