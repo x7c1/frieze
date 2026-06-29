@@ -39,7 +39,7 @@
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{DataEnum, DeriveInput, Fields, Ident, PathArguments, Type, Variant};
+use syn::{DataEnum, DeriveInput, Fields, Ident, Type, Variant};
 
 use crate::doc::{compose_enum_description, description_token, parse_doc_attrs};
 use crate::rename::{
@@ -51,12 +51,12 @@ use crate::ty::{type_to_display, unwrap_maybe, unwrap_option, unwrap_vec};
 /// Variant shape recognised by the derive.
 ///
 /// `Newtype` carries the inner `Type` for downstream inspection (the tag
-/// branch needs the inner's identifier to construct the
-/// `IsStructSchema` bound check and the runtime `SchemaName` reference;
-/// the no-tag branch never reaches this variant because
-/// data-carrying-without-tag is rejected up-front in [`expand_enum`]).
-/// The inner `Type` is boxed so the `Unit` and `Newtype` variants stay
-/// near each other in size (clippy::large_enum_variant).
+/// branch needs the inner `Type` to construct the `IsStructSchema`
+/// bound check and the runtime `SchemaName` reference; the no-tag branch
+/// never reaches this variant because data-carrying-without-tag is
+/// rejected up-front in [`expand_enum`]). The inner `Type` is boxed so
+/// the `Unit` and `Newtype` variants stay near each other in size
+/// (clippy::large_enum_variant).
 enum VariantShape {
     Unit,
     Newtype(Box<Type>),
@@ -243,8 +243,10 @@ fn expand_string_enum(
 ///   tagged wire shape would be indistinguishable from an empty
 ///   struct variant);
 /// - an error if a newtype inner is a primitive, a known wrapper
-///   (`Vec`, `Option`, `Maybe`), a qualified path, or a generic
-///   type — none of which is a struct that implements `Schema`;
+///   (`Vec`, `Option`, `Maybe`), or a qualified path — none of which
+///   is a struct that implements `Schema`. A generic-argument inner
+///   (`Container<i64>`) is accepted: the `IsStructSchema` bound check
+///   below verifies that the concrete instantiation is a struct schema;
 /// - the per-variant `IsStructSchema` bound check at the end fires
 ///   (rustc surfaces the `on_unimplemented` message on the trait)
 ///   when the inner is itself an enum-derived `Schema`.
@@ -255,8 +257,8 @@ fn expand_one_of(
     classified: &[(&Variant, VariantShape)],
     container_rule: RenameAll,
 ) -> Result<TokenStream, syn::Error> {
-    // (wire name, inner type identifier, span at variant, optional per-variant doc)
-    let mut inner_entries: Vec<(String, Ident, proc_macro2::Span, Option<String>)> =
+    // (wire name, inner type, span at variant, optional per-variant doc)
+    let mut inner_entries: Vec<(String, Type, proc_macro2::Span, Option<String>)> =
         Vec::with_capacity(classified.len());
     let mut wire_entries: Vec<(Ident, String, WireSource)> = Vec::with_capacity(classified.len());
 
@@ -285,7 +287,7 @@ fn expand_one_of(
             }
             VariantShape::Newtype(ty) => ty,
         };
-        let inner_ident = extract_newtype_inner_ident(variant_ident, inner_ty)?;
+        let inner_type = extract_newtype_inner_type(variant_ident, inner_ty)?;
 
         let variant_scan = scan_serde_attrs(&variant.attrs, SerdePosition::EnumVariant)?;
         let individual = variant_scan
@@ -299,7 +301,7 @@ fn expand_one_of(
             RenameTarget::Variant,
         )?;
         let variant_doc = parse_doc_attrs(&variant.attrs);
-        inner_entries.push((wire.clone(), inner_ident, variant.span(), variant_doc));
+        inner_entries.push((wire.clone(), inner_type, variant.span(), variant_doc));
         wire_entries.push((variant_ident.clone(), wire, source));
     }
     check_unique_wire_names(&wire_entries, "variant")?;
@@ -316,13 +318,13 @@ fn expand_one_of(
 
     let variant_constructor_exprs: Vec<TokenStream> = inner_entries
         .iter()
-        .map(|(wire, inner_ident, _, doc)| {
+        .map(|(wire, inner_type, _, doc)| {
             let doc_expr = description_token(doc);
             quote! {
                 ::frieze::__private::frieze_model::OneOfVariant::new(
                     #wire,
                     ::frieze::__private::frieze_model::SchemaName::new(
-                        <#inner_ident as ::frieze::__private::frieze_usecase::Schema>::name()
+                        <#inner_type as ::frieze::__private::frieze_usecase::Schema>::name()
                     )
                     .expect("frieze: referenced schema name violates the OAS component-name pattern"),
                 )
@@ -333,12 +335,12 @@ fn expand_one_of(
 
     let struct_bound_checks: Vec<TokenStream> = inner_entries
         .iter()
-        .map(|(_, inner_ident, variant_span, _)| {
+        .map(|(_, inner_type, variant_span, _)| {
             // `const _: () = { ... }` evaluates at compile time; the
             // inner `_assert` must be `const fn` so it can be called
             // from const context. The trait bound on `_assert` makes
             // rustc surface the `on_unimplemented` message attached
-            // to `IsStructSchema` when `#inner_ident` is an
+            // to `IsStructSchema` when `#inner_type` is an
             // enum-derived type that has no `impl IsStructSchema`.
             // Anchoring with `quote_spanned!` makes the diagnostic
             // point at the user's variant rather than at synthesised
@@ -349,7 +351,7 @@ fn expand_one_of(
                         T: ::frieze::__private::frieze_usecase::IsStructSchema,
                     >() {
                     }
-                    _frieze_assert_struct_schema::<#inner_ident>();
+                    _frieze_assert_struct_schema::<#inner_type>();
                 };
             }
         })
@@ -379,14 +381,19 @@ fn expand_one_of(
     Ok(expanded)
 }
 
-/// For a newtype variant `Variant(Inner)`, extract `Inner`'s identifier
-/// (rejecting primitives, wrappers, qualified paths, generic types).
+/// For a newtype variant `Variant(Inner)`, extract `Inner` as a
+/// [`syn::Type`] for downstream use in the runtime `SchemaName`
+/// reference and the compile-time `IsStructSchema` bound check.
 ///
-/// The trait-bound check emitted downstream further refines this: an
-/// `Inner` that is enum-derived (and therefore does not implement
-/// [`frieze_usecase::IsStructSchema`]) fails to compile with the
-/// `on_unimplemented` diagnostic attached to that trait.
-fn extract_newtype_inner_ident(variant_ident: &Ident, inner: &Type) -> Result<Ident, syn::Error> {
+/// Rejects primitives, known wrappers (`Option`, `Vec`, `Maybe`),
+/// qualified paths, and non-path type forms. Generic-argument inners
+/// (`Container<i64>`) are accepted: the downstream `IsStructSchema`
+/// bound check verifies that the concrete instantiation is a struct
+/// schema. An `Inner` whose `Schema` is enum-derived (and therefore
+/// does not implement [`frieze_usecase::IsStructSchema`]) fails to
+/// compile with the `on_unimplemented` diagnostic attached to that
+/// trait.
+fn extract_newtype_inner_type(variant_ident: &Ident, inner: &Type) -> Result<Type, syn::Error> {
     // Known wrappers (`Option`, `Vec`, `Maybe`) cannot be the inner
     // of an internal-tagged newtype variant — they are not structs
     // that implement `Schema`.
@@ -423,8 +430,9 @@ fn extract_newtype_inner_ident(variant_ident: &Ident, inner: &Type) -> Result<Id
             ),
         ));
     }
-    // Reject anything that is not a single-segment, unparametrised
-    // path: qualified paths, generic types, references, tuples, etc.
+    // Reject anything that is not a single-segment path: qualified
+    // paths, references, tuples, etc. Generic arguments on the single
+    // segment are accepted.
     let path = match inner {
         Type::Path(p) if p.qself.is_none() => &p.path,
         _ => {
@@ -450,16 +458,5 @@ fn extract_newtype_inner_ident(variant_ident: &Ident, inner: &Type) -> Result<Id
             ),
         ));
     }
-    let seg = path.segments.first().expect("len == 1");
-    if !matches!(seg.arguments, PathArguments::None) {
-        return Err(syn::Error::new_spanned(
-            inner,
-            format!(
-                "frieze: newtype variant `{variant_ident}` wraps a generic \
-                 type (`{}`); concrete user types only.",
-                type_to_display(inner)
-            ),
-        ));
-    }
-    Ok(seg.ident.clone())
+    Ok(inner.clone())
 }

@@ -12,7 +12,7 @@
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{PathArguments, Type};
+use syn::Type;
 
 use crate::ty::{type_to_display, unwrap_maybe, unwrap_option, unwrap_vec};
 
@@ -114,22 +114,22 @@ pub(crate) fn scalar_property_type_expr(ty: &Type) -> Result<TokenStream, syn::E
     }
 }
 
-/// Treats a single-segment, unparametrised identifier as a reference to
-/// another `Schema`-implementing type, and emits the
-/// `PropertyType::Reference` constructor call.
+/// Treats a single-segment path identifier (optionally carrying generic
+/// arguments) as a reference to another `Schema`-implementing type, and
+/// emits the `PropertyType::Reference` constructor call.
 ///
 /// Rejects:
 ///
 /// - qualified paths (`mymod::User`) — the macro can't reliably resolve
 ///   them, so we require the user to bring the type into scope.
-/// - generic arguments (`Foo<u32>`) — generics over user schemas are
-///   deferred to Phase 1 #11.
 /// - any other shape (references, tuples, etc.) — falls back to the
 ///   generic "unsupported field type" error.
 ///
-/// The Schema bound is enforced naturally by rustc when the generated
-/// `<#ident as ::frieze::__private::frieze_usecase::Schema>::name()` call
-/// fails to compile.
+/// Generic arguments (`Page<User>`, `Box<i64>`) are accepted: the full
+/// type token is forwarded into `<#ty as Schema>::name()` so that the
+/// composed name (or, for transparent wrappers like `Box<T>`, the inner
+/// type's name) is computed at monomorphisation time. The `Schema` bound
+/// is enforced naturally by rustc when the type does not implement it.
 fn reference_property_type_expr(ty: &Type) -> Result<TokenStream, syn::Error> {
     let path = match ty {
         Type::Path(p) if p.qself.is_none() => &p.path,
@@ -147,21 +147,10 @@ fn reference_property_type_expr(ty: &Type) -> Result<TokenStream, syn::Error> {
              Use a `use` statement to bring the type into scope.",
         ));
     }
-    let segment = path
-        .segments
-        .first()
-        .expect("path with >=1 segments has a first segment");
-    if !matches!(segment.arguments, PathArguments::None) {
-        return Err(syn::Error::new_spanned(
-            ty,
-            "frieze: generic type parameters in field type are not supported.",
-        ));
-    }
-    let ident = &segment.ident;
     Ok(quote! {
         ::frieze::__private::frieze_model::PropertyType::Reference(
             ::frieze::__private::frieze_model::SchemaName::new(
-                <#ident as ::frieze::__private::frieze_usecase::Schema>::name()
+                <#ty as ::frieze::__private::frieze_usecase::Schema>::name()
             )
             .expect("frieze: referenced schema name violates the OAS component-name pattern")
         )
