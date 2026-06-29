@@ -16,20 +16,21 @@ fn rejects_oneof_variant_targeting_string_enum() {
     // build check is what enforces "inner must be a struct schema".
     struct DummyStatus;
     impl frieze_usecase::Schema for DummyStatus {
-        fn name() -> &'static str {
-            "Status"
+        fn name() -> String {
+            "Status".to_string()
         }
         fn schema() -> Schema {
             Schema::new_string_enum("Status", vec!["Active".into(), "Inactive".into()]).unwrap()
         }
     }
     impl frieze_usecase::IsStructSchema for DummyStatus {}
+    impl frieze_usecase::IsRegistrable for DummyStatus {}
     // Intentionally implement `IsStructSchema` on DummyStatus so the
     // macro-side check is bypassed; the runtime check still fires.
     struct DummyEvent;
     impl frieze_usecase::Schema for DummyEvent {
-        fn name() -> &'static str {
-            "Event"
+        fn name() -> String {
+            "Event".to_string()
         }
         fn schema() -> Schema {
             Schema::new_one_of(
@@ -43,6 +44,7 @@ fn rejects_oneof_variant_targeting_string_enum() {
             .unwrap()
         }
     }
+    impl frieze_usecase::IsRegistrable for DummyEvent {}
     let err = SchemasBuilder::new()
         .add::<DummyEvent>()
         .add::<DummyStatus>()
@@ -64,8 +66,8 @@ fn rejects_oneof_variant_targeting_other_oneof() {
     // field has nothing to merge into.
     struct DummyInnerStruct;
     impl frieze_usecase::Schema for DummyInnerStruct {
-        fn name() -> &'static str {
-            "InnerStruct"
+        fn name() -> String {
+            "InnerStruct".to_string()
         }
         fn schema() -> Schema {
             Schema::new_object(
@@ -81,11 +83,12 @@ fn rejects_oneof_variant_targeting_other_oneof() {
         }
     }
     impl frieze_usecase::IsStructSchema for DummyInnerStruct {}
+    impl frieze_usecase::IsRegistrable for DummyInnerStruct {}
 
     struct DummyInner;
     impl frieze_usecase::Schema for DummyInner {
-        fn name() -> &'static str {
-            "Inner"
+        fn name() -> String {
+            "Inner".to_string()
         }
         fn schema() -> Schema {
             Schema::new_one_of(
@@ -100,11 +103,12 @@ fn rejects_oneof_variant_targeting_other_oneof() {
         }
     }
     impl frieze_usecase::IsStructSchema for DummyInner {}
+    impl frieze_usecase::IsRegistrable for DummyInner {}
 
     struct DummyOuter;
     impl frieze_usecase::Schema for DummyOuter {
-        fn name() -> &'static str {
-            "Outer"
+        fn name() -> String {
+            "Outer".to_string()
         }
         fn schema() -> Schema {
             Schema::new_one_of(
@@ -115,6 +119,7 @@ fn rejects_oneof_variant_targeting_other_oneof() {
             .unwrap()
         }
     }
+    impl frieze_usecase::IsRegistrable for DummyOuter {}
     let err = SchemasBuilder::new()
         .add::<DummyOuter>()
         .add::<DummyInner>()

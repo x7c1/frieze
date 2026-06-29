@@ -215,8 +215,8 @@ fn expand_string_enum(
     let composed_description_expr = description_token(&composed_description);
     let expanded = quote! {
         impl ::frieze::__private::frieze_usecase::Schema for #ident {
-            fn name() -> &'static str {
-                #schema_name
+            fn name() -> ::std::string::String {
+                ::std::string::String::from(#schema_name)
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
                 ::frieze::__private::frieze_model::Schema::new_string_enum(
@@ -227,6 +227,9 @@ fn expand_string_enum(
                 .with_description(#composed_description_expr)
             }
         }
+        // Marker impl: an enum-derived `Schema` is registrable on a
+        // `Schemas` collection.
+        impl ::frieze::__private::frieze_usecase::IsRegistrable for #ident {}
     };
     Ok(expanded)
 }
@@ -354,8 +357,8 @@ fn expand_one_of(
 
     let expanded = quote! {
         impl ::frieze::__private::frieze_usecase::Schema for #ident {
-            fn name() -> &'static str {
-                #schema_name
+            fn name() -> ::std::string::String {
+                ::std::string::String::from(#schema_name)
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
                 ::frieze::__private::frieze_model::Schema::new_one_of(
@@ -367,6 +370,9 @@ fn expand_one_of(
                 .with_description(#composed_description_expr)
             }
         }
+        // Marker impl: an enum-derived `Schema` is registrable on a
+        // `Schemas` collection.
+        impl ::frieze::__private::frieze_usecase::IsRegistrable for #ident {}
 
         #( #struct_bound_checks )*
     };

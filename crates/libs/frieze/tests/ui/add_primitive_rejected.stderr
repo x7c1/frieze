@@ -1,0 +1,24 @@
+error[E0277]: frieze: `i64` cannot be added to a `Schemas` collection directly
+ --> tests/ui/add_primitive_rejected.rs:8:37
+  |
+8 |     let _ = frieze::schemas().add::<i64>();
+  |                               ---   ^^^ this type does not implement `IsRegistrable`
+  |                               |
+  |                               required by a bound introduced by this call
+  |
+  = help: the trait `frieze::__private::frieze_usecase::schema::IsRegistrable` is not implemented for `i64`
+  = note: primitive scalars (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`, `String`) implement `Schema` so they can appear as generic arguments (e.g. `Box<i64>`, `Page<String>`) but are not registrable as standalone schemas. Wrap the scalar in a `#[derive(Schema)]` struct if you want it to appear under `#/components/schemas`, or register the wrapping type that contains this field instead.
+help: the following other types implement trait `frieze::__private::frieze_usecase::schema::IsRegistrable`
+ --> $WORKSPACE/crates/domain/frieze-usecase/src/wrapper_impls.rs
+  |
+  | impl<T: IsRegistrable + ?Sized> IsRegistrable for Box<T> {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Box<T>`
+  | impl<T: IsRegistrable + ?Sized> IsRegistrable for Rc<T> {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Rc<T>`
+  | impl<T: IsRegistrable + ?Sized> IsRegistrable for Arc<T> {}
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Arc<T>`
+note: required by a bound in `SchemasBuilder::add`
+ --> $WORKSPACE/crates/domain/frieze-usecase/src/schemas_builder.rs
+  |
+  |     pub fn add<T: IsRegistrable>(mut self) -> Self {
+  |                   ^^^^^^^^^^^^^ required by this bound in `SchemasBuilder::add`

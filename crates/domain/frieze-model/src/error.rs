@@ -43,4 +43,10 @@ pub enum Error {
         variant: String,
         inner: SchemaName,
     },
+    #[error(
+        "scalar schema requires a leaf PropertyType (Int32 / Int64 / \
+         UInt32 / UInt64 / Float / Double / Boolean / String); composite \
+         variants (Array / Nullable / Reference) are not scalar"
+    )]
+    NonScalarPropertyType,
 }

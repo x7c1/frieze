@@ -3,7 +3,7 @@
 
 use frieze_model::{Error, PropertyType, Schema as ModelSchema, SchemaName, Schemas};
 
-use crate::schema::Schema;
+use crate::schema::IsRegistrable;
 
 /// In-progress collection of schemas.
 #[derive(Debug, Default)]
@@ -17,7 +17,14 @@ impl SchemasBuilder {
     }
 
     /// Registers the schema produced by `T::schema()`.
-    pub fn add<T: Schema>(mut self) -> Self {
+    ///
+    /// `T` must implement [`IsRegistrable`] — this rejects primitive
+    /// scalars at compile time (`Schemas::add::<i64>()` fails to
+    /// compile), since primitive scalars implement [`Schema`] only so
+    /// they can appear as generic arguments and are not standalone OAS
+    /// schema entries. `#[derive(Schema)]` emits the `IsRegistrable`
+    /// impl for struct and enum inputs.
+    pub fn add<T: IsRegistrable>(mut self) -> Self {
         self.schemas.push(T::schema());
         self
     }
@@ -60,7 +67,9 @@ fn check_one_of_variants_target_struct_schemas(
 ) -> Result<(), Error> {
     let one_of = match schema {
         ModelSchema::OneOf(o) => o,
-        ModelSchema::Object(_) | ModelSchema::StringEnum(_) => return Ok(()),
+        ModelSchema::Object(_) | ModelSchema::StringEnum(_) | ModelSchema::Scalar(_) => {
+            return Ok(())
+        }
     };
     for variant in &one_of.variants {
         let target = match schemas.by_name.get(&variant.inner) {
@@ -72,7 +81,7 @@ fn check_one_of_variants_target_struct_schemas(
         };
         match target {
             ModelSchema::Object(_) => {}
-            ModelSchema::StringEnum(_) | ModelSchema::OneOf(_) => {
+            ModelSchema::StringEnum(_) | ModelSchema::OneOf(_) | ModelSchema::Scalar(_) => {
                 return Err(Error::OneOfVariantInnerNotStruct {
                     schema: one_of.name.as_str().to_string(),
                     variant: variant.wire_name.clone(),
@@ -112,6 +121,12 @@ fn first_unresolved_in_schema<'a>(
             }
             None
         }
+        // Scalar schemas carry a single leaf property type and no
+        // references; nothing to walk. In practice scalar schemas are
+        // filtered out before reaching this point (they are never
+        // registered under `#/components/schemas`), but the arm is
+        // exhaustive for defensive correctness.
+        ModelSchema::Scalar(_) => None,
     }
 }
 
@@ -147,13 +162,14 @@ fn first_unresolved_reference<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schema::Schema;
     use frieze_model::{Error, Presence, Property, PropertyType, SchemaName};
 
     struct DummyUser;
 
     impl Schema for DummyUser {
-        fn name() -> &'static str {
-            "User"
+        fn name() -> String {
+            "User".to_string()
         }
         fn schema() -> frieze_model::Schema {
             frieze_model::Schema::new_object(
@@ -166,6 +182,7 @@ mod tests {
             .unwrap()
         }
     }
+    impl IsRegistrable for DummyUser {}
 
     #[test]
     fn build_rejects_duplicates() {
@@ -183,8 +200,8 @@ mod tests {
     struct DummyProfile;
 
     impl Schema for DummyProfile {
-        fn name() -> &'static str {
-            "Profile"
+        fn name() -> String {
+            "Profile".to_string()
         }
         fn schema() -> frieze_model::Schema {
             frieze_model::Schema::new_object(
@@ -199,6 +216,7 @@ mod tests {
             .unwrap()
         }
     }
+    impl IsRegistrable for DummyProfile {}
 
     #[test]
     fn build_resolves_explicit_reference() {

@@ -4,9 +4,18 @@
 /// Trait implemented by types that can be expressed as an OpenAPI schema.
 ///
 /// `#[derive(frieze::Schema)]` generates an implementation of this trait.
+///
+/// # `name()` returns an owned `String`
+///
+/// The schema name is owned (`String`) rather than `&'static str` so
+/// that generic types can compose names from their type arguments at
+/// monomorphization time — e.g. `Box<i64>` returns
+/// `format!("{}_Box", <i64 as Schema>::name())` which cannot be a
+/// `&'static str`. Non-generic types simply return `"User".to_string()`;
+/// the allocation happens once per schema-construction call.
 pub trait Schema {
     /// The schema name used as the key under `#/components/schemas`.
-    fn name() -> &'static str;
+    fn name() -> String;
 
     /// Builds the validated domain representation of this schema.
     fn schema() -> frieze_model::Schema;
@@ -33,3 +42,26 @@ pub trait Schema {
     note = "wrap `{Self}` in a struct with `#[derive(Schema)]` and use the wrapping struct as the newtype variant inner: `struct {Self}Data {{ value: {Self} }}`, then `enum YourEnum {{ ... ({Self}Data), ... }}`"
 )]
 pub trait IsStructSchema: Schema {}
+
+/// Marker trait implemented by types whose [`Schema`] is meant to be
+/// registered under `#/components/schemas`. Used by
+/// [`crate::SchemasBuilder::add`] to gate registration at compile time:
+/// primitive scalars (`i32`, `i64`, ... `String`) implement [`Schema`]
+/// so they can appear as generic arguments (`Box<i64>`,
+/// `Page<String>`), but they intentionally do **not** implement
+/// `IsRegistrable` so `Schemas::add::<i64>()` fails to compile.
+///
+/// `#[derive(Schema)]` emits `impl IsRegistrable` for `struct` and
+/// `enum` inputs alongside the [`Schema`] impl. Blanket impls in
+/// `frieze-usecase` propagate the marker through transparent wrappers
+/// (`Box<T>` / `Rc<T>` / `Arc<T>`).
+///
+/// Users writing a manual `impl Schema` for a struct or enum type must
+/// also `impl IsRegistrable` to make the type registrable on a
+/// [`crate::SchemasBuilder`].
+#[diagnostic::on_unimplemented(
+    message = "frieze: `{Self}` cannot be added to a `Schemas` collection directly",
+    label = "this type does not implement `IsRegistrable`",
+    note = "primitive scalars (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`, `String`) implement `Schema` so they can appear as generic arguments (e.g. `Box<i64>`, `Page<String>`) but are not registrable as standalone schemas. Wrap the scalar in a `#[derive(Schema)]` struct if you want it to appear under `#/components/schemas`, or register the wrapping type that contains this field instead."
+)]
+pub trait IsRegistrable: Schema {}
