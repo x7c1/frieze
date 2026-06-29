@@ -130,8 +130,12 @@ The macro rejects the following user-written forms as compile errors:
 
 - **Qualified paths** (`mymod::User`) — bring the type into scope with
   a `use` statement first.
-- **Generic arguments on user types** (`Foo<u32>`) — concrete user
-  types only; generics over user schemas are not supported.
+
+Generic arguments on the user type (`Foo<u32>`, `Page<User>`,
+`Container<i64>`) are accepted; the field's `$ref` target is the
+**composed schema name** of the instantiation (`Int32_Foo`, `User_Page`,
+`Int64_Container`). See [Generic types](#generic-types) below for the
+composition rule and registration requirements.
 
 ## Owned wrappers (`Box<T>`, `Rc<T>`, `Arc<T>`)
 
@@ -189,6 +193,140 @@ appear in serialisable API shapes — a real REST handler typically
 takes the lock, clones, then serializes, rather than serializing
 through the lock guard. If the need arises later, the blanket impl
 pattern in `frieze-usecase::wrapper_impls` is the template to follow.
+
+## Generic types
+
+`#[derive(Schema)]` accepts type parameters on the input struct and
+emits an `impl Schema for Foo<T>` that requires `T: Schema` (the bound
+is synthesised automatically, alongside the user's `where` clause).
+The schema name and the schema body are both computed at
+monomorphisation time: each specific instantiation
+(`Page<User>`, `Container<i64>`, ...) is a separate entry under
+`#/components/schemas`.
+
+```rust
+use frieze::Schema;
+
+#[derive(Schema)]
+struct Page<T> {
+    items: Vec<T>,
+    total: i64,
+}
+
+#[derive(Schema)]
+struct User {
+    id: i64,
+    name: String,
+}
+```
+
+```yaml
+User:
+  type: object
+  required: [id, name]
+  properties:
+    id: { type: integer, format: int64 }
+    name: { type: string }
+User_Page:
+  type: object
+  required: [items, total]
+  properties:
+    items:
+      type: array
+      items: { $ref: '#/components/schemas/User' }
+    total: { type: integer, format: int64 }
+```
+
+### Schema name composition
+
+The name of a generic instantiation is the **suffix** form
+`<Arg1>_<Arg2>_..._<BaseName>` — the type arguments come first in
+declaration order, separated by `_`, with the base struct name last.
+The composition is recursive: nested generic arguments expand into the
+same flat sequence.
+
+| Rust type                          | Composed schema name          |
+|------------------------------------|-------------------------------|
+| `Page<User>`                       | `User_Page`                   |
+| `Container<i64>`                   | `Int64_Container`             |
+| `Container<String>`                | `String_Container`            |
+| `Pair<i32, f32>`                   | `Int32_Float_Pair`            |
+| `Pair<i64, String>`                | `Int64_String_Pair`           |
+| `Container<Container<i64>>`        | `Int64_Container_Container`   |
+
+Primitive arguments contribute their `Schema::name()` (the OAS
+type/format convention — `Int32`, `Int64`, `String`, ...). User
+struct/enum arguments contribute their derived name.
+
+The composition is intentionally flat and uses the same `_` separator
+the OAS component-name pattern accepts. Collisions are possible in
+principle (a 2-arg `Pair<A, B_C>` and a 3-arg `Triple<A, B, C>` with a
+common base name could produce the same string); the
+[duplicate-schema check](#explicit-transitive-closure) at
+`Schemas::build()` reports them by name when they occur.
+
+### Registration of generic instantiations
+
+Each generic instantiation is a distinct schema entry and must be
+registered on the builder explicitly:
+
+```rust
+frieze::schemas()
+    .add::<Page<User>>()    // registers `User_Page`
+    .add::<User>()          // registers `User`
+    .build()?;
+```
+
+A struct that references a generic instantiation in a field (`profile:
+Page<User>`) sees its `$ref` resolved through the standard
+[transitive-closure walk](#explicit-transitive-closure); the builder
+reports the missing target by its composed name:
+
+```text
+Err(UnresolvedReference(SchemaName("User_Page")))
+```
+
+### Owned-wrapper composition
+
+`Box<T>`, `Rc<T>`, and `Arc<T>` are
+[transparent owned wrappers](#owned-wrappers-boxt-rct-arct), so they do
+**not** contribute to the composed name. `Box<User>`'s schema name is
+`"User"`, not `"User_Box"`; `Vec<Box<Tree>>`'s element name is
+`"Tree"`. This is what makes recursive type definitions
+(`struct Tree { children: Vec<Box<Tree>> }`) emit a finite,
+self-referencing schema instead of an unbounded `Tree_Box_Box_..."`
+cascade.
+
+### Recursive generic types
+
+Recursive types compose naturally with generics. A `Node<T>` linked
+list using `Option<Box<Node<T>>>` for the tail is self-referencing
+through the same transparent-`Box` mechanism, so each instantiation
+(`Node<User>`, `Node<i64>`, ...) is a single, finite schema entry.
+
+```rust
+#[derive(Schema)]
+struct Node<T> {
+    value: T,
+    next: Option<Box<Node<T>>>,
+}
+```
+
+`Node<User>` registers as `User_Node` with `next` resolving back to
+the same `User_Node` entry.
+
+### Rejected generic shapes
+
+- **Lifetime parameters** (`struct Borrowed<'a> { s: &'a str }`) —
+  rejected at macro-expansion time. frieze schemas describe owned data
+  layouts, and the OAS representation of a borrow is undefined.
+- **Const generics** (`struct ArrN<const N: usize> { ... }`) —
+  rejected at macro-expansion time. The OAS encoding of a
+  compile-time constant in a schema name or shape is not in scope.
+- **Trait objects as arguments** (`Box<dyn Schema>`) — rejected by
+  rustc (the `T: Schema` bound is not satisfied by `dyn Schema`).
+  frieze does not synthesise a curated diagnostic for this; the
+  standard rustc message is sufficient.
 
 ## Unit-variant enums
 

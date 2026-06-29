@@ -1,0 +1,5 @@
+error: frieze: const generics are not supported in #[derive(Schema)] (struct `ArrN`).
+ --> tests/ui/generic_struct_const_generic_unsupported.rs:9:13
+  |
+9 | struct ArrN<const N: usize> {
+  |             ^^^^^^^^^^^^^^

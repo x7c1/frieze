@@ -1,5 +1,0 @@
-error: frieze: generic type parameters in field type are not supported.
- --> tests/ui/unsupported_generic_nested.rs:9:12
-  |
-9 |     field: Wrapper<u32>,
-  |            ^^^^^^^^^^^^
