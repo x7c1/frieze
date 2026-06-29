@@ -27,9 +27,9 @@
 //!   trait is implemented only for struct-derived `Schema`s; the
 //!   diagnostic message ships with the trait declaration in
 //!   `frieze-usecase::schema`);
-//! - tag attribute on a unit-only enum (E-7) / data-carrying variant
-//!   without tag (E-1) / unit variant mixed into a tagged enum
-//!   (E-2a) — checked in [`expand_enum`] / [`expand_one_of`].
+//! - tag attribute on a unit-only enum / data-carrying variant
+//!   without tag / unit variant mixed into a tagged enum —
+//!   checked in [`expand_enum`] / [`expand_one_of`].
 //!
 //! Variant wire names follow the container `rename_all` / per-variant
 //! `rename` precedence implemented in [`crate::rename::wire_name`], and
@@ -76,8 +76,7 @@ pub(crate) fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<TokenStr
     let container_rule = rename_all_from_scan(&container_scan)?;
 
     // Classify every variant up-front. Struct variants and tuple
-    // variants with multiple fields fail here regardless of tag mode
-    // (E-3 / E-4).
+    // variants with multiple fields fail here regardless of tag mode.
     let mut classified: Vec<(&Variant, VariantShape)> = Vec::with_capacity(data.variants.len());
     for variant in &data.variants {
         classified.push((variant, classify_variant(variant, ident)?));
@@ -94,7 +93,11 @@ pub(crate) fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<TokenStr
 
     if let Some(tag) = tag_value {
         if all_unit {
-            // E-7: unit-only enum should not carry an internal tag.
+            // Unit-only enum carrying an explicit internal tag:
+            // rejected because the string-enum path (no tag) emits a
+            // cleaner `{type: string, enum: [...]}` shape, while a
+            // tagged unit-only enum would serialise to anonymous
+            // `{<tag>: "..."}` wrapper objects.
             return Err(syn::Error::new_spanned(
                 ident,
                 format!(
@@ -109,7 +112,9 @@ pub(crate) fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<TokenStr
         expand_one_of(ident, &ast.attrs, tag, &classified, container_rule)
     } else {
         if any_data {
-            // E-1: data-carrying variant without tag.
+            // A data-carrying variant requires an internal tag so the
+            // wire shape carries a discriminator; without one, the
+            // emitted schema cannot distinguish the variants.
             return Err(syn::Error::new_spanned(
                 ident,
                 format!(
@@ -128,8 +133,8 @@ pub(crate) fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<TokenStr
 
 /// Recognise the syntactic shape of one variant.
 ///
-/// Rejects struct variants (`Foo { ... }` — E-3) and tuple variants with
-/// `n != 1` fields (E-4) unconditionally, since neither shape is
+/// Rejects struct variants (`Foo { ... }`) and tuple variants with
+/// `n != 1` fields unconditionally, since neither shape is
 /// representable as a OAS schema under the current frieze rules. Unit
 /// and newtype variants pass through and are dispatched by the caller
 /// according to the container's tag-mode.
@@ -231,12 +236,15 @@ fn expand_string_enum(
 ///
 /// Per-variant checks raise:
 ///
-/// - E-2a if a unit variant is mixed into the tagged enum;
-/// - E-2b if a newtype inner is a primitive, a known wrapper (`Vec`,
-///   `Option`, `Maybe`), a qualified path, or a generic type;
-/// - the bound check at the end fires E-2c (rustc surfaces the
-///   `IsStructSchema` `on_unimplemented` message) when the inner is
-///   another enum.
+/// - an error if a unit variant is mixed into the tagged enum (the
+///   tagged wire shape would be indistinguishable from an empty
+///   struct variant);
+/// - an error if a newtype inner is a primitive, a known wrapper
+///   (`Vec`, `Option`, `Maybe`), a qualified path, or a generic
+///   type — none of which is a struct that implements `Schema`;
+/// - the per-variant `IsStructSchema` bound check at the end fires
+///   (rustc surfaces the `on_unimplemented` message on the trait)
+///   when the inner is itself an enum-derived `Schema`.
 fn expand_one_of(
     ident: &Ident,
     enum_attrs: &[syn::Attribute],
@@ -253,7 +261,10 @@ fn expand_one_of(
         let variant_ident = &variant.ident;
         let inner_ty = match shape {
             VariantShape::Unit => {
-                // E-2a: unit variant in a tagged enum.
+                // Unit variant in a tagged enum: the wire shape would
+                // be `{"<tag>": "<variant>"}`, indistinguishable from
+                // an empty struct variant. Either split unit variants
+                // into a separate string-enum, or give them a payload.
                 return Err(syn::Error::new_spanned(
                     variant,
                     format!(
@@ -322,12 +333,13 @@ fn expand_one_of(
         .map(|(_, inner_ident, variant_span, _)| {
             // `const _: () = { ... }` evaluates at compile time; the
             // inner `_assert` must be `const fn` so it can be called
-            // from const context. The trait bound on `_assert` fires
-            // E-2c (rustc surfaces the `on_unimplemented` message on
-            // `IsStructSchema`) when `#inner_ident` is an enum-derived
-            // type that has no `impl IsStructSchema`. Anchoring with
-            // `quote_spanned!` makes the diagnostic point at the
-            // user's variant rather than at synthesised macro code.
+            // from const context. The trait bound on `_assert` makes
+            // rustc surface the `on_unimplemented` message attached
+            // to `IsStructSchema` when `#inner_ident` is an
+            // enum-derived type that has no `impl IsStructSchema`.
+            // Anchoring with `quote_spanned!` makes the diagnostic
+            // point at the user's variant rather than at synthesised
+            // macro code.
             quote_spanned! { *variant_span =>
                 const _: () = {
                     const fn _frieze_assert_struct_schema<
@@ -369,8 +381,9 @@ fn expand_one_of(
 /// [`frieze_usecase::IsStructSchema`]) fails to compile with the
 /// `on_unimplemented` diagnostic attached to that trait.
 fn extract_newtype_inner_ident(variant_ident: &Ident, inner: &Type) -> Result<Ident, syn::Error> {
-    // E-2b: known wrappers cannot be the inner of an internal-tagged
-    // newtype variant.
+    // Known wrappers (`Option`, `Vec`, `Maybe`) cannot be the inner
+    // of an internal-tagged newtype variant — they are not structs
+    // that implement `Schema`.
     if unwrap_option(inner).is_some()
         || unwrap_vec(inner).is_some()
         || unwrap_maybe(inner).is_some()
@@ -388,7 +401,7 @@ fn extract_newtype_inner_ident(variant_ident: &Ident, inner: &Type) -> Result<Id
         ));
     }
     let rendered = type_to_display(inner);
-    // E-2b: primitive scalars.
+    // Primitive scalars are not structs that implement `Schema`.
     if matches!(
         rendered.as_str(),
         "i32" | "i64" | "u32" | "u64" | "f32" | "f64" | "bool" | "String"
@@ -404,7 +417,8 @@ fn extract_newtype_inner_ident(variant_ident: &Ident, inner: &Type) -> Result<Id
             ),
         ));
     }
-    // E-2b: anything that is not a single-segment, unparametrised path.
+    // Reject anything that is not a single-segment, unparametrised
+    // path: qualified paths, generic types, references, tuples, etc.
     let path = match inner {
         Type::Path(p) if p.qself.is_none() => &p.path,
         _ => {

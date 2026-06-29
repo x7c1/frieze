@@ -7,8 +7,9 @@ struct BarData {
     value: i64,
 }
 
-// E-2a: unit variant mixed with a data-carrying variant under
-// `#[serde(tag = "...")]`.
+// Unit variant mixed with a data-carrying variant under
+// `#[serde(tag = "...")]`: the wire shape of `Foo` would be
+// `{"kind": "Foo"}`, indistinguishable from an empty struct variant.
 #[derive(Schema, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 #[allow(dead_code)]

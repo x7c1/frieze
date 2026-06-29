@@ -1,5 +1,5 @@
 error: frieze: newtype variant `Counts` wraps `Vec<i64>`, which is not a struct. internal-tagged enums require every newtype variant to wrap a struct that implements `Schema` (i.e. has #[derive(Schema)]). Define a named struct: #[derive(Schema)] struct CountsData { ... }.
- --> tests/ui/enum_internal_tagged_newtype_vec.rs:9:12
-  |
-9 |     Counts(Vec<i64>),
-  |            ^^^^^^^^
+  --> tests/ui/enum_internal_tagged_newtype_vec.rs:11:12
+   |
+11 |     Counts(Vec<i64>),
+   |            ^^^^^^^^

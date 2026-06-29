@@ -1,7 +1,8 @@
 use frieze::Schema;
 
-// E-3: struct variants are never supported (any mode, with or without
-// `#[serde(tag = "...")]`).
+// Struct variants (named fields) are never supported, with or
+// without `#[serde(tag = "...")]`: their anonymous shape has no
+// reusable OAS schema name, so frieze requires a named newtype.
 #[derive(Schema)]
 #[allow(dead_code)]
 enum Event {

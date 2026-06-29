@@ -1,6 +1,8 @@
 use frieze::Schema;
 
-// E-4: tuple variants with multiple fields are not supported.
+// Tuple variants with multiple fields are not supported: frieze
+// requires a named newtype struct so the inner has a reusable OAS
+// schema name.
 #[derive(Schema)]
 #[allow(dead_code)]
 enum Bad {

@@ -1,5 +1,5 @@
 error: frieze: adjacent tagging (`#[serde(tag = "...", content = "...")]`) is not supported. Use an internal tag without `content` instead: `#[serde(tag = "kind")]`.
-  --> tests/ui/enum_adjacent_tagged.rs:12:23
+  --> tests/ui/enum_adjacent_tagged.rs:15:23
    |
-12 | #[serde(tag = "kind", content = "data")]
+15 | #[serde(tag = "kind", content = "data")]
    |                       ^^^^^^^^^^^^^^^^

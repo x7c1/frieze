@@ -1,5 +1,5 @@
 error: frieze: newtype variant `Text` wraps a non-Schema type (`String`). internal-tagged enums require every newtype variant to wrap a struct that implements `Schema` (i.e. has #[derive(Schema)]). Define a named struct: #[derive(Schema)] struct TextData { value: String }.
- --> tests/ui/enum_internal_tagged_newtype_primitive.rs:9:10
-  |
-9 |     Text(String),
-  |          ^^^^^^
+  --> tests/ui/enum_internal_tagged_newtype_primitive.rs:11:10
+   |
+11 |     Text(String),
+   |          ^^^^^^

@@ -7,7 +7,10 @@ struct LoginData {
     user_id: i64,
 }
 
-// E-6: adjacent tagging (`tag` + `content`) is not supported.
+// Adjacent tagging (`tag` + `content`) is not supported: the wire
+// shape is a two-level wrapper that does not fit the OAS
+// `discriminator` semantics. Use an internal tag without `content`
+// instead.
 #[derive(Schema, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
 #[allow(dead_code)]

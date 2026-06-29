@@ -1,7 +1,9 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
-// E-2b: newtype inner is a primitive scalar (`String`).
+// Newtype variant whose inner is a primitive scalar (`String`):
+// internally-tagged variants need a `Schema`-implementing struct
+// inner, not a primitive.
 #[derive(Schema, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 #[allow(dead_code)]

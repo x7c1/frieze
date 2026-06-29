@@ -312,16 +312,16 @@ applies unchanged when `U` is an internally-tagged enum.
 |---------------------------------------------------------------------------|-------------------------------------------------------------------------|
 | Unit-only enum (no tag)                                                   | string-enum schema                                                      |
 | Internally-tagged enum, every variant a newtype-of-Schema-struct          | `oneOf` schema with `discriminator.propertyName`                        |
-| Data-carrying variants without `#[serde(tag = "...")]`                    | **E-1**: compile error — `tag` attribute is required                    |
-| `#[serde(tag = "...")]` mixed with a unit variant                         | **E-2a**: compile error — every variant must be a newtype-of-struct     |
-| Newtype inner is a primitive (`String`, `i64`, etc.)                      | **E-2b**: compile error — inner must be a struct that implements `Schema` |
-| Newtype inner is `Vec<T>` / `Option<T>` / `Maybe<T>`                      | **E-2b**: compile error — inner must be a struct that implements `Schema` |
-| Newtype inner is itself a Schema-deriving enum (string-enum / `oneOf`)    | **E-2c**: compile error via the `IsStructSchema` bound (rustc surfaces the diagnostic message) |
-| Struct variants (`Login { user_id: i64 }`)                                | **E-3**: compile error in every mode                                    |
-| Tuple variants with multiple fields (`Point(i32, i32)`)                   | **E-4**: compile error in every mode                                    |
-| `#[serde(untagged)]`                                                      | **E-5**: compile error                                                  |
-| `#[serde(tag = "...", content = "...")]` (adjacent tagging)               | **E-6**: compile error                                                  |
-| Unit-only enum with an explicit `#[serde(tag = "...")]`                   | **E-7**: compile error — drop the attribute to emit a string-enum schema |
+| Data-carrying variants without `#[serde(tag = "...")]`                    | compile error — `tag` attribute is required                             |
+| `#[serde(tag = "...")]` mixed with a unit variant                         | compile error — every variant must be a newtype-of-struct               |
+| Newtype inner is a primitive (`String`, `i64`, etc.)                      | compile error — inner must be a struct that implements `Schema`         |
+| Newtype inner is `Vec<T>` / `Option<T>` / `Maybe<T>`                      | compile error — inner must be a struct that implements `Schema`         |
+| Newtype inner is itself a Schema-deriving enum (string-enum / `oneOf`)    | compile error via the `IsStructSchema` bound (rustc surfaces the diagnostic message) |
+| Struct variants (`Login { user_id: i64 }`)                                | compile error in every mode                                             |
+| Tuple variants with multiple fields (`Point(i32, i32)`)                   | compile error in every mode                                             |
+| `#[serde(untagged)]`                                                      | compile error                                                           |
+| `#[serde(tag = "...", content = "...")]` (adjacent tagging)               | compile error                                                           |
+| Unit-only enum with an explicit `#[serde(tag = "...")]`                   | compile error — drop the attribute to emit a string-enum schema         |
 | Empty enum (`enum Empty {}`)                                              | compile error — no inhabitants to enumerate                             |
 
 ### Tag-vs-field collision is the user's responsibility
@@ -338,9 +338,9 @@ from the synthesised tag arm). frieze does not check for this:
 - mainstream OAS validators catch the resulting contradictory schema.
 
 The expected discipline is to choose a tag name that does not collide
-with any field of any of the inner structs in the enum. The E-1 error
-message names the typical safe choices (`type`, `kind`, `label`,
-`event_type`).
+with any field of any of the inner structs in the enum. The
+"data-carrying variants without `#[serde(tag = "...")]`" error message
+names the typical safe choices (`type`, `kind`, `label`, `event_type`).
 
 ## Wire names (`rename` and `rename_all`)
 

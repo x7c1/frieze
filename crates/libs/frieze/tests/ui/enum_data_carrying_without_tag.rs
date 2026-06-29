@@ -12,7 +12,8 @@ struct LogoutData {
     reason: String,
 }
 
-// E-1: data-carrying variants but no `#[serde(tag = "...")]`.
+// Data-carrying variants without `#[serde(tag = "...")]`: the macro
+// requires an internal tag so the wire shape carries a discriminator.
 #[derive(Schema)]
 #[allow(dead_code)]
 enum Event {

@@ -1,5 +1,5 @@
 error: frieze: `#[serde(untagged)]` enums are not supported. Use an internal tag instead: `#[serde(tag = "kind")]`.
- --> tests/ui/enum_untagged.rs:6:9
+ --> tests/ui/enum_untagged.rs:8:9
   |
-6 | #[serde(untagged)]
+8 | #[serde(untagged)]
   |         ^^^^^^^^
