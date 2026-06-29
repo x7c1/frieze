@@ -1,12 +1,13 @@
-//! Schema name composition for a two-argument generic struct:
-//! `Pair<i32, f32>` produces `Int32_Float_Pair` — the type parameters
-//! appear in declaration order, separated by `_`, with the base name as
-//! the suffix. The primitive names follow the OAS type/format
-//! convention (`f32` is `Float`; `f64` is `Double`).
+//! Schema name composition and end-to-end registration for a
+//! two-argument generic struct: `Pair<i32, f32>` produces
+//! `Int32_Float_Pair` — the type parameters appear in declaration
+//! order, separated by `_`, with the base name as the suffix. The
+//! primitive names follow the OAS type/format convention (`f32` is
+//! `Float`; `f64` is `Double`).
 //!
-//! As with the single-arg primitive case, the full Schemas-build flow
-//! is not exercised here (primitive references to `Int32` / `Float`
-//! cannot be resolved through `Schemas` directly).
+//! Both primitive fields are inlined at the leaf position (no
+//! `components/schemas/Int32` or `components/schemas/Float` entry is
+//! emitted), so `Schemas::add::<Pair<i32, f32>>().build()` succeeds.
 
 use frieze::Schema;
 
@@ -29,4 +30,27 @@ fn pair_argument_order_is_significant() {
     // schema names, in argument declaration order.
     assert_eq!(<Pair<i64, String> as Schema>::name(), "Int64_String_Pair");
     assert_eq!(<Pair<String, i64> as Schema>::name(), "String_Int64_Pair");
+}
+
+#[test]
+fn pair_two_primitives_inlines_both_fields() {
+    let s: frieze::Schemas = frieze::schemas()
+        .add::<Pair<i32, f64>>()
+        .build()
+        .expect("schemas build inlines both primitive references");
+
+    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
+    Int32_Double_Pair:
+      type: object
+      required:
+        - fst
+        - snd
+      properties:
+        fst:
+          type: integer
+          format: int32
+        snd:
+          type: number
+          format: double
+    "##);
 }

@@ -2,6 +2,44 @@
 
 use crate::schema_name::SchemaName;
 
+/// Maps a [`SchemaName`] to its primitive leaf [`PropertyType`] if the
+/// name matches one of the eight primitive scalar conventions
+/// (`Int32` / `Int64` / `UInt32` / `UInt64` / `Float` / `Double` /
+/// `Boolean` / `String`).
+///
+/// Generic instantiations whose argument is a primitive (e.g.
+/// `Container<i64>`) emit `PropertyType::Reference(SchemaName("Int64"))`
+/// from the derive output, because the macro cannot determine whether
+/// the type parameter is a primitive at expansion time. Primitives are
+/// not [`crate::Schemas`] entries (they implement `Schema` but not
+/// `IsRegistrable`), so such a reference would otherwise be unresolved.
+///
+/// This helper is the single source of truth used by:
+///
+/// - the build-time reference walk in `frieze-usecase`, which treats a
+///   primitive-named reference as resolved without requiring a
+///   registered entry;
+/// - the boundary conversion in `frieze-usecase::to_value`, which
+///   inlines the leaf scalar shape (`{type: integer, format: int64}`,
+///   `{type: string}`, ...) at the reference position instead of
+///   emitting a dangling `$ref: #/components/schemas/Int64`.
+///
+/// Returns `None` for any other name; the caller then falls back to its
+/// normal "registered reference" treatment.
+pub fn primitive_property_type_for(name: &SchemaName) -> Option<PropertyType> {
+    match name.as_str() {
+        "Int32" => Some(PropertyType::Int32),
+        "Int64" => Some(PropertyType::Int64),
+        "UInt32" => Some(PropertyType::UInt32),
+        "UInt64" => Some(PropertyType::UInt64),
+        "Float" => Some(PropertyType::Float),
+        "Double" => Some(PropertyType::Double),
+        "Boolean" => Some(PropertyType::Boolean),
+        "String" => Some(PropertyType::String),
+        _ => None,
+    }
+}
+
 /// Property types currently supported by the derive in Phase 1.
 ///
 /// Unsigned variants (`UInt32`, `UInt64`) carry their non-negative
@@ -62,4 +100,42 @@ pub enum PropertyType {
     /// `$ref: "#/components/schemas/<name>"` (non-nullable) or wrapped in
     /// `allOf` / `oneOf` when nullable, per the active OAS version.
     Reference(SchemaName),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn primitive_lookup_maps_each_scalar_name() {
+        let cases: &[(&str, PropertyType)] = &[
+            ("Int32", PropertyType::Int32),
+            ("Int64", PropertyType::Int64),
+            ("UInt32", PropertyType::UInt32),
+            ("UInt64", PropertyType::UInt64),
+            ("Float", PropertyType::Float),
+            ("Double", PropertyType::Double),
+            ("Boolean", PropertyType::Boolean),
+            ("String", PropertyType::String),
+        ];
+        for (name, expected) in cases {
+            let actual = primitive_property_type_for(&SchemaName::new(*name).unwrap());
+            assert_eq!(
+                actual.as_ref(),
+                Some(expected),
+                "primitive lookup mismatch for `{name}`"
+            );
+        }
+    }
+
+    #[test]
+    fn primitive_lookup_returns_none_for_non_primitive_names() {
+        for input in ["User", "Int64_Container", "string", "INT64", "Int128"] {
+            let name = SchemaName::new(input).unwrap();
+            assert!(
+                primitive_property_type_for(&name).is_none(),
+                "expected non-primitive name `{input}` to map to None"
+            );
+        }
+    }
 }

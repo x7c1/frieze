@@ -1,7 +1,9 @@
 //! Boundary conversion from [`frieze_model::Schemas`] to
 //! [`serde_yaml::Value`], via [`frieze_openapi`].
 
-use frieze_model::{Property, PropertyType, Schema, SchemaName, Schemas};
+use frieze_model::{
+    primitive_property_type_for, Property, PropertyType, Schema, SchemaName, Schemas,
+};
 use frieze_openapi::{
     ObjectSchema, OneOfSchema, OneOfVariant, SchemaObject, SchemaType, StringEnumSchema,
 };
@@ -189,6 +191,15 @@ const fn is_oas_3_0() -> bool {
 /// "nullable reference" shape ([`nullable_reference_object`]) rather than
 /// attempting to attach `nullable: true` directly to the `$ref` (which is
 /// invalid OAS).
+///
+/// References whose name maps to one of the eight primitive scalar
+/// conventions ([`primitive_property_type_for`]) are **inlined** at the
+/// leaf position as the matching scalar shape (`{type: integer, format:
+/// int64}`, `{type: string}`, ...). Generic derive output for
+/// `Container<i64>`-style instantiations cannot tell at macro-expansion
+/// time whether the type parameter is a primitive, so it always emits
+/// `PropertyType::Reference`; the boundary inlines those references so
+/// the OAS document has no dangling `$ref: #/components/schemas/Int64`.
 fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
     let (schema_ty, format, minimum) = match ty {
         PropertyType::Int32 => (SchemaType::Integer, Some("int32"), None),
@@ -211,6 +222,16 @@ fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
             // `$ref` schema object — `$ref` siblings are ignored in OAS 3.0
             // and disallowed in 3.1. Use the version-specific wrap instead.
             if let PropertyType::Reference(name) = inner.as_ref() {
+                // Primitive references inline at the leaf, so the
+                // "nullable reference" wrap is unnecessary: emit the
+                // scalar shape with the standard scalar nullability
+                // treatment (`nullable: true` under 3.0, `type` sequence
+                // under 3.1).
+                if let Some(prim) = primitive_property_type_for(name) {
+                    let mut inner_schema = property_type_to_object_schema(&prim);
+                    inner_schema.nullable = Some(true);
+                    return inner_schema;
+                }
                 return nullable_reference_object(name);
             }
             let mut inner_schema = property_type_to_object_schema(inner);
@@ -218,6 +239,9 @@ fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
             return inner_schema;
         }
         PropertyType::Reference(name) => {
+            if let Some(prim) = primitive_property_type_for(name) {
+                return property_type_to_object_schema(&prim);
+            }
             return reference_object(name);
         }
     };

@@ -50,7 +50,7 @@ mod property_name;
 pub use property_name::PropertyName;
 
 mod property_type;
-pub use property_type::PropertyType;
+pub use property_type::{primitive_property_type_for, PropertyType};
 
 mod presence;
 pub use presence::Presence;

@@ -1,7 +1,9 @@
 //! Builder that collects [`Schema`] implementations into a validated
 //! [`frieze_model::Schemas`].
 
-use frieze_model::{Error, PropertyType, Schema as ModelSchema, SchemaName, Schemas};
+use frieze_model::{
+    primitive_property_type_for, Error, PropertyType, Schema as ModelSchema, SchemaName, Schemas,
+};
 
 use crate::schema::IsRegistrable;
 
@@ -133,13 +135,22 @@ fn first_unresolved_in_schema<'a>(
 /// Returns the first [`PropertyType::Reference`] encountered in `ty`
 /// whose name is not registered in `schemas`, walking
 /// [`PropertyType::Array`] and [`PropertyType::Nullable`].
+///
+/// A reference whose name matches one of the eight primitive scalar
+/// names ([`primitive_property_type_for`]) is treated as resolved even
+/// when no such entry is registered: primitives implement `Schema` (so
+/// they can appear as generic arguments) but not `IsRegistrable`, so
+/// `Schemas::add::<i64>()` is intentionally rejected at compile time
+/// and the name is never in `schemas.by_name`. The boundary conversion
+/// inlines the leaf scalar shape at the reference position, so the
+/// resulting OAS document has no dangling `$ref` to follow.
 fn first_unresolved_reference<'a>(
     ty: &'a PropertyType,
     schemas: &Schemas,
 ) -> Option<&'a SchemaName> {
     match ty {
         PropertyType::Reference(name) => {
-            if schemas.by_name.contains_key(name) {
+            if schemas.by_name.contains_key(name) || primitive_property_type_for(name).is_some() {
                 None
             } else {
                 Some(name)
