@@ -345,14 +345,48 @@ struct Node<T> {
 `Node<User>` registers as `User_Node` with `next` resolving back to
 the same `User_Node` entry.
 
+### Generic enums
+
+The same rules apply to enum derive: `#[derive(Schema)]` accepts type
+parameters on both the unit-variant (`type: string, enum: [...]`) and
+the internally-tagged (`oneOf` with `discriminator`) branches, with a
+synthesised `T: Schema` bound on every type parameter and the user's
+`where` clause preserved verbatim. The composed schema name follows
+the same suffix-form rule as struct derive — `Event<i64, String>` (a
+two-parameter internally-tagged enum) becomes `Int64_String_Event`.
+
+For an internally-tagged enum whose newtype variant inners are
+themselves generic structs (`Container<T>`), the per-variant
+`IsStructSchema` bound check accepts the concrete instantiation
+because `Container<T>: IsStructSchema` holds whenever `T: Schema` does
+(the struct derive carries the `IsStructSchema` impl forward through
+the same `T: Schema` bound). Each generic-struct instantiation is a
+distinct schema entry and must be registered explicitly alongside the
+enum:
+
+```rust
+frieze::schemas()
+    .add::<Event<i64, String>>()    // registers `Int64_String_Event`
+    .add::<Container<i64>>()        // registers `Int64_Container`
+    .add::<Container<String>>()     // registers `String_Container`
+    .build()?;
+```
+
+Primitive arguments are inlined the same way they are for generic
+structs — `Container<i64>`'s `value: T` reference becomes
+`{type: integer, format: int64}` at the leaf, without producing a
+dangling `$ref: Int64` or a `components/schemas/Int64` entry.
+
 ### Rejected generic shapes
 
-- **Lifetime parameters** (`struct Borrowed<'a> { s: &'a str }`) —
-  rejected at macro-expansion time. frieze schemas describe owned data
-  layouts, and the OAS representation of a borrow is undefined.
-- **Const generics** (`struct ArrN<const N: usize> { ... }`) —
-  rejected at macro-expansion time. The OAS encoding of a
-  compile-time constant in a schema name or shape is not in scope.
+- **Lifetime parameters** (`struct Borrowed<'a> { s: &'a str }`,
+  `enum Borrowed<'a> { ... }`) — rejected at macro-expansion time.
+  frieze schemas describe owned data layouts, and the OAS
+  representation of a borrow is undefined.
+- **Const generics** (`struct ArrN<const N: usize> { ... }`,
+  `enum ArrN<const N: usize> { ... }`) — rejected at macro-expansion
+  time. The OAS encoding of a compile-time constant in a schema name
+  or shape is not in scope.
 - **Trait objects as arguments** (`Box<dyn Schema>`) — rejected by
   rustc (the `T: Schema` bound is not satisfied by `dyn Schema`).
   frieze does not synthesise a curated diagnostic for this; the

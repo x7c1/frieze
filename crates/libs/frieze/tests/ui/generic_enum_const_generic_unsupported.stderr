@@ -1,0 +1,5 @@
+error: frieze: const generics are not supported in #[derive(Schema)] (enum `ArrN`).
+  --> tests/ui/generic_enum_const_generic_unsupported.rs:10:11
+   |
+10 | enum ArrN<const N: usize> {
+   |           ^^^^^^^^^^^^^^

@@ -1,0 +1,5 @@
+error: frieze: lifetime parameters are not supported in #[derive(Schema)] (enum `Borrowed`). frieze schemas describe owned data layouts; remove the lifetime parameter or wrap the borrowed data in an owned type.
+  --> tests/ui/generic_enum_lifetime_unsupported.rs:10:15
+   |
+10 | enum Borrowed<'a> {
+   |               ^^
