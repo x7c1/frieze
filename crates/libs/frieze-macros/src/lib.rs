@@ -82,6 +82,7 @@ mod expand_enum;
 mod expand_struct;
 mod field;
 mod property_type;
+mod register;
 mod rename;
 mod serde_scan;
 mod ty;

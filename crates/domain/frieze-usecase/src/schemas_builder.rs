@@ -5,7 +5,7 @@ use frieze_model::{
     primitive_property_type_for, Error, PropertyType, Schema as ModelSchema, SchemaName, Schemas,
 };
 
-use crate::schema::IsRegistrable;
+use crate::schema::{IsRegistrable, Schema};
 
 /// In-progress collection of schemas.
 #[derive(Debug, Default)]
@@ -18,7 +18,8 @@ impl SchemasBuilder {
         Self::default()
     }
 
-    /// Registers the schema produced by `T::schema()`.
+    /// Registers the schema produced by `T::schema()` and recursively
+    /// registers every type that `T`'s schema references.
     ///
     /// `T` must implement [`IsRegistrable`] — this rejects primitive
     /// scalars at compile time (`Schemas::add::<i64>()` fails to
@@ -26,20 +27,70 @@ impl SchemasBuilder {
     /// they can appear as generic arguments and are not standalone OAS
     /// schema entries. `#[derive(Schema)]` emits the `IsRegistrable`
     /// impl for struct and enum inputs.
+    ///
+    /// The traversal is performed by [`Schema::register_into`]: the
+    /// derived impl walks each field type's `register_into`, so a single
+    /// `add::<Foo>()` call pulls in `Foo` together with every nested
+    /// struct / enum / generic instance reachable from `Foo`'s fields.
+    /// Calls are idempotent — adding the same root twice, or having a
+    /// root reachable through multiple paths, leaves only one entry per
+    /// name in the resulting `Schemas`.
     pub fn add<T: IsRegistrable>(mut self) -> Self {
-        self.schemas.push(T::schema());
+        <T as Schema>::register_into(&mut self);
         self
     }
 
-    /// Finalizes the collection, checking for duplicate schema names
-    /// **and** that every `$ref` resolves to a registered schema.
+    /// Pushes `schema` into the in-progress collection only if no schema
+    /// with the same registration name is already present.
+    ///
+    /// `Schema::Scalar` entries (and anything else whose
+    /// [`ModelSchema::name`] returns `None`) are always appended — they
+    /// have no key to dedup on and are filtered out at
+    /// [`Schemas::new`] anyway.
+    ///
+    /// This is the idempotent push primitive used by
+    /// [`Schema::register_into`] (both the default impl and the
+    /// derive-emitted override) so the same root reached through
+    /// multiple paths or via a self-referential cycle (`struct Tree
+    /// { children: Vec<Box<Tree>> }`) collapses to a single entry.
+    pub fn push_unique(&mut self, schema: ModelSchema) {
+        if let Some(name) = schema.name() {
+            if self.contains_name(name.as_str()) {
+                return;
+            }
+        }
+        self.schemas.push(schema);
+    }
+
+    /// Returns `true` if a previously-pushed schema has the same
+    /// registration name as `name`.
+    ///
+    /// The derive-emitted [`Schema::register_into`] uses this as the
+    /// early-return guard at the top of the body: `if
+    /// builder.contains_name(&Self::name()) { return; }` short-circuits
+    /// recursion through self-referential types and multi-path arrival
+    /// of the same root.
+    pub fn contains_name(&self, name: &str) -> bool {
+        self.schemas
+            .iter()
+            .any(|s| s.name().map(|n| n.as_str() == name).unwrap_or(false))
+    }
+
+    /// Finalizes the collection, checking that every `$ref` resolves
+    /// to a registered schema.
     ///
     /// References are gathered by walking each property's type tree
     /// (recursing into `Array(...)` and `Nullable(...)`) and each
     /// `oneOf` variant's inner reference. The first ref that points at
     /// a schema not in the collection produces
-    /// [`Error::UnresolvedReference`], in declaration order — the same
-    /// fail-fast UX as [`Error::DuplicateSchema`].
+    /// [`Error::UnresolvedReference`], in declaration order.
+    ///
+    /// Duplicate-name detection still runs at the domain layer via
+    /// [`Schemas::new`], but the builder pushes every entry through
+    /// [`Self::push_unique`], so [`Error::DuplicateSchema`] is no
+    /// longer reachable through the standard `add` path; it remains
+    /// the defensive guarantee at the model layer when a `Schemas`
+    /// value is built outside the use-case-layer builder.
     ///
     /// In addition, each `oneOf` variant's inner reference must point at
     /// a struct schema (`Schema::Object`); pointing at another enum
@@ -176,6 +227,11 @@ mod tests {
     use crate::schema::Schema;
     use frieze_model::{Error, Presence, Property, PropertyType, SchemaName};
 
+    /// `DummyUser` and `DummyProfile` deliberately omit a `register_into`
+    /// override: the default trait impl pushes only `Self`, so these
+    /// hand-written `impl Schema`s exercise the non-recursive default
+    /// path and let us assert the low-level behaviour (silent dedup,
+    /// unresolved-reference detection) without depending on the derive.
     struct DummyUser;
 
     impl Schema for DummyUser {
@@ -196,16 +252,21 @@ mod tests {
     impl IsRegistrable for DummyUser {}
 
     #[test]
-    fn build_rejects_duplicates() {
-        let err = SchemasBuilder::new()
+    fn build_dedups_same_root_silently() {
+        // Two `add::<DummyUser>()` calls used to surface
+        // `Error::DuplicateSchema`; with transitive `register_into`
+        // semantics the same root being reached twice is normal (e.g. a
+        // recursive type, or two siblings referencing the same nested
+        // struct), so the builder silently keeps one entry per name.
+        let schemas = SchemasBuilder::new()
             .add::<DummyUser>()
             .add::<DummyUser>()
             .build()
-            .unwrap_err();
-        assert_eq!(
-            err,
-            Error::DuplicateSchema(SchemaName::new("User").unwrap())
-        );
+            .expect("duplicate adds collapse silently to a single entry");
+        assert_eq!(schemas.by_name.len(), 1);
+        assert!(schemas
+            .by_name
+            .contains_key(&SchemaName::new("User").unwrap()));
     }
 
     struct DummyProfile;
@@ -245,7 +306,17 @@ mod tests {
     }
 
     #[test]
-    fn build_detects_unresolved_reference() {
+    fn build_detects_unresolved_reference_for_manual_impl() {
+        // `DummyProfile` keeps the default (non-recursive)
+        // `register_into`, so adding only the profile does not pull in
+        // `DummyUser`. The reference `Profile.user -> User` therefore
+        // dangles and the builder fails fast.
+        //
+        // This exercises the path where `UnresolvedReference` is still
+        // raised: hand-written `impl Schema`s that reference other types
+        // but do not override `register_into` to walk their dependencies.
+        // Code using `#[derive(Schema)]` never lands here because the
+        // derived `register_into` walks each field type.
         let err = SchemasBuilder::new()
             .add::<DummyProfile>()
             .build()
