@@ -35,11 +35,25 @@
 //! `rename` precedence implemented in [`crate::rename::wire_name`], and
 //! must be pairwise distinct (the same uniqueness check that guards
 //! struct field wire names and unit-enum variant wire names).
+//!
+//! # Generic enums
+//!
+//! When the input carries type parameters (`enum Either<T, E> { ... }`),
+//! the derive propagates them onto the emitted `impl` blocks with a
+//! synthesised `T: Schema` bound on every type parameter (alongside the
+//! user's own `where` clause, which is preserved verbatim), and the
+//! generated `name()` composes the schema name from each parameter's
+//! name in the **suffix** form `<Arg1>_<Arg2>_..._<BaseName>` — same
+//! rule as `expand_struct`. Non-generic enums keep emitting the plain
+//! literal base name.
+//!
+//! Lifetime parameters and const generics are rejected at compile time
+//! with the same wording struct derive uses.
 
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
-use syn::{DataEnum, DeriveInput, Fields, Ident, Type, Variant};
+use syn::{DataEnum, DeriveInput, Fields, GenericParam, Generics, Ident, Type, Variant};
 
 use crate::doc::{compose_enum_description, description_token, parse_doc_attrs};
 use crate::rename::{
@@ -72,6 +86,10 @@ pub(crate) fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<TokenStr
             "frieze: enums with no variants cannot be represented as an OAS schema.",
         ));
     }
+    // Reject lifetime / const-generic parameters before doing anything
+    // else so we don't waste downstream work on a shape we won't emit.
+    reject_unsupported_generic_params(&ast.generics, ident)?;
+
     let container_scan = scan_serde_attrs(&ast.attrs, SerdePosition::EnumContainer)?;
     let container_rule = rename_all_from_scan(&container_scan)?;
 
@@ -109,7 +127,14 @@ pub(crate) fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<TokenStr
                 ),
             ));
         }
-        expand_one_of(ident, &ast.attrs, tag, &classified, container_rule)
+        expand_one_of(
+            ident,
+            &ast.generics,
+            &ast.attrs,
+            tag,
+            &classified,
+            container_rule,
+        )
     } else {
         if any_data {
             // A data-carrying variant requires an internal tag so the
@@ -127,7 +152,13 @@ pub(crate) fn expand_enum(ast: &DeriveInput, data: &DataEnum) -> Result<TokenStr
                 ),
             ));
         }
-        expand_string_enum(ident, &ast.attrs, &classified, container_rule)
+        expand_string_enum(
+            ident,
+            &ast.generics,
+            &ast.attrs,
+            &classified,
+            container_rule,
+        )
     }
 }
 
@@ -179,6 +210,7 @@ fn classify_variant(variant: &Variant, enum_ident: &Ident) -> Result<VariantShap
 /// now established by [`classify_variant`] in the caller.
 fn expand_string_enum(
     ident: &Ident,
+    generics: &Generics,
     enum_attrs: &[syn::Attribute],
     classified: &[(&Variant, VariantShape)],
     container_rule: RenameAll,
@@ -206,21 +238,27 @@ fn expand_string_enum(
     }
     check_unique_wire_names(&wire_entries, "variant")?;
 
-    let schema_name = ident.to_string();
+    let base_name = ident.to_string();
     let value_literals = values.iter().map(|v| {
         quote! { ::std::string::String::from(#v) }
     });
     let enum_doc = parse_doc_attrs(enum_attrs);
     let composed_description = compose_enum_description(enum_doc.as_deref(), &variant_descriptions);
     let composed_description_expr = description_token(&composed_description);
+
+    let mut impl_generics_storage = generics.clone();
+    push_schema_bound(&mut impl_generics_storage);
+    let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
+    let name_body = composed_name_body(generics, &base_name);
+
     let expanded = quote! {
-        impl ::frieze::__private::frieze_usecase::Schema for #ident {
+        impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
             fn name() -> ::std::string::String {
-                ::std::string::String::from(#schema_name)
+                #name_body
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
                 ::frieze::__private::frieze_model::Schema::new_string_enum(
-                    #schema_name,
+                    <Self as ::frieze::__private::frieze_usecase::Schema>::name(),
                     ::std::vec![ #( #value_literals ),* ],
                 )
                 .expect("frieze: derived enum schema satisfies invariants by construction")
@@ -229,7 +267,7 @@ fn expand_string_enum(
         }
         // Marker impl: an enum-derived `Schema` is registrable on a
         // `Schemas` collection.
-        impl ::frieze::__private::frieze_usecase::IsRegistrable for #ident {}
+        impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
     };
     Ok(expanded)
 }
@@ -252,6 +290,7 @@ fn expand_string_enum(
 ///   when the inner is itself an enum-derived `Schema`.
 fn expand_one_of(
     ident: &Ident,
+    generics: &Generics,
     enum_attrs: &[syn::Attribute],
     tag: &str,
     classified: &[(&Variant, VariantShape)],
@@ -306,7 +345,7 @@ fn expand_one_of(
     }
     check_unique_wire_names(&wire_entries, "variant")?;
 
-    let schema_name = ident.to_string();
+    let base_name = ident.to_string();
     let tag_lit = tag.to_string();
     let enum_doc = parse_doc_attrs(enum_attrs);
     let variant_descriptions: Vec<(String, Option<String>)> = inner_entries
@@ -333,38 +372,74 @@ fn expand_one_of(
         })
         .collect();
 
+    let has_generics = !generics.params.is_empty();
     let struct_bound_checks: Vec<TokenStream> = inner_entries
         .iter()
         .map(|(_, inner_type, variant_span, _)| {
-            // `const _: () = { ... }` evaluates at compile time; the
-            // inner `_assert` must be `const fn` so it can be called
-            // from const context. The trait bound on `_assert` makes
-            // rustc surface the `on_unimplemented` message attached
-            // to `IsStructSchema` when `#inner_type` is an
-            // enum-derived type that has no `impl IsStructSchema`.
-            // Anchoring with `quote_spanned!` makes the diagnostic
-            // point at the user's variant rather than at synthesised
-            // macro code.
-            quote_spanned! { *variant_span =>
-                const _: () = {
-                    const fn _frieze_assert_struct_schema<
-                        T: ::frieze::__private::frieze_usecase::IsStructSchema,
-                    >() {
-                    }
-                    _frieze_assert_struct_schema::<#inner_type>();
-                };
+            // The `_assert` function carries the `IsStructSchema`
+            // trait bound; calling it on `#inner_type` makes rustc
+            // surface the `on_unimplemented` message attached to
+            // `IsStructSchema` when the inner type is an enum-derived
+            // `Schema` (or any other type without an `IsStructSchema`
+            // impl). Anchoring with `quote_spanned!` makes the
+            // diagnostic point at the user's variant rather than at
+            // synthesised macro code.
+            //
+            // Non-generic enums emit the assertion at top level via
+            // `const _: () = { ... }` so it fires eagerly. For generic
+            // enums the inner type contains the enum's type parameters
+            // (e.g. `Container<T>`), so the check has to live inside the
+            // `impl` block — we use `inline const { ... }` inside the
+            // `schema()` body so the assertion is part of the
+            // monomorphisation step and the type parameters are in
+            // scope. The bound check still runs at compile time,
+            // per-instantiation.
+            if has_generics {
+                quote_spanned! { *variant_span =>
+                    {
+                        const fn _frieze_assert_struct_schema<
+                            T: ::frieze::__private::frieze_usecase::IsStructSchema,
+                        >() {
+                        }
+                        _frieze_assert_struct_schema::<#inner_type>();
+                    };
+                }
+            } else {
+                quote_spanned! { *variant_span =>
+                    const _: () = {
+                        const fn _frieze_assert_struct_schema<
+                            T: ::frieze::__private::frieze_usecase::IsStructSchema,
+                        >() {
+                        }
+                        _frieze_assert_struct_schema::<#inner_type>();
+                    };
+                }
             }
         })
         .collect();
 
+    let mut impl_generics_storage = generics.clone();
+    push_schema_bound(&mut impl_generics_storage);
+    let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
+    let name_body = composed_name_body(generics, &base_name);
+
+    let (inner_bound_checks, outer_bound_checks): (TokenStream, TokenStream) = if has_generics {
+        (quote! { #( #struct_bound_checks )* }, quote! {})
+    } else {
+        (quote! {}, quote! { #( #struct_bound_checks )* })
+    };
+
     let expanded = quote! {
-        impl ::frieze::__private::frieze_usecase::Schema for #ident {
+        impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
             fn name() -> ::std::string::String {
-                ::std::string::String::from(#schema_name)
+                #name_body
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
+                // Per-variant `IsStructSchema` bound checks for the
+                // generic case — see `struct_bound_checks` above.
+                #inner_bound_checks
                 ::frieze::__private::frieze_model::Schema::new_one_of(
-                    #schema_name,
+                    <Self as ::frieze::__private::frieze_usecase::Schema>::name(),
                     #tag_lit,
                     ::std::vec![ #( #variant_constructor_exprs ),* ],
                 )
@@ -374,9 +449,9 @@ fn expand_one_of(
         }
         // Marker impl: an enum-derived `Schema` is registrable on a
         // `Schemas` collection.
-        impl ::frieze::__private::frieze_usecase::IsRegistrable for #ident {}
+        impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
 
-        #( #struct_bound_checks )*
+        #outer_bound_checks
     };
     Ok(expanded)
 }
@@ -459,4 +534,74 @@ fn extract_newtype_inner_type(variant_ident: &Ident, inner: &Type) -> Result<Typ
         ));
     }
     Ok(inner.clone())
+}
+
+/// Reject lifetime parameters and const generics with a curated message
+/// (the same wording used for struct derive). Type parameters fall
+/// through unchanged for downstream handling.
+fn reject_unsupported_generic_params(generics: &Generics, ident: &Ident) -> Result<(), syn::Error> {
+    for param in &generics.params {
+        match param {
+            GenericParam::Type(_) => {}
+            GenericParam::Lifetime(lifetime) => {
+                return Err(syn::Error::new_spanned(
+                    lifetime,
+                    format!(
+                        "frieze: lifetime parameters are not supported in \
+                         #[derive(Schema)] (enum `{ident}`). frieze schemas \
+                         describe owned data layouts; remove the lifetime \
+                         parameter or wrap the borrowed data in an owned type."
+                    ),
+                ));
+            }
+            GenericParam::Const(const_param) => {
+                return Err(syn::Error::new_spanned(
+                    const_param,
+                    format!(
+                        "frieze: const generics are not supported in \
+                         #[derive(Schema)] (enum `{ident}`)."
+                    ),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Push the synthesised `T: Schema` bound onto every type parameter in
+/// `generics`. The user's own `where` clause is preserved by the
+/// downstream `split_for_impl()` call.
+fn push_schema_bound(generics: &mut Generics) {
+    for param in generics.params.iter_mut() {
+        if let GenericParam::Type(type_param) = param {
+            let bound: syn::TypeParamBound =
+                syn::parse_quote!(::frieze::__private::frieze_usecase::Schema);
+            type_param.bounds.push(bound);
+        }
+    }
+}
+
+/// Build the token stream that computes the schema name at runtime.
+///
+/// - Non-generic enums return the literal base name as a `String`,
+///   byte-identical to the pre-generic expansion (snapshot stability).
+/// - Generic enums return `format!("{}_..._<Base>", T1::name(), ...)`
+///   using the same suffix-form composition rule that `expand_struct`
+///   uses for generic structs.
+fn composed_name_body(generics: &Generics, base_name: &str) -> TokenStream {
+    let type_param_idents: Vec<&Ident> = generics.type_params().map(|tp| &tp.ident).collect();
+    if type_param_idents.is_empty() {
+        return quote! { ::std::string::String::from(#base_name) };
+    }
+    let mut format_str = String::new();
+    for _ in 0..type_param_idents.len() {
+        format_str.push_str("{}_");
+    }
+    format_str.push_str(base_name);
+    let args = type_param_idents.iter().map(|t| {
+        quote! { <#t as ::frieze::__private::frieze_usecase::Schema>::name() }
+    });
+    quote! {
+        ::std::format!(#format_str, #(#args),*)
+    }
 }
