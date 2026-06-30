@@ -1,6 +1,6 @@
 //! The top-level OpenAPI Schema Object sum supported by the current derive.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 use crate::object_schema::ObjectSchema;
 use crate::one_of_schema::OneOfSchema;
@@ -37,7 +37,7 @@ use crate::string_enum_schema::StringEnumSchema;
 /// only to let frieze-produced documents survive a YAML/JSON round-trip
 /// through [`crate::OasDocument`]. Full external-input robustness will
 /// arrive with the dedicated canonical (de)serializers in a later step.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(untagged)]
 pub enum SchemaObject {
     /// A `oneOf` schema with a top-level `discriminator` block, derived
@@ -54,4 +54,20 @@ pub enum SchemaObject {
     /// per-property shape (`$ref`, scalar `type` + `format`, array,
     /// nullable composition).
     Object(ObjectSchema),
+}
+
+/// Dispatch-only `Serialize` impl: delegates straight to the active
+/// variant's handwritten serializer so each variant controls its own
+/// canonical OAS key order.
+impl Serialize for SchemaObject {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match self {
+            SchemaObject::OneOf(one_of) => one_of.serialize(serializer),
+            SchemaObject::StringEnum(string_enum) => string_enum.serialize(serializer),
+            SchemaObject::Object(object) => object.serialize(serializer),
+        }
+    }
 }
