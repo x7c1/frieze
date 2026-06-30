@@ -1,8 +1,8 @@
-//! `Option<T>` without `#[serde(skip_serializing_if)]` maps to branch ②
-//! (required + nullable) under the current optionality mapping. The
-//! field name stays in the `required` array; the value-level `"null"`
-//! marker is folded into the inner schema's `type` sequence under
-//! OAS 3.1.
+//! `Option<T>` without `#[serde(skip_serializing_if)]` produces the
+//! required + nullable shape (`Option<T>` serde default in
+//! `docs/field-shapes.md`). The field name stays in the `required` array;
+//! the value-level `"null"` marker is folded into the inner schema's
+//! `type` sequence under OAS 3.1.
 
 #![cfg(feature = "oas-3-1")]
 

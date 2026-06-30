@@ -1,6 +1,7 @@
 //! `Option<T>` paired with `#[serde(skip_serializing_if = "Option::is_none")]`
-//! maps to branch ③ (optional + non-nullable). The field name is **dropped**
-//! from the `required` array and no `nullable` marker appears.
+//! produces the optional + non-nullable shape (`Option<T>` with
+//! `skip_serializing_if` in `docs/field-shapes.md`). The field name is
+//! **dropped** from the `required` array and no `nullable` marker appears.
 //!
 //! This file also serves as a contract test that the macro inspects field-
 //! level serde attributes and switches its emission based on them.

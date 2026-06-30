@@ -1,6 +1,6 @@
-//! `Maybe<T>` maps to branch ④ (optional + nullable): the field is dropped
-//! from the schema's `required` array **and** the inner schema is marked
-//! nullable.
+//! `Maybe<T>` produces the optional + nullable shape (`Maybe<T>` in
+//! `docs/field-shapes.md`): the field is dropped from the schema's
+//! `required` array **and** the inner schema is marked nullable.
 //!
 //! The struct also exercises serde round-tripping: a `Maybe<String>` field
 //! paired with `#[serde(default, skip_serializing_if = "Maybe::is_missing")]`
