@@ -88,12 +88,12 @@ frieze = { version = "...", features = ["inventory"] }
 ```
 
 With the feature on, every non-generic `#[derive(Schema)]` type is
-collected automatically:
+collected automatically — a single call is enough for the typical
+case:
 
 ```rust
 let schemas = frieze::schemas()
     .from_inventory()
-    .add::<Box<MyOtherType>>() // chain explicit roots if needed
     .build()?;
 ```
 
@@ -101,7 +101,33 @@ Generic types (`Page<T>`) are not auto-collected — Rust's `static`
 cannot hold generic types, so the derive does not emit an inventory
 entry for them. They are still registered transitively when a
 non-generic root's field references the concrete instantiation
-(`struct Foo { page: Page<Bar> }` walks into `Page<Bar>` from `Foo`).
+(`struct Foo { page: Page<Bar> }` walks into `Page<Bar>` from `Foo`),
+so the manual `add` is only needed for *unreachable* generic
+instances.
+
+### When you still need explicit `add`
+
+Two genuine cases require chaining `add::<T>()` after
+`from_inventory()`:
+
+1. **Documentation-only generic instantiations.** A generic instance
+   like `Page<Bar>` that is not referenced by any non-generic root's
+   field will not be reached by either channel. If you still want
+   `Page<Bar>` in the OAS document (for example, to publish it as a
+   standalone reusable component), register it as an isolated root
+   with `add::<Page<Bar>>()`.
+
+   ```rust
+   let schemas = frieze::schemas()
+       .from_inventory()
+       .add::<Page<Bar>>() // unreachable from any inventory-submitted root
+       .build()?;
+   ```
+
+2. **Hand-written `impl Schema` for foreign types.** Types from
+   external crates cannot carry `#[derive(Schema)]`, so they never
+   submit to `inventory`. Provide a hand-written `impl Schema` and
+   register it via `add::<ForeignType>()`.
 
 `inventory` aggregates per binary, so every test in a given test
 binary observes the same submission set. Tests that need an isolated
