@@ -92,15 +92,20 @@ pub(crate) fn parse_field(
             let array = array_property_type_expr(element);
             return Ok((nullable_property_type_expr(array), presence_required()));
         }
-        // Scalar `T` inside Option — branch ② / ③.
+        // Scalar `T` inside Option — either optional + non-nullable
+        // (with `skip_serializing_if = "Option::is_none"`) or required +
+        // nullable (serde default). See `docs/field-shapes.md`.
         let scalar = scalar_property_type_expr(inner).map_err(|_| {
             syn::Error::new_spanned(ty, unsupported_inside_message(inner, "Option<...>"))
         })?;
         if is_option_skip_predicate(scan) {
-            // Branch ③: optional, non-nullable.
+            // Optional, non-nullable: dropped from `required`, no
+            // `nullable` marker on the value.
             Ok((scalar, presence_optional()))
         } else {
-            // Branch ② (serde default): required, nullable.
+            // Required, nullable (serde default): stays in `required`,
+            // value carries `nullable` (or `"null"` in the 3.1 type
+            // sequence).
             Ok((nullable_property_type_expr(scalar), presence_required()))
         }
     } else if let Some(vec_inner) = unwrap_vec(ty) {

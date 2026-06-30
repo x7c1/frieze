@@ -1,7 +1,8 @@
-//! `Option<User>` (serde default — no `skip_serializing_if`) maps to
-//! branch ② (required + nullable). Under OAS 3.0, a nullable reference
-//! is expressed with `allOf` + `nullable: true` because the spec
-//! disallows sibling keys on a `$ref` schema.
+//! `Option<User>` (serde default — no `skip_serializing_if`) produces
+//! the required + nullable shape (`Option<U>` serde default in
+//! `docs/field-shapes.md`). Under OAS 3.0, a nullable reference is
+//! expressed with `allOf` + `nullable: true` because the spec disallows
+//! sibling keys on a `$ref` schema.
 
 #![cfg(feature = "oas-3-0")]
 

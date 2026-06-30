@@ -1,7 +1,9 @@
-//! `Option<Status>` (serde default — no `skip_serializing_if`) maps to
-//! branch ② (required + nullable). Under OAS 3.0, a nullable reference
-//! to an enum schema is expressed with `allOf` + `nullable: true` —
-//! the same wrap used for nullable nested-struct references.
+//! `Option<Status>` (serde default — no `skip_serializing_if`) produces
+//! the required + nullable shape (`Option<U>` serde default in
+//! `docs/field-shapes.md`, with `U` an enum schema here). Under OAS 3.0,
+//! a nullable reference to an enum schema is expressed with `allOf` +
+//! `nullable: true` — the same wrap used for nullable nested-struct
+//! references.
 
 #![cfg(feature = "oas-3-0")]
 

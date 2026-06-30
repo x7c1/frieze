@@ -1,6 +1,7 @@
-//! `Maybe<User>` maps to branch ④ (optional + nullable). The field is
-//! dropped from `required` and the reference is rendered through the
-//! OAS-3.0 nullable-ref wrap (`allOf: [$ref], nullable: true`).
+//! `Maybe<User>` produces the optional + nullable shape (`Maybe<U>` in
+//! `docs/field-shapes.md`). The field is dropped from `required` and the
+//! reference is rendered through the OAS-3.0 nullable-ref wrap
+//! (`allOf: [$ref], nullable: true`).
 
 #![cfg(feature = "oas-3-0")]
 

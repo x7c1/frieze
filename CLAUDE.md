@@ -81,6 +81,31 @@ cargo test   --workspace --no-default-features --features oas-3-1,inventory
 - PR titles follow Conventional Commits (`feat:`, `fix:`, `docs:`, `chore:`, `refactor:`, `test:`, `ci:`, `build:`, `perf:`, `revert:`).
 - Snapshot tests use `insta`. Update snapshots intentionally via `cargo insta review`; never blindly accept.
 
+## OSS hygiene (no upstream-private references)
+
+This repository is published as OSS. Comments, docstrings, commit messages, PR
+titles, PR bodies, and documentation files MUST be self-contained against the
+contents of this repository — they MUST NOT depend on, link to, or quote
+terminology that lives only in any other (upstream / private / planning)
+repository.
+
+In particular, do NOT introduce:
+
+- Numbered design labels that are only defined in an external plan document
+  (e.g. `branch ①`, `branch ④`, `N1`–`N4`, `case ②`).
+- Cross-repository URLs or paths that point outside this repository.
+- Quoted decisions or rationales that the reader cannot resolve from files
+  inside this repository.
+
+When a concept is referenced inside this repository, prefer the canonical
+wording defined in [`docs/field-shapes.md`](docs/field-shapes.md),
+[`docs/output-ordering.md`](docs/output-ordering.md),
+[`docs/oas-versions.md`](docs/oas-versions.md), or this `CLAUDE.md` itself —
+not an abbreviation that only makes sense in an upstream tracker.
+
+All artifacts pushed to this repository (code, comments, commit messages, PR
+descriptions, documentation) are written in English.
+
 ## Documentation pointers
 
 When you change behaviour, also update the matching specification file:
