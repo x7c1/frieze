@@ -1,10 +1,10 @@
-//! Submission channel and iterator for the `inventory`-based opt-in
+//! Submission channel and iterator for the `inventory`-based
 //! auto-collection layer.
 //!
 //! `#[derive(Schema)]` emits a `SchemaRoot` entry per non-generic type
 //! through the facade's `__private::inventory_submit!` wrapper macro.
-//! When the `inventory` feature is enabled on the facade (and therefore
-//! on this crate), every such entry lands in the `inventory` linker
+//! The `inventory` feature is on by default on the facade (and therefore
+//! on this crate), so every such entry lands in the `inventory` linker
 //! section and [`SchemasBuilder::from_inventory`] walks them all,
 //! invoking each entry's `register_fn` to drive the transitive
 //! [`crate::Schema::register_into`] walk rooted at the submitted type.
@@ -16,9 +16,10 @@
 //! (`struct Foo { page: Page<Bar> }`): the derived `register_into` walks
 //! into `<Page<Bar> as Schema>::register_into` at runtime.
 //!
-//! This module is compiled only under `#[cfg(feature = "inventory")]`.
-//! Consumers that do not opt into the feature pay no link-time or
-//! runtime cost for the channel.
+//! This module is compiled only under `#[cfg(feature = "inventory")]`,
+//! which remains a gate so consumers that opt out (via
+//! `default-features = false`) pay no link-time or runtime cost for the
+//! channel.
 
 use crate::schemas_builder::SchemasBuilder;
 
