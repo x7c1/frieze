@@ -13,7 +13,7 @@
 //! When the `inventory` feature is off, no namespace declarations can
 //! be observed and the helper short-circuits to the base name — every
 //! `#[derive(Schema)]` therefore keeps the same OAS key it had before
-//! PR 1.5.
+//! the namespace mechanism was introduced.
 
 /// Compose the OAS schema name for a type derived at `module_path`.
 ///

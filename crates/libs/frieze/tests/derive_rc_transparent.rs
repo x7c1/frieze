@@ -1,9 +1,7 @@
 //! `Rc<T>` is treated as a transparent owned wrapper, parallel to
 //! `Box<T>` (see `derive_box_transparent.rs`).
 //!
-//! Note: the field-type integration that would let a user write
-//! `struct Owner { rc: Rc<User> }` arrives in Phase 1 #11b. For #11a the
-//! transparency is asserted at the trait level.
+//! The transparency is asserted at the trait level here.
 
 use std::rc::Rc;
 

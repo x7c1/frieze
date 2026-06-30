@@ -55,7 +55,7 @@
 //! # Rejected shapes (compile error)
 //!
 //! - `Option<Option<T>>` — serde flattens nested options.
-//! - `Vec<Vec<T>>` — nested arrays are not modelled in Phase 1.
+//! - `Vec<Vec<T>>` — nested arrays are not modelled.
 //! - `Vec<Maybe<T>>` — array elements cannot be `Missing`; use
 //!   `Vec<Option<T>>` for arrays of nullable items.
 //! - `Option<Maybe<T>>` — presence is doubly defined.

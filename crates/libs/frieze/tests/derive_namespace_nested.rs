@@ -1,10 +1,11 @@
 //! End-to-end: two layers of `#[frieze(namespace)]` (`v1` containing
 //! `v2`) fold into the dotted OAS key `v1.v2.User`.
 //!
-//! Exercises the central claim of design A2 / B: the prefix walk in
-//! `compose_schema_name` retains every segment whose full path is a
-//! declared namespace, joining them by `.`. Two-level nesting is the
-//! smallest interesting test of "more than one namespace contributes".
+//! Exercises the central claim of the prefix walk: every segment in
+//! `compose_schema_name` whose full path is a declared namespace is
+//! retained, and the retained segments are joined by `.`. Two-level
+//! nesting is the smallest interesting test of "more than one
+//! namespace contributes".
 //!
 //! Per-binary inventory isolation: this test binary defines two
 //! namespaces (`v1`, `v1::v2`) and exactly one `#[derive(Schema)]`

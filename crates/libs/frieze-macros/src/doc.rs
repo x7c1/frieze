@@ -91,8 +91,7 @@ pub(crate) fn description_token(description: &Option<String>) -> TokenStream {
 
 /// Composes the enum-level description by appending a bullet list of
 /// per-variant docs (using each variant's post-`rename_all` name) to
-/// the enum-level doc. Mirrors the rules table in `design/descriptions.md`
-/// section B5:
+/// the enum-level doc. Mirrors the rules table for description encoding:
 ///
 /// |              | enum-level doc present | enum-level doc absent |
 /// |--------------|-----------------------|-----------------------|

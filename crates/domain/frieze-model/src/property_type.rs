@@ -1,4 +1,4 @@
-//! The enum of property types supported in Phase 1.
+//! The enum of property types currently supported by the derive.
 
 use crate::schema_name::SchemaName;
 
@@ -40,7 +40,7 @@ pub fn primitive_property_type_for(name: &SchemaName) -> Option<PropertyType> {
     }
 }
 
-/// Property types currently supported by the derive in Phase 1.
+/// Property types currently supported by the derive.
 ///
 /// Unsigned variants (`UInt32`, `UInt64`) carry their non-negative
 /// semantics over to OAS via `minimum: 0`, since OAS 3.0 has no

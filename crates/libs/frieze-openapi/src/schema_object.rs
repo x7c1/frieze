@@ -1,4 +1,4 @@
-//! The top-level OpenAPI Schema Object sum supported by Phase 1.
+//! The top-level OpenAPI Schema Object sum supported by the current derive.
 
 use crate::object_schema::ObjectSchema;
 use crate::one_of_schema::OneOfSchema;

@@ -2,8 +2,8 @@
 //! mod composes its OAS key as `v1.Int64_Container` when instantiated
 //! with `T = i64`.
 //!
-//! Exercises design A6: generic-suffix composition (`<Arg>_<Base>`)
-//! happens first, then the namespace prefix is `.` -joined onto the
+//! Exercises the order of operations: generic-suffix composition
+//! (`<Arg>_<Base>`) happens first, then the namespace prefix is `.` -joined onto the
 //! composed base. Primitive arguments (`i64` → `"Int64"`) do not
 //! carry namespaces of their own (they do not implement `Schema`
 //! through a derive site, so `module_path!()` does not enter the

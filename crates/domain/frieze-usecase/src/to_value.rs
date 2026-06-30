@@ -599,7 +599,7 @@ fn schema_type_to_value(ty: SchemaType) -> Value {
 /// `minimum: 0` rather than `0.0`), and as a float otherwise.
 ///
 /// `ObjectSchema.minimum` is typed as `f64` so the API can carry fractional
-/// bounds in the future, but the only values Phase 1 produces are integer
+/// bounds in the future, but the only values the derive currently produces are integer
 /// constants (0 for `u32` / `u64`), which should render as integers.
 fn minimum_to_value(minimum: f64) -> Value {
     let as_int = minimum as i64;

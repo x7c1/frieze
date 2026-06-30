@@ -2,7 +2,7 @@
 //! `#[frieze(namespace)]` attribute is a transparent pass-through and
 //! the OAS keys are bare names.
 //!
-//! Design F1 / H5: the macro itself is always built (it is part of
+//! The attribute macro itself is always built (it is part of
 //! the proc-macro crate which has no feature gate), but the
 //! `inventory_namespace!` helper compiles to nothing without the
 //! `inventory` feature. Consumers who write a namespace declaration
