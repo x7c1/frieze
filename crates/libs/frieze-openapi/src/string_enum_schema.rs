@@ -4,13 +4,20 @@
 //! canonical key order within a string-enum schema is
 //! `type, description, enum` — `description` is emitted only when present.
 
+use serde::{Deserialize, Serialize};
+
 /// The string-enum variant carried by [`crate::SchemaObject`].
 ///
 /// Values are stored in source order. Sorting is intentionally not
 /// performed — the on-the-wire string representation produced by serde
 /// uses source order, and matching that here keeps the OAS schema and
 /// the serialised form aligned.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// The `Serialize` / `Deserialize` derives are auto-derived solely to let
+/// this type ride along inside the round-tripped [`crate::OasDocument`].
+/// The canonical OAS rendering remains the responsibility of
+/// `frieze-usecase::to_value`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StringEnumSchema {
     pub values: Vec<String>,
     /// Free-form description text. Carried verbatim from `frieze-model`

@@ -26,6 +26,7 @@ pub use frieze_macros::{frieze, Schema};
 pub use frieze_model::{
     Error, Maybe, Presence, Property, PropertyName, PropertyType, SchemaName, Schemas,
 };
+pub use frieze_openapi::{Components, Info, OasDocument};
 pub use frieze_usecase::{to_value, to_yaml, Schema, SchemasBuilder};
 
 /// Convenience entry point: returns a fresh [`SchemasBuilder`].
