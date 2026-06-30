@@ -1,6 +1,7 @@
-//! `Maybe<E>` where `E` is an internally-tagged enum maps to branch ④
-//! (optional + nullable): the field is dropped from `required`, and the
-//! reference to `E` is rendered through the OAS-3.0 nullable-ref wrap
+//! `Maybe<E>` where `E` is an internally-tagged enum maps to the
+//! optional + nullable shape (`Maybe<T>` in `docs/field-shapes.md`):
+//! the field is dropped from `required`, and the reference to `E` is
+//! rendered through the OAS-3.0 nullable-ref wrap
 //! (`{allOf: [{$ref: E}], nullable: true}`) — the same composition used
 //! by `Maybe<U>` over a struct and by `Option<E>` over the same enum
 //! shape. Guards against regressions in the shared `Maybe` × `$ref`
