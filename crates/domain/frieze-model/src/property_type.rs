@@ -54,10 +54,10 @@ pub fn primitive_property_type_for(name: &SchemaName) -> Option<PropertyType> {
 /// rejected by the macro before reaching this type.
 ///
 /// **Nullability is encoded on the type, not on the outer `Property`.**
-/// This is the structural change introduced by PR-F that unlocks
-/// per-element nullability for arrays (`Vec<Option<T>>` →
-/// `Array(Nullable(...))`) and keeps presence (`required`) cleanly
-/// orthogonal to value-level nullability.
+/// Separating presence from nullability is what unlocks per-element
+/// nullability for arrays (`Vec<Option<T>>` → `Array(Nullable(...))`)
+/// and keeps presence (`required`) cleanly orthogonal to value-level
+/// nullability.
 ///
 /// [`PropertyType::Reference`] carries a [`SchemaName`] pointing at another
 /// schema registered in the surrounding [`crate::Schemas`] — this is how

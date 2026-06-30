@@ -1,9 +1,10 @@
-//! `Vec<Option<T>>` — array of nullable items. Under PR-F this maps to
+//! `Vec<Option<T>>` — array of nullable items. This maps to
 //! `Array(Nullable(<T>))`, so the `nullable` marker rides on the **items**
 //! schema and not on the outer array. The field stays in `required`.
 //!
-//! This shape was rejected as a compile error in PR-E; PR-F lifts the
-//! restriction by moving nullability onto the type tree.
+//! Nullability rides on the type tree rather than on the surrounding
+//! `Property`, which is what makes per-element nullability for arrays
+//! expressible.
 
 #![cfg(feature = "oas-3-0")]
 

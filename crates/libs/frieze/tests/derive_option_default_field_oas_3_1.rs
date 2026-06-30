@@ -1,7 +1,8 @@
 //! `Option<T>` without `#[serde(skip_serializing_if)]` maps to branch ②
-//! (required + nullable) under the PR-F mapping. The field name stays in
-//! the `required` array; the value-level `"null"` marker is folded into
-//! the inner schema's `type` sequence under OAS 3.1.
+//! (required + nullable) under the current optionality mapping. The
+//! field name stays in the `required` array; the value-level `"null"`
+//! marker is folded into the inner schema's `type` sequence under
+//! OAS 3.1.
 
 #![cfg(feature = "oas-3-1")]
 
