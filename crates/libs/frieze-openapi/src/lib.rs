@@ -37,3 +37,12 @@ pub use schema_object::SchemaObject;
 
 mod schema_type;
 pub use schema_type::SchemaType;
+
+mod components;
+pub use components::Components;
+
+mod info;
+pub use info::Info;
+
+mod oas_document;
+pub use oas_document::OasDocument;

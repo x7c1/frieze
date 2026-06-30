@@ -1,6 +1,6 @@
 //! The `type` field of an OpenAPI Schema Object.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The `type` field of an OpenAPI Schema Object.
 ///
@@ -8,7 +8,7 @@ use serde::Serialize;
 /// `"null"` as a primitive type name. The renderer in `frieze-usecase`
 /// uses it as the second element of `oneOf` when expressing a
 /// "nullable reference" (`oneOf: [$ref, {type: "null"}]`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SchemaType {
     Object,

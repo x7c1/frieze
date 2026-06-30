@@ -9,13 +9,20 @@
 //! `frieze-usecase`. The canonical key order within a `oneOf` schema is
 //! `description, oneOf, discriminator` (description only when present).
 
+use serde::{Deserialize, Serialize};
+
 /// One arm of an internally-tagged [`OneOfSchema`].
 ///
 /// `inner_reference` is the JSON pointer used as the `$ref` target in the
 /// `allOf` arm — pre-formatted as `#/components/schemas/<Name>` by the
 /// caller. `wire_name` is the tag value emitted in the synthesized
 /// `enum: [<wire_name>]` constraint inside the same `allOf` arm.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// The `Serialize` / `Deserialize` derives here exist only so this type
+/// can be carried inside the round-tripped [`crate::OasDocument`]; the
+/// canonical OAS rendering of a `oneOf` arm is still produced manually
+/// by `frieze-usecase::to_value`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OneOfVariant {
     pub wire_name: String,
     pub inner_reference: String,
@@ -27,7 +34,10 @@ pub struct OneOfVariant {
 /// `variants` lists each arm in source declaration order. `description`
 /// already carries the composed enum-level-plus-per-variant doc text
 /// produced upstream in `frieze-macros`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+///
+/// See [`OneOfVariant`] for the rationale behind the auto-derived
+/// serde impls.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OneOfSchema {
     pub tag: String,
     pub variants: Vec<OneOfVariant>,
