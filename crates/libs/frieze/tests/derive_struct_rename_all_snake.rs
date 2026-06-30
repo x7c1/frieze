@@ -8,6 +8,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -23,17 +25,23 @@ fn struct_rename_all_snake_case_is_noop_for_snake_case_idents() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
-    Account:
-      type: object
-      required:
-        - account_id
-        - display_name
-      properties:
-        account_id:
-          type: integer
-          format: int64
-        display_name:
-          type: string
-    "###);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Account:
+          type: object
+          required:
+          - account_id
+          - display_name
+          properties:
+            account_id:
+              type: integer
+              format: int64
+            display_name:
+              type: string
+    ");
 }

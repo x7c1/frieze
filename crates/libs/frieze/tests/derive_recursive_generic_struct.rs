@@ -15,6 +15,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct User {
@@ -48,31 +50,37 @@ fn node_user_self_references_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for a recursive generic type");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    User:
-      type: object
-      required:
-        - id
-        - name
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-    User_Node:
-      type: object
-      required:
-        - value
-        - next
-      properties:
-        value:
-          $ref: "#/components/schemas/User"
-        next:
-          allOf:
-            - $ref: "#/components/schemas/User_Node"
-          nullable: true
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        User:
+          type: object
+          required:
+          - id
+          - name
+          properties:
+            id:
+              type: integer
+              format: int64
+            name:
+              type: string
+        User_Node:
+          type: object
+          required:
+          - value
+          - next
+          properties:
+            value:
+              $ref: '#/components/schemas/User'
+            next:
+              allOf:
+              - $ref: '#/components/schemas/User_Node'
+              nullable: true
+    ");
 }
 
 #[cfg(feature = "oas-3-1")]
@@ -84,31 +92,37 @@ fn node_user_self_references_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for a recursive generic type");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    User:
-      type: object
-      required:
-        - id
-        - name
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-    User_Node:
-      type: object
-      required:
-        - value
-        - next
-      properties:
-        value:
-          $ref: "#/components/schemas/User"
-        next:
-          oneOf:
-            - $ref: "#/components/schemas/User_Node"
-            - type: "null"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        User:
+          type: object
+          required:
+          - id
+          - name
+          properties:
+            id:
+              type: integer
+              format: int64
+            name:
+              type: string
+        User_Node:
+          type: object
+          required:
+          - value
+          - next
+          properties:
+            value:
+              $ref: '#/components/schemas/User'
+            next:
+              oneOf:
+              - $ref: '#/components/schemas/User_Node'
+              - type: 'null'
+    ");
 }
 
 #[cfg(feature = "oas-3-0")]
@@ -124,21 +138,27 @@ fn node_i64_self_references_with_inline_primitive_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for a recursive generic over a primitive");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Int64_Node:
-      type: object
-      required:
-        - value
-        - next
-      properties:
-        value:
-          type: integer
-          format: int64
-        next:
-          allOf:
-            - $ref: "#/components/schemas/Int64_Node"
-          nullable: true
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Int64_Node:
+          type: object
+          required:
+          - value
+          - next
+          properties:
+            value:
+              type: integer
+              format: int64
+            next:
+              allOf:
+              - $ref: '#/components/schemas/Int64_Node'
+              nullable: true
+    ");
 }
 
 #[cfg(feature = "oas-3-1")]
@@ -149,19 +169,25 @@ fn node_i64_self_references_with_inline_primitive_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for a recursive generic over a primitive");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Int64_Node:
-      type: object
-      required:
-        - value
-        - next
-      properties:
-        value:
-          type: integer
-          format: int64
-        next:
-          oneOf:
-            - $ref: "#/components/schemas/Int64_Node"
-            - type: "null"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Int64_Node:
+          type: object
+          required:
+          - value
+          - next
+          properties:
+            value:
+              type: integer
+              format: int64
+            next:
+              oneOf:
+              - $ref: '#/components/schemas/Int64_Node'
+              - type: 'null'
+    ");
 }

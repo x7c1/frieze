@@ -9,6 +9,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct UserLoginData {
@@ -38,45 +40,51 @@ fn rename_all_snake_case_rewrites_tag_values() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Event:
-      oneOf:
-        - allOf:
-            - $ref: "#/components/schemas/UserLoginData"
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Event:
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/UserLoginData'
             - type: object
               required:
-                - type
+              - type
               properties:
                 type:
                   type: string
                   enum:
-                    - user_login
-        - allOf:
-            - $ref: "#/components/schemas/UserLogoutData"
+                  - user_login
+          - allOf:
+            - $ref: '#/components/schemas/UserLogoutData'
             - type: object
               required:
-                - type
+              - type
               properties:
                 type:
                   type: string
                   enum:
-                    - user_logout
-      discriminator:
-        propertyName: type
-    UserLoginData:
-      type: object
-      required:
-        - user_id
-      properties:
-        user_id:
-          type: integer
-          format: int64
-    UserLogoutData:
-      type: object
-      required:
-        - reason
-      properties:
-        reason:
-          type: string
-    "##);
+                  - user_logout
+          discriminator:
+            propertyName: type
+        UserLoginData:
+          type: object
+          required:
+          - user_id
+          properties:
+            user_id:
+              type: integer
+              format: int64
+        UserLogoutData:
+          type: object
+          required:
+          - reason
+          properties:
+            reason:
+              type: string
+    ");
 }

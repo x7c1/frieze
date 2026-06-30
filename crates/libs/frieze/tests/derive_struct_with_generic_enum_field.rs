@@ -9,6 +9,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct Container<T> {
@@ -41,52 +43,58 @@ fn log_field_refs_composed_event_name() {
             "schemas build resolves the Event<i64, String> reference and its transitive closure",
         );
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Int64_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          type: integer
-          format: int64
-    Int64_String_Event:
-      oneOf:
-        - allOf:
-            - $ref: "#/components/schemas/Int64_Container"
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Int64_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              type: integer
+              format: int64
+        Int64_String_Event:
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/Int64_Container'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Held
-        - allOf:
-            - $ref: "#/components/schemas/String_Container"
+                  - Held
+          - allOf:
+            - $ref: '#/components/schemas/String_Container'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Lost
-      discriminator:
-        propertyName: kind
-    Log:
-      type: object
-      required:
-        - event
-      properties:
-        event:
-          $ref: "#/components/schemas/Int64_String_Event"
-    String_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          type: string
-    "##);
+                  - Lost
+          discriminator:
+            propertyName: kind
+        Log:
+          type: object
+          required:
+          - event
+          properties:
+            event:
+              $ref: '#/components/schemas/Int64_String_Event'
+        String_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              type: string
+    ");
 }

@@ -2,15 +2,18 @@
 //!
 //! Defines the [`Schema`] trait that user types implement (typically through
 //! the derive macro in `frieze-macros`), the [`SchemasBuilder`] that collects
-//! schemas into a validated [`frieze_model::Schemas`], and the boundary
-//! conversion from `frieze-model` to `frieze-openapi` (see [`to_value`] and
-//! [`to_yaml`]).
+//! schemas into a validated [`frieze_model::Schemas`], the private boundary
+//! conversion from `frieze-model` to `frieze-openapi` (in [`boundary`]),
+//! and the composition entry points ([`compose`], [`from_schemas`]) that
+//! produce a complete [`frieze_openapi::OasDocument`] ready for
+//! serialization.
 //!
 //! # Feature flags
 //!
 //! Exactly one of `oas-3-0` (default) or `oas-3-1` must be enabled.
-//! The two are mutually exclusive: they control how [`to_value`] renders
-//! the `nullable` intent into YAML.
+//! The two are mutually exclusive: they control how the `nullable`
+//! intent is encoded by the handwritten `Serialize` impls in
+//! `frieze-openapi`.
 
 #[cfg(all(feature = "oas-3-0", feature = "oas-3-1"))]
 compile_error!(
@@ -39,8 +42,10 @@ pub use inventory::{Namespace, SchemaRoot};
 mod naming;
 pub use naming::compose_schema_name;
 
-mod to_value;
-pub use to_value::to_value;
+mod boundary;
+
+mod compose;
+pub use compose::{compose, from_schemas};
 
 mod to_yaml;
 pub use to_yaml::to_yaml;

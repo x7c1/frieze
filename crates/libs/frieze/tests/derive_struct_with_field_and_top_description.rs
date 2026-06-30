@@ -5,6 +5,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 /// A registered user of the system.
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -22,20 +24,26 @@ fn struct_with_field_and_top_descriptions() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
-    User:
-      type: object
-      description: A registered user of the system.
-      required:
-        - id
-        - name
-      properties:
-        id:
-          type: integer
-          description: "The user's id."
-          format: int64
-        name:
-          type: string
-          description: "The user's display name."
-    "#);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        User:
+          type: object
+          description: A registered user of the system.
+          required:
+          - id
+          - name
+          properties:
+            id:
+              type: integer
+              description: The user's id.
+              format: int64
+            name:
+              type: string
+              description: The user's display name.
+    ");
 }

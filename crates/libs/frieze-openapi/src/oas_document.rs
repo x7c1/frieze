@@ -60,6 +60,44 @@ pub struct OasDocument {
     pub extensions: BTreeMap<String, serde_json::Value>,
 }
 
+impl OasDocument {
+    /// Constructs a complete [`OasDocument`] from an [`Info`] and a
+    /// [`Components`] whose `schemas` map has been pre-populated.
+    ///
+    /// The resulting document has empty `paths`, no `servers`, etc.; the
+    /// caller adds those via direct field access if needed. The OAS
+    /// version string is taken from the active feature flag
+    /// (`oas-3-0` → `"3.0.3"`, `oas-3-1` → `"3.1.0"`).
+    ///
+    /// This constructor is format-neutral — the returned value can be
+    /// rendered to YAML (via `serde_yaml::to_string`) or JSON (via
+    /// `serde_json::to_string`) without re-running the schema pipeline.
+    pub fn from_components(info: Info, components: Components) -> Self {
+        Self {
+            openapi: oas_version_string().to_string(),
+            info,
+            servers: None,
+            paths: None,
+            components: Some(components),
+            security: None,
+            tags: None,
+            external_docs: None,
+            extensions: BTreeMap::new(),
+        }
+    }
+}
+
+/// The OAS version string for the active feature flag.
+#[cfg(feature = "oas-3-0")]
+fn oas_version_string() -> &'static str {
+    "3.0.3"
+}
+
+#[cfg(feature = "oas-3-1")]
+fn oas_version_string() -> &'static str {
+    "3.1.0"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

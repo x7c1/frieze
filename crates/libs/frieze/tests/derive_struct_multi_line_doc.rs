@@ -12,6 +12,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Note {
@@ -27,16 +29,22 @@ fn multi_line_doc_comment_emits_as_literal_block_scalar() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
-    Note:
-      type: object
-      required:
-      - body
-      properties:
-        body:
-          type: string
-          description: |-
-            The first line of the body.
-            The second line of the body.
-    "#);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Note:
+          type: object
+          required:
+          - body
+          properties:
+            body:
+              type: string
+              description: |-
+                The first line of the body.
+                The second line of the body.
+    ");
 }

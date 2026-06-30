@@ -9,6 +9,7 @@
 
 #![cfg(feature = "inventory")]
 
+mod common;
 #[frieze::frieze(namespace)]
 pub mod v1 {
     // Implementation-detail submodule, no namespace attribute. Its
@@ -45,14 +46,20 @@ fn intermediate_non_namespace_mod_is_collapsed() {
     //   "derive_namespace_with_facade_inside::v1::foo"
     // Prefix walk: only `v1` is declared, so `foo` is dropped. Final
     // composed name: `v1.Foo`.
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    v1.Foo:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        v1.Foo:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+    ");
 }

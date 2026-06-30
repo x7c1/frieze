@@ -6,6 +6,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)] // Fields are read by the derive at compile time, not at runtime.
 struct Tag {
@@ -21,26 +23,32 @@ fn vec_field_renders_as_type_array_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r#"
-    Tag:
-      type: object
-      required:
-        - name
-        - aliases
-        - parent_ids
-      properties:
-        name:
-          type: string
-        aliases:
-          type: array
-          items:
-            type: string
-        parent_ids:
-          type:
-            - array
-            - "null"
-          items:
-            type: integer
-            format: int64
-    "#);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Tag:
+          type: object
+          required:
+          - name
+          - aliases
+          - parent_ids
+          properties:
+            name:
+              type: string
+            aliases:
+              type: array
+              items:
+                type: string
+            parent_ids:
+              type:
+              - array
+              - 'null'
+              items:
+                type: integer
+                format: int64
+    ");
 }

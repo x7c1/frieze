@@ -65,6 +65,7 @@ dependencies = [
  "inventory",
  "serde",
  "serde_json",
+ "serde_yaml",
  "trybuild",
 ]
 

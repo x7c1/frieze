@@ -9,6 +9,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct User {
@@ -28,21 +30,27 @@ fn single_add_auto_collects_transitive_struct() {
         .build()
         .expect("transitive `register_into` collects the nested `User` automatically");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Foo:
-      type: object
-      required:
-        - user
-      properties:
-        user:
-          $ref: "#/components/schemas/User"
-    User:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Foo:
+          type: object
+          required:
+          - user
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+        User:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+    ");
 }

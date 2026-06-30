@@ -5,6 +5,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct User {
@@ -34,28 +36,34 @@ fn build_resolves_reference_to_generic_instance() {
 
     // `Profile.container` resolves to the `User_Container` entry, which
     // in turn resolves to `User`. The transitive closure terminates.
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Profile:
-      type: object
-      required:
-        - container
-      properties:
-        container:
-          $ref: "#/components/schemas/User_Container"
-    User:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    User_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          $ref: "#/components/schemas/User"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Profile:
+          type: object
+          required:
+          - container
+          properties:
+            container:
+              $ref: '#/components/schemas/User_Container'
+        User:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+        User_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              $ref: '#/components/schemas/User'
+    ");
 }

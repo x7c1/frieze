@@ -20,6 +20,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[frieze::frieze(namespace)]
 pub mod v1 {
     use frieze::Schema;
@@ -43,16 +45,22 @@ fn namespace_attr_is_passthrough_when_inventory_disabled() {
     // without namespace declarations. The attribute itself parsed and
     // the surrounding code compiled — the side channel just had
     // nowhere to land.
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    User:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        User:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+    ");
 }
 
 // Reference `Schema` to silence the unused-import lint when this is

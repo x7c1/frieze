@@ -24,6 +24,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 // `Inner` and `Root` deliberately omit `///` doc comments: doc comments
 // would compose into the OAS `description` field and bloat the
 // snapshot below. The rationale for the test types is kept here as
@@ -55,21 +57,27 @@ fn from_inventory_collects_every_derived_root() {
         .build()
         .expect("inventory iteration produces a closed schemas set");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Inner:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    Root:
-      type: object
-      required:
-        - inner
-      properties:
-        inner:
-          $ref: "#/components/schemas/Inner"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Inner:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+        Root:
+          type: object
+          required:
+          - inner
+          properties:
+            inner:
+              $ref: '#/components/schemas/Inner'
+    ");
 }

@@ -11,6 +11,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Pair<A, B> {
@@ -39,18 +41,24 @@ fn pair_two_primitives_inlines_both_fields() {
         .build()
         .expect("schemas build inlines both primitive references");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Int32_Double_Pair:
-      type: object
-      required:
-        - fst
-        - snd
-      properties:
-        fst:
-          type: integer
-          format: int32
-        snd:
-          type: number
-          format: double
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Int32_Double_Pair:
+          type: object
+          required:
+          - fst
+          - snd
+          properties:
+            fst:
+              type: integer
+              format: int32
+            snd:
+              type: number
+              format: double
+    ");
 }

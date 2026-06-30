@@ -5,6 +5,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct User {
@@ -34,39 +36,45 @@ fn vec_generic_renders_as_array_of_ref() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Listings:
-      type: object
-      required:
-        - pages
-      properties:
-        pages:
-          type: array
-          items:
-            $ref: "#/components/schemas/User_Page"
-    User:
-      type: object
-      required:
-        - id
-        - name
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-    User_Page:
-      type: object
-      required:
-        - items
-        - total
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/User"
-        total:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Listings:
+          type: object
+          required:
+          - pages
+          properties:
+            pages:
+              type: array
+              items:
+                $ref: '#/components/schemas/User_Page'
+        User:
+          type: object
+          required:
+          - id
+          - name
+          properties:
+            id:
+              type: integer
+              format: int64
+            name:
+              type: string
+        User_Page:
+          type: object
+          required:
+          - items
+          - total
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+            total:
+              type: integer
+              format: int64
+    ");
 }

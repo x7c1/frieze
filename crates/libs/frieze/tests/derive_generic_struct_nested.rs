@@ -11,6 +11,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Container<T> {
@@ -41,21 +43,27 @@ fn container_of_container_of_i64_registers_two_layers() {
         .build()
         .expect("two-layer registration resolves the inner reference and inlines the primitive");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Int64_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          type: integer
-          format: int64
-    Int64_Container_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          $ref: "#/components/schemas/Int64_Container"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Int64_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              type: integer
+              format: int64
+        Int64_Container_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              $ref: '#/components/schemas/Int64_Container'
+    ");
 }

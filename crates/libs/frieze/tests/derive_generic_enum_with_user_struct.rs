@@ -10,6 +10,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct UserA {
@@ -55,59 +57,65 @@ fn either_user_structs_render_through_refs() {
         .build()
         .expect("schemas build resolves all transitive references");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    UserA:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    UserA_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          $ref: "#/components/schemas/UserA"
-    UserA_UserB_Either:
-      oneOf:
-        - allOf:
-            - $ref: "#/components/schemas/UserA_Container"
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        UserA:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+        UserA_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              $ref: '#/components/schemas/UserA'
+        UserA_UserB_Either:
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/UserA_Container'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Left
-        - allOf:
-            - $ref: "#/components/schemas/UserB_Container"
+                  - Left
+          - allOf:
+            - $ref: '#/components/schemas/UserB_Container'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Right
-      discriminator:
-        propertyName: kind
-    UserB:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-    UserB_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          $ref: "#/components/schemas/UserB"
-    "##);
+                  - Right
+          discriminator:
+            propertyName: kind
+        UserB:
+          type: object
+          required:
+          - name
+          properties:
+            name:
+              type: string
+        UserB_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              $ref: '#/components/schemas/UserB'
+    ");
 }
