@@ -55,7 +55,7 @@ upon — refer to them by their crate-specific roles instead.
 ## Build / Test matrix
 
 Both OAS feature gates must remain green, both with and without the
-opt-in `inventory` feature:
+`inventory` feature (which is on by default, but can be opted out of):
 
 ```
 cargo fmt --all -- --check
