@@ -6,19 +6,21 @@
 //! [`schemas`] entry point, and the `#[derive(Schema)]` macro so that
 //! `use frieze::Schema;` brings both the trait and the derive into scope.
 //!
-//! # Auto-collection via `inventory` (opt-in)
+//! # Auto-collection via `inventory`
 //!
-//! Enable the `inventory` Cargo feature to use
-//! [`SchemasBuilder::from_inventory`]. With the feature on, every
-//! non-generic `#[derive(Schema)]` type is registered into the
-//! per-binary `inventory` linker section and iterated when
-//! `from_inventory()` is called; the derived `Schema::register_into`
-//! walks each root's transitive dependency graph (including generic
-//! field instantiations such as `Page<Bar>`) automatically.
+//! [`SchemasBuilder::from_inventory`] is available out of the box —
+//! the `inventory` Cargo feature is on by default. Every non-generic
+//! `#[derive(Schema)]` type is registered into the per-binary
+//! `inventory` linker section and iterated when `from_inventory()` is
+//! called; the derived `Schema::register_into` walks each root's
+//! transitive dependency graph (including generic field instantiations
+//! such as `Page<Bar>`) automatically.
 //!
-//! When the feature is off, the derive's submission site expands to a
-//! no-op so feature-gated code paths in user crates stay valid in both
-//! configurations.
+//! Consumers that want to skip the linker section entirely can opt out
+//! with `default-features = false` (selecting an OAS version feature
+//! such as `oas-3-0` explicitly). With the feature off, the derive's
+//! submission site expands to a no-op so feature-gated code paths in
+//! user crates stay valid in both configurations.
 
 pub use frieze_macros::Schema;
 pub use frieze_model::{
@@ -68,8 +70,9 @@ macro_rules! __frieze_inventory_submit {
 
 /// No-op counterpart to [`__frieze_inventory_submit`] for builds with
 /// the `inventory` feature disabled. The derive always emits the
-/// submission tokens; this arm discards them so consumers that do not
-/// opt into the feature pay no link-time or runtime cost.
+/// submission tokens; this arm discards them so consumers that opt out
+/// of the feature (via `default-features = false`) pay no link-time or
+/// runtime cost.
 #[cfg(not(feature = "inventory"))]
 #[doc(hidden)]
 #[macro_export]
