@@ -2,7 +2,7 @@
 //! `#[frieze(namespace)]` attribute is a transparent pass-through and
 //! the OAS keys are bare names.
 //!
-//! Design F1 / H5: the macro itself is always built (it is part of
+//! The attribute macro itself is always built (it is part of
 //! the proc-macro crate which has no feature gate), but the
 //! `inventory_namespace!` helper compiles to nothing without the
 //! `inventory` feature. Consumers who write a namespace declaration
@@ -39,9 +39,10 @@ fn namespace_attr_is_passthrough_when_inventory_disabled() {
         .expect("schemas builder closes over `User` alone");
 
     // With `inventory` off, `compose_schema_name` is the identity:
-    // the OAS key is the bare `User`, identical to the pre-PR-1.5
-    // emission. The attribute itself parsed and the surrounding code
-    // compiled — the side channel just had nowhere to land.
+    // the OAS key is the bare `User`, identical to the derive output
+    // without namespace declarations. The attribute itself parsed and
+    // the surrounding code compiled — the side channel just had
+    // nowhere to land.
     insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
     User:
       type: object

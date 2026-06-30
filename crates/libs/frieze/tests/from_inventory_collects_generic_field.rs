@@ -2,9 +2,10 @@
 //! instantiation (`Page<Bar>`) reached through a non-generic root's
 //! field, with no explicit `add::<T>()` calls.
 //!
-//! This is the integration test for the central claim of PR #12:
-//! "derive a few types and call `from_inventory().build()`; generic
-//! instances on field positions are pulled in automatically."
+//! This is the integration test for the central claim of the
+//! auto-collection mechanism: "derive a few types and call
+//! `from_inventory().build()`; generic instances on field positions
+//! are pulled in automatically."
 //!
 //! The inventory channel submits only the two non-generic types
 //! (`Foo` and `Bar`); `Page<T>` is generic and intentionally not

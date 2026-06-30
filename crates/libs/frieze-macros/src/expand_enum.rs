@@ -620,8 +620,8 @@ fn push_schema_bound(generics: &mut Generics) {
 ///   generic structs, then pass it through `compose_schema_name`.
 ///
 /// When no namespace declarations reach this binary, the wrapping
-/// call is the identity, so the emitted name keeps the pre-PR-1.5
-/// value byte-for-byte.
+/// call is the identity, so the emitted name keeps the value
+/// byte-for-byte with the no-namespace form.
 fn composed_name_body(generics: &Generics, base_name: &str) -> TokenStream {
     let type_param_idents: Vec<&Ident> = generics.type_params().map(|tp| &tp.ident).collect();
     if type_param_idents.is_empty() {

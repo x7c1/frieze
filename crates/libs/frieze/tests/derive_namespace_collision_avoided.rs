@@ -2,8 +2,8 @@
 //! `struct User` co-exist as `v1.User` and `v2.User` without
 //! collision.
 //!
-//! Exercises the motivating scenario from design "問題: 同名衝突 と
-//! facade pattern の両立" — the bare-name collision that would
+//! Exercises the motivating scenario for the namespace mechanism:
+//! the bare-name collision that would
 //! cause `Error::SchemaConflict` at build time is sidestepped by
 //! the namespace mechanism. Per-binary inventory isolation means
 //! both `User` instances live in this one test binary and the

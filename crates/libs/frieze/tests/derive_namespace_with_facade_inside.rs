@@ -2,7 +2,7 @@
 //! collapses `foo` (no namespace) but retains `v1`, producing
 //! `v1.Foo` — not `v1.foo.Foo`.
 //!
-//! Exercises design A8 / B: the prefix walk drops segments whose
+//! Exercises the prefix-walk fold: it drops segments whose
 //! full path is *not* declared as a namespace, even when they sit
 //! between two ancestors that *are* declared. Here only `v1` is
 //! declared; `v1::foo` is implementation detail and is folded away.

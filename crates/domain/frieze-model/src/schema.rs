@@ -13,7 +13,7 @@ use crate::string_enum_schema::StringEnumSchema;
 ///
 /// The sum determines what shape a registered schema entry can take.
 /// Variants are added as new top-level kinds are supported by the
-/// derive — Phase 1 covers object schemas, unit-variant enum schemas,
+/// derive currently covers object schemas, unit-variant enum schemas,
 /// internally-tagged `oneOf` schemas built from enums whose every
 /// variant is a newtype wrapping a `Schema`-implementing struct, and
 /// scalar schemas wrapping a single leaf [`PropertyType`]. Matches on

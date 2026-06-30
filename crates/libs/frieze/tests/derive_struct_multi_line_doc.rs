@@ -1,7 +1,7 @@
 //! A multi-line `///` block joins its lines with `\n`, and the YAML
 //! emitter must render any such string as a literal block scalar (`|-`)
 //! rather than a quoted-and-escaped scalar. This is the chosen form for
-//! every multi-line string the schema YAML emits, per design A節:
+//! every multi-line string the schema YAML emits: the
 //! quoted form (`"a\nb"`) is wire-equivalent but unreadable for the
 //! CommonMark prose, bullet lists, and multi-line examples that
 //! `description` carries in practice.

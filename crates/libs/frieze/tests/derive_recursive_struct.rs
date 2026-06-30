@@ -8,11 +8,10 @@
 //! an infinite cascade `Tree_Box`, `Tree_Box_Box`, ... — the
 //! transitive-closure walker would never terminate.
 //!
-//! Note: the field-type integration that would let a user write
-//! `children: Vec<Box<Tree>>` arrives in Phase 1 #11b. For #11a the
-//! recursive transparency contract is asserted at the trait level —
-//! a `Box<Tree>` value's `name()` and `schema()` agree with `Tree`
-//! itself, which is exactly what #11b's integration test will rely on.
+//! The recursive transparency contract is asserted at the trait level
+//! here — a `Box<Tree>` value's `name()` and `schema()` agree with
+//! `Tree` itself, which is exactly what the field-type integration
+//! (`children: Vec<Box<Tree>>`) relies on end-to-end.
 
 use frieze::Schema;
 
@@ -26,8 +25,8 @@ struct Tree {
 #[test]
 fn box_tree_name_equals_tree_name() {
     // Recursive transparency: `Box<Tree>` is the same schema as `Tree`.
-    // Once #11b lands and lets `children: Vec<Box<Tree>>` parse, the
-    // emitted `items` will resolve to `Tree` via this same identity.
+    // When `children: Vec<Box<Tree>>` is parsed by the field-type
+    // pipeline, the emitted `items` resolve to `Tree` via this same identity.
     assert_eq!(<Box<Tree> as Schema>::name(), "Tree");
     assert_eq!(<Box<Tree> as Schema>::schema(), <Tree as Schema>::schema());
 }

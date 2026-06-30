@@ -5,8 +5,8 @@
 //! `Tree` entry and the transitive-closure walker terminates.
 //!
 //! This is the end-to-end upgrade of the trait-level assertions in
-//! `derive_recursive_struct.rs`; the field-type integration in #11b
-//! makes the `Vec<Box<Tree>>` parse path work.
+//! `derive_recursive_struct.rs`; the field-type integration makes the
+//! `Vec<Box<Tree>>` parse path work.
 //!
 //! Identical output under `oas-3-0` and `oas-3-1`.
 

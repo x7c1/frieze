@@ -189,7 +189,7 @@ fn reject_unsupported_generic_params(
 /// `compose_schema_name` consults the `Namespace` side channel
 /// populated by `#[frieze(namespace)]` — when no namespace declarations
 /// reach this binary the call is the identity, so the emitted name
-/// keeps the pre-PR-1.5 value byte-for-byte.
+/// keeps the value byte-for-byte with the no-namespace form.
 fn composed_name_body(generics: &syn::Generics, base_name: &str) -> TokenStream {
     let type_param_idents: Vec<&Ident> = generics.type_params().map(|tp| &tp.ident).collect();
     if type_param_idents.is_empty() {

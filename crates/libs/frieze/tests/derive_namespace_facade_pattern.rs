@@ -1,10 +1,10 @@
 //! End-to-end: a regular `mod foo; pub use foo::Foo;` facade pattern
 //! produces the bare OAS key `Foo` — no namespace prefix.
 //!
-//! This is the back-stop test for the design's central promise:
+//! This is the back-stop test for the central promise:
 //! when no `#[frieze(namespace)]` attribute is in scope, the
 //! `compose_schema_name` helper is the identity and the OAS keys are
-//! byte-identical to the pre-PR-1.5 derive output. Existing snapshot
+//! byte-identical to the pre-namespace derive output. Existing snapshot
 //! tests already cover the "no namespace anywhere" case for many
 //! shapes; this test specifically anchors the facade-pattern
 //! interpretation — `mod foo;` (no attribute) is *implementation

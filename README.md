@@ -2,7 +2,7 @@
 
 Generate OpenAPI Schema Objects from Rust types via `#[derive(Schema)]`.
 
-> Status: early Phase 1. Public API may shift.
+> Status: early development. Public API may shift.
 
 ## Quick start
 

@@ -4,11 +4,9 @@
 //! identical to `User`'s — i.e. no separate `User_Box` entry is
 //! generated under `#/components/schemas`.
 //!
-//! Note: the field-type integration that would let a user write
-//! `struct Owner { boxed: Box<User> }` arrives in Phase 1 #11b (field
-//! type parsing of generic arguments). For #11a the transparency is
-//! asserted at the trait level instead — sufficient to lock in the
-//! contract that #11b builds upon.
+//! The transparency is asserted at the trait level here — sufficient
+//! to lock in the contract that field-type integration with generic
+//! arguments relies on.
 
 use frieze::Schema;
 

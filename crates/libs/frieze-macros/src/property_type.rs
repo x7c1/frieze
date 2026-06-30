@@ -183,11 +183,11 @@ pub(crate) fn presence_optional() -> TokenStream {
     quote! { ::frieze::__private::frieze_model::Presence::Optional }
 }
 
-/// Standard "unsupported field type" error message, listing the Phase 1
-/// supported shapes.
+/// Standard "unsupported field type" error message, listing the
+/// currently supported shapes.
 fn unsupported_message(rendered: &str) -> String {
     format!(
-        "frieze: unsupported field type `{rendered}`; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Vec<Option<T>>, Option<T>, Option<Vec<T>>, Maybe<T> (for any supported scalar T). Future PRs will add more."
+        "frieze: unsupported field type `{rendered}`; only the following are currently supported: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Vec<Option<T>>, Option<T>, Option<Vec<T>>, Maybe<T> (for any supported scalar T)."
     )
 }
 
@@ -195,7 +195,7 @@ fn unsupported_message(rendered: &str) -> String {
 /// the offending inner type (e.g. `Option<...>` / `Vec<...>` / `Maybe<...>`).
 pub(crate) fn unsupported_inside_message(inner: &Type, container: &str) -> String {
     format!(
-        "frieze: unsupported field type `{}` inside {container}; only the following are supported in Phase 1: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Vec<Option<T>>, Option<T>, Option<Vec<T>>, Maybe<T> (for any supported scalar T). Future PRs will add more.",
+        "frieze: unsupported field type `{}` inside {container}; only the following are currently supported: i32, i64, u32, u64, f32, f64, bool, String, Vec<T>, Vec<Option<T>>, Option<T>, Option<Vec<T>>, Maybe<T> (for any supported scalar T).",
         type_to_display(inner)
     )
 }

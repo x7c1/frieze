@@ -4,7 +4,7 @@
 //! `register_into`, so the nested `User` is registered automatically
 //! through the field walk on `Foo.user`.
 //!
-//! This is the foundational PR-1 case — the auto-collection feature in
+//! This is the foundational case for the auto-collection feature in
 //! its smallest form. Identical output under `oas-3-0` and `oas-3-1`.
 
 use frieze::Schema;
