@@ -80,16 +80,10 @@ table and the version-specific shapes for nullable references.
 
 ## Auto-collection via `inventory`
 
-Enable the `inventory` Cargo feature to opt into
-`Schemas::builder().from_inventory()`:
-
-```toml
-frieze = { version = "...", features = ["inventory"] }
-```
-
-With the feature on, every non-generic `#[derive(Schema)]` type is
-collected automatically — a single call is enough for the typical
-case:
+`Schemas::builder().from_inventory()` is available out of the box —
+the `inventory` Cargo feature is on by default. Every non-generic
+`#[derive(Schema)]` type is collected automatically, so a single call
+is enough for the typical web-API server case:
 
 ```rust
 let schemas = frieze::schemas()
@@ -132,6 +126,19 @@ Two genuine cases require chaining `add::<T>()` after
 `inventory` aggregates per binary, so every test in a given test
 binary observes the same submission set. Tests that need an isolated
 schemas set should reach for the explicit `add::<T>()` path.
+
+### Opting out (no_std / WASM / embedded)
+
+Targets that cannot host `inventory`'s linker-based registration can
+opt out by disabling the default features:
+
+```toml
+frieze = { version = "...", default-features = false, features = ["oas-3-0"] }
+```
+
+With the feature off, `Schemas::builder().from_inventory()` is no
+longer available and the derive macro's `inventory_submit!` expansion
+becomes a no-op. Register schemas explicitly via `add::<T>()` instead.
 
 ## Documentation
 
