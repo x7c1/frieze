@@ -1,0 +1,7 @@
+error: frieze: `#[frieze(namespace)]` takes no arguments; the module's own ident is used as the namespace name. Remove the argument and rename the `mod` if a different name is desired.
+ --> tests/ui/namespace_attr_with_arg.rs:1:1
+  |
+1 | #[frieze::frieze(namespace = "v1")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `frieze::frieze` (in Nightly builds, run with -Z macro-backtrace for more info)

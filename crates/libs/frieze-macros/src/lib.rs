@@ -72,7 +72,8 @@
 //! `frieze` facade crate.
 
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, Data, DeriveInput};
+use proc_macro2::TokenStream as TokenStream2;
+use syn::{parse, parse_macro_input, Data, DeriveInput, Ident, Meta};
 
 use crate::expand_enum::expand_enum;
 use crate::expand_struct::expand_struct;
@@ -81,6 +82,7 @@ mod doc;
 mod expand_enum;
 mod expand_struct;
 mod field;
+mod namespace_attr;
 mod property_type;
 mod register;
 mod rename;
@@ -96,6 +98,98 @@ pub fn derive_schema(input: TokenStream) -> TokenStream {
     expand(ast)
         .unwrap_or_else(syn::Error::into_compile_error)
         .into()
+}
+
+/// The `#[frieze(...)]` attribute macro.
+///
+/// Currently the only recognised sub-keyword is `namespace`. The
+/// `#[frieze(namespace)]` form is applied to a `mod` declaration to
+/// register the module as a namespace for OAS schema-name composition
+/// — see [`namespace_attr::expand_namespace`] for the full semantics.
+///
+/// The attribute path is `#[frieze(...)]` rather than
+/// `#[frieze::namespace]` to match serde-style conventions where a
+/// single attribute name dispatches on the inner keyword
+/// (`#[serde(rename = "...")]`, `#[serde(skip)]`, ...).
+#[proc_macro_attribute]
+pub fn frieze(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args_ts2: TokenStream2 = args.into();
+    let (keyword, remainder) = match parse_frieze_keyword(args_ts2.clone()) {
+        Ok(parts) => parts,
+        Err(err) => return err.to_compile_error().into(),
+    };
+
+    match keyword.to_string().as_str() {
+        "namespace" => namespace_attr::expand_namespace(remainder.into(), input),
+        other => syn::Error::new(
+            keyword.span(),
+            format!(
+                "frieze: unknown sub-keyword `{other}` for `#[frieze(...)]`. \
+                 The only currently supported keyword is `namespace`."
+            ),
+        )
+        .to_compile_error()
+        .into(),
+    }
+}
+
+/// Parse the attribute arguments into a leading keyword identifier and
+/// the remaining tokens (for the keyword's own arg parser).
+///
+/// `#[frieze(namespace)]` → keyword `namespace`, remainder empty.
+/// `#[frieze(namespace = "v1")]` → keyword `namespace`, remainder
+///   `= "v1"`. The remainder is forwarded to the keyword's expander
+/// (here `namespace_attr::expand_namespace`), which rejects non-empty
+/// remainders with a curated diagnostic.
+fn parse_frieze_keyword(args: TokenStream2) -> Result<(Ident, TokenStream2), syn::Error> {
+    // Empty `#[frieze]` is rejected up front — the attribute is a
+    // dispatch entry point and needs a keyword to know what to do.
+    if args.is_empty() {
+        return Err(syn::Error::new(
+            proc_macro2::Span::call_site(),
+            "frieze: `#[frieze(...)]` requires a sub-keyword (e.g. `#[frieze(namespace)]`).",
+        ));
+    }
+
+    // Use `syn::Meta` to lift the first token group cleanly: it
+    // recognises both `namespace` (Path) and `namespace = ...`
+    // (NameValue) shapes uniformly, so the keyword + remainder split
+    // is the same code path.
+    let meta: Meta = parse(args.clone().into())?;
+    match meta {
+        Meta::Path(path) => {
+            let ident = path.get_ident().cloned().ok_or_else(|| {
+                syn::Error::new_spanned(
+                    &path,
+                    "frieze: `#[frieze(...)]` sub-keyword must be a single identifier.",
+                )
+            })?;
+            Ok((ident, TokenStream2::new()))
+        }
+        Meta::NameValue(nv) => {
+            let ident = nv.path.get_ident().cloned().ok_or_else(|| {
+                syn::Error::new_spanned(
+                    &nv.path,
+                    "frieze: `#[frieze(...)]` sub-keyword must be a single identifier.",
+                )
+            })?;
+            // Reconstruct the `= <value>` portion so the keyword's
+            // expander can decide whether to accept or reject it.
+            let value = &nv.value;
+            let remainder = quote::quote! { = #value };
+            Ok((ident, remainder))
+        }
+        Meta::List(list) => {
+            let ident = list.path.get_ident().cloned().ok_or_else(|| {
+                syn::Error::new_spanned(
+                    &list.path,
+                    "frieze: `#[frieze(...)]` sub-keyword must be a single identifier.",
+                )
+            })?;
+            let tokens = list.tokens.clone();
+            Ok((ident, tokens))
+        }
+    }
 }
 
 fn expand(ast: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {

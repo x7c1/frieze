@@ -181,18 +181,32 @@ fn reject_unsupported_generic_params(
 
 /// Build the token stream that computes the schema name at runtime.
 ///
-/// - Non-generic structs return the literal base name as a `String`.
-/// - Generic structs return `format!("{}_..._<Base>", T1::name(), ...)`
-///   using the suffix-form composition rule.
+/// - Non-generic structs compose `compose_schema_name(module_path!(), "<Base>")`.
+/// - Generic structs first build the suffix-composed base
+///   (`format!("{}_..._<Base>", T1::name(), ...)`) and then pass that
+///   through `compose_schema_name`.
+///
+/// `compose_schema_name` consults the `Namespace` side channel
+/// populated by `#[frieze(namespace)]` — when no namespace declarations
+/// reach this binary the call is the identity, so the emitted name
+/// keeps the pre-PR-1.5 value byte-for-byte.
 fn composed_name_body(generics: &syn::Generics, base_name: &str) -> TokenStream {
     let type_param_idents: Vec<&Ident> = generics.type_params().map(|tp| &tp.ident).collect();
     if type_param_idents.is_empty() {
-        return quote! { ::std::string::String::from(#base_name) };
+        return quote! {
+            ::frieze::__private::compose_schema_name(
+                ::core::module_path!(),
+                #base_name,
+            )
+        };
     }
     // Suffix form per the design: `<Arg1>_<Arg2>_..._<Base>`. The
     // format string is `{}_` repeated N times followed by the literal
     // base name; the arguments are `<T_i as Schema>::name()` for each
-    // type parameter in declaration order.
+    // type parameter in declaration order. The result is then wrapped
+    // in `compose_schema_name` so namespace prefixes from the derive
+    // site's `module_path!()` participate identically to the
+    // non-generic path.
     let mut format_str = String::new();
     for _ in 0..type_param_idents.len() {
         format_str.push_str("{}_");
@@ -202,6 +216,9 @@ fn composed_name_body(generics: &syn::Generics, base_name: &str) -> TokenStream 
         quote! { <#t as ::frieze::__private::frieze_usecase::Schema>::name() }
     });
     quote! {
-        ::std::format!(#format_str, #(#args),*)
+        ::frieze::__private::compose_schema_name(
+            ::core::module_path!(),
+            &::std::format!(#format_str, #(#args),*),
+        )
     }
 }

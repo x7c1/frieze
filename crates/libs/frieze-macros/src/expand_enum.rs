@@ -613,15 +613,24 @@ fn push_schema_bound(generics: &mut Generics) {
 
 /// Build the token stream that computes the schema name at runtime.
 ///
-/// - Non-generic enums return the literal base name as a `String`,
-///   byte-identical to the pre-generic expansion (snapshot stability).
-/// - Generic enums return `format!("{}_..._<Base>", T1::name(), ...)`
-///   using the same suffix-form composition rule that `expand_struct`
-///   uses for generic structs.
+/// - Non-generic enums compose `compose_schema_name(module_path!(), "<Base>")`.
+/// - Generic enums first build the suffix-composed base
+///   (`format!("{}_..._<Base>", T1::name(), ...)`) using the same
+///   suffix-form composition rule that `expand_struct` uses for
+///   generic structs, then pass it through `compose_schema_name`.
+///
+/// When no namespace declarations reach this binary, the wrapping
+/// call is the identity, so the emitted name keeps the pre-PR-1.5
+/// value byte-for-byte.
 fn composed_name_body(generics: &Generics, base_name: &str) -> TokenStream {
     let type_param_idents: Vec<&Ident> = generics.type_params().map(|tp| &tp.ident).collect();
     if type_param_idents.is_empty() {
-        return quote! { ::std::string::String::from(#base_name) };
+        return quote! {
+            ::frieze::__private::compose_schema_name(
+                ::core::module_path!(),
+                #base_name,
+            )
+        };
     }
     let mut format_str = String::new();
     for _ in 0..type_param_idents.len() {
@@ -632,6 +641,9 @@ fn composed_name_body(generics: &Generics, base_name: &str) -> TokenStream {
         quote! { <#t as ::frieze::__private::frieze_usecase::Schema>::name() }
     });
     quote! {
-        ::std::format!(#format_str, #(#args),*)
+        ::frieze::__private::compose_schema_name(
+            ::core::module_path!(),
+            &::std::format!(#format_str, #(#args),*),
+        )
     }
 }
