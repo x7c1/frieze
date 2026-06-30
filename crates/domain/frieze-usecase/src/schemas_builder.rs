@@ -8,9 +8,18 @@ use frieze_model::{
 use crate::schema::{IsRegistrable, Schema};
 
 /// In-progress collection of schemas.
+///
+/// `conflict` records the first same-name / different-content collision
+/// observed by [`SchemasBuilder::push_unique`]. It is surfaced as
+/// [`Error::SchemaConflict`] from [`SchemasBuilder::build`] — the
+/// builder follows the same fail-at-finalization pattern as
+/// [`Error::UnresolvedReference`] so `register_into` callers and the
+/// derive expansion can keep pushing through `push_unique` without
+/// threading a `Result` through every registration site.
 #[derive(Debug, Default)]
 pub struct SchemasBuilder {
     schemas: Vec<ModelSchema>,
+    conflict: Option<Error>,
 }
 
 impl SchemasBuilder {
@@ -53,11 +62,34 @@ impl SchemasBuilder {
     /// derive-emitted override) so the same root reached through
     /// multiple paths or via a self-referential cycle (`struct Tree
     /// { children: Vec<Box<Tree>> }`) collapses to a single entry.
+    ///
+    /// When an incoming schema shares a name with one already registered
+    /// but their bodies differ, the first such conflict is recorded on
+    /// the builder and reported as [`Error::SchemaConflict`] from
+    /// [`Self::build`]. Same-name / same-content pushes remain a silent
+    /// dedup — the normal case for a transitive root reached through
+    /// multiple paths.
     pub fn push_unique(&mut self, schema: ModelSchema) {
-        if let Some(name) = schema.name() {
-            if self.contains_name(name.as_str()) {
-                return;
+        let Some(name) = schema.name().cloned() else {
+            // Schemas with no registration name (e.g. `Schema::Scalar`)
+            // have no key to dedup on; preserve the historical
+            // append-always behaviour. `Schemas::new` filters them out
+            // afterwards anyway.
+            self.schemas.push(schema);
+            return;
+        };
+        if let Some(existing) = self.schemas.iter().find(|s| s.name() == Some(&name)) {
+            if existing != &schema && self.conflict.is_none() {
+                self.conflict = Some(Error::SchemaConflict {
+                    name,
+                    existing: Box::new(existing.clone()),
+                    incoming: Box::new(schema),
+                });
             }
+            // Either way, do not push: a same-name entry is already
+            // present, and recording a second copy would defeat the
+            // dedup invariant `register_into` relies on.
+            return;
         }
         self.schemas.push(schema);
     }
@@ -98,7 +130,17 @@ impl SchemasBuilder {
     /// with [`Error::OneOfVariantInnerNotStruct`] because the
     /// synthesized tag field must merge into an object body, not into a
     /// scalar-shaped or already-discriminated value.
-    pub fn build(self) -> Result<Schemas, Error> {
+    ///
+    /// Same-name / different-content conflicts recorded by
+    /// [`Self::push_unique`] surface here as [`Error::SchemaConflict`]
+    /// before any other validation runs: the first such conflict is
+    /// reported and downstream `$ref` / `oneOf` checks are skipped, since
+    /// the rest of the collection cannot be trusted once a registration
+    /// disagreement is known.
+    pub fn build(mut self) -> Result<Schemas, Error> {
+        if let Some(conflict) = self.conflict.take() {
+            return Err(conflict);
+        }
         let schemas = Schemas::new(self.schemas)?;
         for schema in schemas.by_name.values() {
             if let Some(missing) = first_unresolved_in_schema(schema, &schemas) {
@@ -303,6 +345,55 @@ mod tests {
         assert!(schemas
             .by_name
             .contains_key(&SchemaName::new("Profile").unwrap()));
+    }
+
+    /// Same registration name as `DummyUser` ("User") but with a
+    /// different property set, used to exercise the same-name /
+    /// different-content path in [`SchemasBuilder::push_unique`].
+    struct DummyUserAlt;
+
+    impl Schema for DummyUserAlt {
+        fn name() -> String {
+            "User".to_string()
+        }
+        fn schema() -> frieze_model::Schema {
+            frieze_model::Schema::new_object(
+                "User",
+                vec![
+                    Property::new("id", PropertyType::Int64, Presence::Required).unwrap(),
+                    // `DummyUser` has `name: String`; we substitute
+                    // `email: String` so the schemas share a name but
+                    // differ in content.
+                    Property::new("email", PropertyType::String, Presence::Required).unwrap(),
+                ],
+            )
+            .unwrap()
+        }
+    }
+    impl IsRegistrable for DummyUserAlt {}
+
+    #[test]
+    fn build_detects_schema_conflict() {
+        // Two schemas registered under the same name but with different
+        // properties must be reported as `Error::SchemaConflict` at
+        // `build()` time, rather than silently dedup-ed (which would hide
+        // the bug behind first-wins semantics).
+        let err = SchemasBuilder::new()
+            .add::<DummyUser>()
+            .add::<DummyUserAlt>()
+            .build()
+            .unwrap_err();
+        match err {
+            Error::SchemaConflict {
+                name,
+                existing,
+                incoming,
+            } => {
+                assert_eq!(name.as_str(), "User");
+                assert_ne!(existing, incoming);
+            }
+            other => panic!("expected SchemaConflict, got {:?}", other),
+        }
     }
 
     #[test]

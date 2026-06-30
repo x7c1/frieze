@@ -29,6 +29,37 @@ pub enum Error {
     DuplicateProperty { schema: String, property: String },
     #[error("schema `{0}` was added more than once")]
     DuplicateSchema(SchemaName),
+    /// Two schemas were registered under the same name but with
+    /// different content.
+    ///
+    /// Reachable through `frieze_usecase::SchemasBuilder::push_unique`
+    /// (and therefore through `SchemasBuilder::add`) when two roots
+    /// produce the same registration name but disagree on their body —
+    /// e.g. two distinct Rust types renamed to the same OAS name, or a
+    /// hand-written `impl Schema` colliding with a derived one. Same-name
+    /// registrations whose bodies are byte-for-byte equal are still
+    /// silently deduplicated; only divergence surfaces this error.
+    ///
+    /// The error is reported by `SchemasBuilder::build`, not at the
+    /// moment of registration — `push_unique` records the first conflict
+    /// and the builder fails fast when finalized. The `existing` and
+    /// `incoming` schemas are wrapped in `Box` to keep `Error`'s size
+    /// down; their bodies are available for inspection or error
+    /// rendering.
+    ///
+    /// Recovery: rename one of the colliding types, or attach
+    /// `#[frieze(namespace = "...")]` to a containing `mod` so the two
+    /// types acquire distinct fully-qualified registration names.
+    #[error(
+        "schema `{name}` was registered twice with different definitions \
+         (use `#[frieze(namespace = ...)]` on a containing `mod` to give \
+         them distinct fully-qualified names, or rename one of the types)"
+    )]
+    SchemaConflict {
+        name: SchemaName,
+        existing: Box<crate::Schema>,
+        incoming: Box<crate::Schema>,
+    },
     /// A `$ref` resolution failure detected by
     /// [`crate::Schemas`]-consuming code (typically
     /// `frieze_usecase::SchemasBuilder::build`).
