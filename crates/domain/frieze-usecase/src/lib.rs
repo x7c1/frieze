@@ -34,7 +34,10 @@ pub use schemas_builder::SchemasBuilder;
 #[cfg(feature = "inventory")]
 mod inventory;
 #[cfg(feature = "inventory")]
-pub use inventory::SchemaRoot;
+pub use inventory::{Namespace, SchemaRoot};
+
+mod naming;
+pub use naming::compose_schema_name;
 
 mod to_value;
 pub use to_value::to_value;

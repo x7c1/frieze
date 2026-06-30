@@ -22,7 +22,7 @@
 //! submission site expands to a no-op so feature-gated code paths in
 //! user crates stay valid in both configurations.
 
-pub use frieze_macros::Schema;
+pub use frieze_macros::{frieze, Schema};
 pub use frieze_model::{
     Error, Maybe, Presence, Property, PropertyName, PropertyType, SchemaName, Schemas,
 };
@@ -80,6 +80,51 @@ macro_rules! __frieze_inventory_submit {
     ($name:expr, $register_fn:expr $(,)?) => {};
 }
 
+/// Wrapper macro used by `#[frieze(namespace)]` to submit a namespace
+/// declaration to the `inventory` collection channel.
+///
+/// The attribute macro emits a call of the form
+/// `::frieze::__private::inventory_namespace! { "<mod_ident>" }`
+/// next to the original `mod` declaration. The macro routes the call
+/// so that:
+///
+/// - With the `inventory` Cargo feature enabled, the call expands to
+///   `inventory::submit!` of a `__private::Namespace` value, capturing
+///   `module_path!()` at the attribute site as the namespace's
+///   `parent_path` so the full path
+///   `format!("{}::{}", parent_path, local_name)` can be reconstructed
+///   later by [`frieze_usecase::compose_schema_name`].
+/// - Without the feature, the call expands to nothing and the
+///   attribute behaves as a transparent pass-through.
+///
+/// The indirection mirrors [`__frieze_inventory_submit`]: the
+/// proc-macro crate stays feature-agnostic and the facade decides
+/// whether the submission has runtime effect.
+#[cfg(feature = "inventory")]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __frieze_inventory_namespace {
+    ($local_name:expr $(,)?) => {
+        $crate::__private::inventory::submit! {
+            $crate::__private::Namespace {
+                parent_path: ::core::module_path!(),
+                local_name: $local_name,
+            }
+        }
+    };
+}
+
+/// No-op counterpart to [`__frieze_inventory_namespace`] for builds
+/// with the `inventory` feature disabled. Symmetric matcher with the
+/// `cfg(feature = "inventory")` arm so the attribute macro emits a
+/// single, predictable invocation in either configuration.
+#[cfg(not(feature = "inventory"))]
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __frieze_inventory_namespace {
+    ($local_name:expr $(,)?) => {};
+}
+
 /// Implementation details exposed only so the derive macro's expansion can
 /// reach the underlying crates without users having to depend on them
 /// directly. Not covered by semver.
@@ -89,23 +134,30 @@ pub mod __private {
     pub use frieze_openapi;
     pub use frieze_usecase;
 
-    // Re-export the wrapper macro under the `__private` path so derive
-    // output writes a single, predictable invocation:
-    // `::frieze::__private::inventory_submit! { ... }`. The macro itself
-    // is `#[macro_export]`-ed at the crate root with a name-spaced
-    // identifier to avoid shadowing anything in user code.
+    // Re-export the wrapper macros under the `__private` path so
+    // derive / attribute output writes a single, predictable
+    // invocation: `::frieze::__private::inventory_submit! { ... }` and
+    // `::frieze::__private::inventory_namespace! { ... }`. The macros
+    // themselves are `#[macro_export]`-ed at the crate root with
+    // name-spaced identifiers to avoid shadowing anything in user code.
+    pub use crate::__frieze_inventory_namespace as inventory_namespace;
     pub use crate::__frieze_inventory_submit as inventory_submit;
 
+    // Helper used by `#[derive(Schema)]`-generated `Schema::name()`
+    // bodies to fold `module_path!()` against the namespace set
+    // populated by `#[frieze(namespace)]`.
+    pub use frieze_usecase::compose_schema_name;
+
     // The `inventory` crate re-export is only available when the
-    // feature is enabled; the wrapper macro above branches on the same
+    // feature is enabled; the wrapper macros above branch on the same
     // cfg so the path is only used when valid.
     #[cfg(feature = "inventory")]
     pub use ::inventory;
 
-    // `SchemaRoot` itself is only defined when the feature is on, since
-    // its sole purpose is to be the value type for the `inventory`
-    // linker section. The macro above references this re-export only in
-    // the feature-on arm.
+    // `Namespace` and `SchemaRoot` are only defined when the feature
+    // is on, since their sole purpose is to be the value types for the
+    // `inventory` linker sections. The macros above reference these
+    // re-exports only in the feature-on arms.
     #[cfg(feature = "inventory")]
-    pub use frieze_usecase::SchemaRoot;
+    pub use frieze_usecase::{Namespace, SchemaRoot};
 }

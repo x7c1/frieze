@@ -42,6 +42,32 @@ pub struct SchemaRoot {
 
 inventory::collect!(SchemaRoot);
 
+/// Submission entry that declares a Rust `mod` to be a namespace for
+/// OAS schema-name composition.
+///
+/// `#[frieze(namespace)]` on a `mod` declaration emits one of these via
+/// the facade's `inventory_namespace!` wrapper, capturing the parent
+/// module path (the `module_path!()` at the attribute site) and the
+/// mod's local ident (`stringify!(v1)`). The full namespace path is
+/// reconstructed as `format!("{}::{}", parent_path, local_name)` and
+/// stored in a process-wide set consulted by
+/// [`crate::naming::compose_schema_name`].
+///
+/// The attribute macro never touches the mod's contents; this side
+/// channel records only the fact "this mod is a namespace" so derive
+/// output can later walk `module_path!()` and decide which segments to
+/// keep.
+pub struct Namespace {
+    /// `module_path!()` at the position where `#[frieze(namespace)]`
+    /// is applied — the parent module of the declared namespace.
+    pub parent_path: &'static str,
+    /// The mod's local identifier (`stringify!(v1)` for
+    /// `#[frieze(namespace)] pub mod v1;`).
+    pub local_name: &'static str,
+}
+
+inventory::collect!(Namespace);
+
 impl SchemasBuilder {
     /// Iterates every `inventory`-submitted [`SchemaRoot`] and invokes
     /// the entry's `register_fn` on `self`, producing the transitive

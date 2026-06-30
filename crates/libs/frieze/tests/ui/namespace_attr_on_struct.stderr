@@ -1,0 +1,5 @@
+error: frieze: `#[frieze(namespace)]` can only be applied to `mod` declarations (`pub mod foo;` or `pub mod foo { ... }`).
+ --> tests/ui/namespace_attr_on_struct.rs:2:1
+  |
+2 | struct NotAMod;
+  | ^^^^^^^^^^^^^^^
