@@ -4,6 +4,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 enum Status {
@@ -25,20 +27,26 @@ fn vec_of_enum_field_renders_as_array_of_refs() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Status:
-      type: string
-      enum:
-        - Active
-        - Inactive
-    User:
-      type: object
-      required:
-        - statuses
-      properties:
-        statuses:
-          type: array
-          items:
-            $ref: "#/components/schemas/Status"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Status:
+          type: string
+          enum:
+          - Active
+          - Inactive
+        User:
+          type: object
+          required:
+          - statuses
+          properties:
+            statuses:
+              type: array
+              items:
+                $ref: '#/components/schemas/Status'
+    ");
 }

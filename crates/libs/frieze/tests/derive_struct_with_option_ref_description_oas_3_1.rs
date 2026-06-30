@@ -7,6 +7,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Image {
@@ -28,23 +30,29 @@ fn option_ref_with_description_carries_description_on_one_of_wrap_under_oas_3_1(
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
-    Image:
-      type: object
-      required:
-        - url
-      properties:
-        url:
-          type: string
-    Profile:
-      type: object
-      required:
-        - avatar
-      properties:
-        avatar:
-          description: Optional avatar associated with this profile.
-          oneOf:
-            - $ref: "#/components/schemas/Image"
-            - type: "null"
-    "###);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Image:
+          type: object
+          required:
+          - url
+          properties:
+            url:
+              type: string
+        Profile:
+          type: object
+          required:
+          - avatar
+          properties:
+            avatar:
+              description: Optional avatar associated with this profile.
+              oneOf:
+              - $ref: '#/components/schemas/Image'
+              - type: 'null'
+    ");
 }

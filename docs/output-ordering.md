@@ -82,13 +82,13 @@ the output rather than emitted as `[]` or `{}`. The concrete rule today
 covers an object schema's `required`: when no fields are required,
 `required:` is absent entirely (no `required: []` line).
 
-YAML rendering goes through the custom emitter
-(`schema_object_to_value` in `frieze-usecase`), which walks the
-sum-typed `SchemaObject` and constructs YAML nodes manually rather
-than through `serde::Serialize`. The emitter applies the empty-check
-before adding `required` to the output. When changing the omission
-rule, update the emitter — there is no parallel serde path to keep in
-sync.
+YAML rendering goes through the handwritten `Serialize` impl on
+`ObjectSchema` in `frieze-openapi` (with sibling handwritten impls on
+`StringEnumSchema` and `OneOfSchema`), which walks the sum-typed
+`SchemaObject` and emits map keys in the canonical order. The impl
+applies the empty-check on `required` before writing it to the output.
+When changing the omission rule, update the handwritten `Serialize`
+impl — frieze produces YAML and JSON through the same serde path.
 
 Reason for the rule: `required: []` is technically valid OAS but
 noisy and easy to misread as "no required fields known" vs. "this is
@@ -107,15 +107,15 @@ struct User {
 }
 ```
 
-renders as:
+renders, inside `components.schemas`, as:
 
 ```yaml
 User:
   type: object
   description: A registered user of the system.
   required:
-    - id
-    - name
+  - id
+  - name
   properties:
     id:
       type: integer

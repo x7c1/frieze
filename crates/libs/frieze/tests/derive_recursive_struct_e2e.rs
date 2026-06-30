@@ -12,6 +12,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 // `Vec<Box<Tree>>` is the canonical recursive-Rust pattern this test is
@@ -30,19 +32,25 @@ fn recursive_struct_emits_self_referential_ref() {
         .build()
         .expect("schemas build should succeed for a self-referential type");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Tree:
-      type: object
-      required:
-        - value
-        - children
-      properties:
-        value:
-          type: integer
-          format: int64
-        children:
-          type: array
-          items:
-            $ref: "#/components/schemas/Tree"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Tree:
+          type: object
+          required:
+          - value
+          - children
+          properties:
+            value:
+              type: integer
+              format: int64
+            children:
+              type: array
+              items:
+                $ref: '#/components/schemas/Tree'
+    ");
 }

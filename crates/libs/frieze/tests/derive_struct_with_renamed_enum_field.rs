@@ -6,6 +6,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[allow(dead_code)]
@@ -29,18 +31,24 @@ fn renamed_field_keeps_referenced_enum_rename_all_intact() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
-    Lifecycle:
-      type: string
-      enum:
-      - active
-      - inactive_since
-    User:
-      type: object
-      required:
-      - lifecycle
-      properties:
-        lifecycle:
-          $ref: '#/components/schemas/Lifecycle'
-    "#);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Lifecycle:
+          type: string
+          enum:
+          - active
+          - inactive_since
+        User:
+          type: object
+          required:
+          - lifecycle
+          properties:
+            lifecycle:
+              $ref: '#/components/schemas/Lifecycle'
+    ");
 }

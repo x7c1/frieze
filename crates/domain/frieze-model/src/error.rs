@@ -108,4 +108,20 @@ pub enum Error {
          variants (Array / Nullable / Reference) are not scalar"
     )]
     NonScalarPropertyType,
+    /// The partial OAS document handed to `compose` already contains
+    /// schemas under `components.schemas`. That slot must be empty so
+    /// that schemas generated from Rust types via `#[derive(Schema)]`
+    /// are the single source of truth.
+    ///
+    /// Recovery: remove every entry from `components.schemas` in the
+    /// partial document and re-run `compose` — the schemas registered
+    /// via `SchemasBuilder` will fill the slot.
+    #[error(
+        "partial OAS document already contains {count} schema(s) under \
+         `components.schemas`; this slot must be empty so that schemas \
+         generated from Rust types via `#[derive(Schema)]` are the \
+         single source of truth. Remove the schemas from your partial \
+         OAS document."
+    )]
+    PartialAlreadyHasSchemas { count: usize },
 }

@@ -21,6 +21,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Standalone {
@@ -52,35 +54,41 @@ fn from_inventory_composes_with_explicit_generic_root() {
         .build()
         .expect("inventory + add chain produces a closed schemas set");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Bar:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    Bar_Page:
-      type: object
-      required:
-        - items
-        - total
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/Bar"
-        total:
-          type: integer
-          format: int64
-          minimum: 0
-    Standalone:
-      type: object
-      required:
-        - name
-      properties:
-        name:
-          type: string
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Bar:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+        Bar_Page:
+          type: object
+          required:
+          - items
+          - total
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Bar'
+            total:
+              type: integer
+              format: int64
+              minimum: 0
+        Standalone:
+          type: object
+          required:
+          - name
+          properties:
+            name:
+              type: string
+    ");
 }

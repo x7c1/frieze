@@ -3,6 +3,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 /// Lifecycle state of an entity.
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -18,12 +20,18 @@ fn enum_top_doc_only_renders_without_variant_list() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
-    Status:
-      type: string
-      description: Lifecycle state of an entity.
-      enum:
-        - Active
-        - Inactive
-    "###);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Status:
+          type: string
+          description: Lifecycle state of an entity.
+          enum:
+          - Active
+          - Inactive
+    ");
 }

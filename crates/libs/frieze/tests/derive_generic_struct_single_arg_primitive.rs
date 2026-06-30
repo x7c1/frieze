@@ -16,6 +16,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Container<T> {
@@ -44,16 +46,22 @@ fn container_i64_inlines_primitive_value() {
         .build()
         .expect("schemas build succeeds without a registered `Int64`");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Int64_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Int64_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              type: integer
+              format: int64
+    ");
 }
 
 #[test]
@@ -63,15 +71,21 @@ fn container_string_inlines_primitive_value() {
         .build()
         .expect("schemas build succeeds without a registered `String`");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    String_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          type: string
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        String_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              type: string
+    ");
 }
 
 #[test]
@@ -81,13 +95,19 @@ fn container_bool_inlines_primitive_value() {
         .build()
         .expect("schemas build succeeds without a registered `Boolean`");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Boolean_Container:
-      type: object
-      required:
-        - value
-      properties:
-        value:
-          type: boolean
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Boolean_Container:
+          type: object
+          required:
+          - value
+          properties:
+            value:
+              type: boolean
+    ");
 }

@@ -13,6 +13,8 @@
 use frieze::{Maybe, Schema};
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize, Debug, PartialEq)]
 struct Profile {
     id: i64,
@@ -27,18 +29,24 @@ fn maybe_field_renders_optional_and_nullable_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @"
-    Profile:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-        avatar_url:
-          type: string
-          nullable: true
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Profile:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+            avatar_url:
+              type: string
+              nullable: true
     ");
 }
 

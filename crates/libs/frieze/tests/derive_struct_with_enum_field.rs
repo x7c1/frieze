@@ -9,6 +9,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 enum Status {
@@ -31,22 +33,28 @@ fn struct_field_of_enum_type_renders_as_ref() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Status:
-      type: string
-      enum:
-        - Active
-        - Inactive
-    User:
-      type: object
-      required:
-        - id
-        - status
-      properties:
-        id:
-          type: integer
-          format: int64
-        status:
-          $ref: "#/components/schemas/Status"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Status:
+          type: string
+          enum:
+          - Active
+          - Inactive
+        User:
+          type: object
+          required:
+          - id
+          - status
+          properties:
+            id:
+              type: integer
+              format: int64
+            status:
+              $ref: '#/components/schemas/Status'
+    ");
 }

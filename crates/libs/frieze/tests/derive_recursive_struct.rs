@@ -15,6 +15,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Tree {
@@ -44,17 +46,23 @@ fn box_tree_is_registrable_through_blanket_impl() {
         .add::<Box<Tree>>()
         .build()
         .expect("registering Box<Tree> succeeds and is equivalent to adding Tree");
-    insta::assert_yaml_snapshot!(frieze::to_value(&schemas), @"
-    Tree:
-      type: object
-      required:
-        - value
-        - label
-      properties:
-        value:
-          type: integer
-          format: int64
-        label:
-          type: string
+    insta::assert_snapshot!(common::snapshot_yaml(schemas), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Tree:
+          type: object
+          required:
+          - value
+          - label
+          properties:
+            value:
+              type: integer
+              format: int64
+            label:
+              type: string
     ");
 }

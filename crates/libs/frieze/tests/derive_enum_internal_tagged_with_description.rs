@@ -12,6 +12,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct LoginData {
@@ -48,50 +50,56 @@ fn variant_doc_comments_compose_into_enum_description_bullets() {
     // description renders as the YAML literal block scalar that frieze
     // emits at the YAML level (the `Value` form would escape `\n` and
     // hide the line structure).
-    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
-    Event:
-      description: |-
-        A user session event.
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Event:
+          description: |-
+            A user session event.
 
-        - Login: The user logged in.
-        - Logout: The user logged out.
-      oneOf:
-      - allOf:
-        - $ref: '#/components/schemas/LoginData'
-        - type: object
+            - Login: The user logged in.
+            - Logout: The user logged out.
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/LoginData'
+            - type: object
+              required:
+              - kind
+              properties:
+                kind:
+                  type: string
+                  enum:
+                  - Login
+          - allOf:
+            - $ref: '#/components/schemas/LogoutData'
+            - type: object
+              required:
+              - kind
+              properties:
+                kind:
+                  type: string
+                  enum:
+                  - Logout
+          discriminator:
+            propertyName: kind
+        LoginData:
+          type: object
           required:
-          - kind
+          - user_id
           properties:
-            kind:
-              type: string
-              enum:
-              - Login
-      - allOf:
-        - $ref: '#/components/schemas/LogoutData'
-        - type: object
+            user_id:
+              type: integer
+              format: int64
+        LogoutData:
+          type: object
           required:
-          - kind
+          - reason
           properties:
-            kind:
+            reason:
               type: string
-              enum:
-              - Logout
-      discriminator:
-        propertyName: kind
-    LoginData:
-      type: object
-      required:
-      - user_id
-      properties:
-        user_id:
-          type: integer
-          format: int64
-    LogoutData:
-      type: object
-      required:
-      - reason
-      properties:
-        reason:
-          type: string
-    "#);
+    ");
 }

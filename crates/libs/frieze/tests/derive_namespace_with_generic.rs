@@ -11,6 +11,7 @@
 
 #![cfg(feature = "inventory")]
 
+mod common;
 #[frieze::frieze(namespace)]
 pub mod v1 {
     use frieze::Schema;
@@ -46,21 +47,27 @@ fn namespace_prefix_composes_with_generic_suffix() {
     // generic-suffix base `"Int64_Container"`, then
     // `compose_schema_name(module_path!(), "Int64_Container")`
     // prefixes `v1`, yielding `v1.Int64_Container`.
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    v1.Int64_Container:
-      type: object
-      required:
-        - item
-      properties:
-        item:
-          type: integer
-          format: int64
-    v1.Wrapper:
-      type: object
-      required:
-        - inner
-      properties:
-        inner:
-          $ref: "#/components/schemas/v1.Int64_Container"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        v1.Int64_Container:
+          type: object
+          required:
+          - item
+          properties:
+            item:
+              type: integer
+              format: int64
+        v1.Wrapper:
+          type: object
+          required:
+          - inner
+          properties:
+            inner:
+              $ref: '#/components/schemas/v1.Int64_Container'
+    ");
 }

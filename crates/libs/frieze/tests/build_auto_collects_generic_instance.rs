@@ -15,6 +15,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Bar {
@@ -41,35 +43,41 @@ fn single_add_auto_collects_generic_instance() {
         .build()
         .expect("transitive `register_into` collects `Page<Bar>` and `Bar` automatically");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Bar:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    Bar_Page:
-      type: object
-      required:
-        - items
-        - total
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/Bar"
-        total:
-          type: integer
-          format: int64
-          minimum: 0
-    Foo:
-      type: object
-      required:
-        - page
-      properties:
-        page:
-          $ref: "#/components/schemas/Bar_Page"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Bar:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+        Bar_Page:
+          type: object
+          required:
+          - items
+          - total
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Bar'
+            total:
+              type: integer
+              format: int64
+              minimum: 0
+        Foo:
+          type: object
+          required:
+          - page
+          properties:
+            page:
+              $ref: '#/components/schemas/Bar_Page'
+    ");
 }

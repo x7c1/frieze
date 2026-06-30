@@ -5,6 +5,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 /// Lifecycle state of an entity.
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -23,17 +25,23 @@ fn missing_variant_docs_are_omitted_from_the_bullet_list() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
-    Status:
-      type: string
-      description: |-
-        Lifecycle state of an entity.
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Status:
+          type: string
+          description: |-
+            Lifecycle state of an entity.
 
-        - Active: The entity is currently active.
-        - Inactive: The entity is no longer active.
-      enum:
-      - Active
-      - Pending
-      - Inactive
-    "#);
+            - Active: The entity is currently active.
+            - Inactive: The entity is no longer active.
+          enum:
+          - Active
+          - Pending
+          - Inactive
+    ");
 }

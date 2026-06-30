@@ -13,6 +13,7 @@
 
 #![cfg(feature = "inventory")]
 
+mod common;
 #[frieze::frieze(namespace)]
 pub mod v1 {
     #[frieze::frieze(namespace)]
@@ -41,14 +42,20 @@ fn nested_namespaces_chain_with_dots() {
     //   "derive_namespace_nested::v1::v2"
     // Prefix walk keeps `v1` then `v2`, dropping the crate name; the
     // base "User" is `.` -joined onto the chain.
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    v1.v2.User:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        v1.v2.User:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+    ");
 }

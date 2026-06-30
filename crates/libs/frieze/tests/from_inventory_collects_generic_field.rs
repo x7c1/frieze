@@ -24,6 +24,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct Bar {
@@ -50,35 +52,41 @@ fn from_inventory_walks_into_generic_field() {
         .build()
         .expect("inventory + transitive walk produces a closed schemas set");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Bar:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    Bar_Page:
-      type: object
-      required:
-        - items
-        - total
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/Bar"
-        total:
-          type: integer
-          format: int64
-          minimum: 0
-    Foo:
-      type: object
-      required:
-        - page
-      properties:
-        page:
-          $ref: "#/components/schemas/Bar_Page"
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Bar:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+        Bar_Page:
+          type: object
+          required:
+          - items
+          - total
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Bar'
+            total:
+              type: integer
+              format: int64
+              minimum: 0
+        Foo:
+          type: object
+          required:
+          - page
+          properties:
+            page:
+              $ref: '#/components/schemas/Bar_Page'
+    ");
 }

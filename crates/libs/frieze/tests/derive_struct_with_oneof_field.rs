@@ -8,6 +8,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct LoginData {
@@ -45,56 +47,62 @@ fn struct_field_of_oneof_type_renders_as_ref() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Audit:
-      type: object
-      required:
-        - id
-        - event
-      properties:
-        id:
-          type: integer
-          format: int64
-        event:
-          $ref: "#/components/schemas/Event"
-    Event:
-      oneOf:
-        - allOf:
-            - $ref: "#/components/schemas/LoginData"
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Audit:
+          type: object
+          required:
+          - id
+          - event
+          properties:
+            id:
+              type: integer
+              format: int64
+            event:
+              $ref: '#/components/schemas/Event'
+        Event:
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/LoginData'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Login
-        - allOf:
-            - $ref: "#/components/schemas/LogoutData"
+                  - Login
+          - allOf:
+            - $ref: '#/components/schemas/LogoutData'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Logout
-      discriminator:
-        propertyName: kind
-    LoginData:
-      type: object
-      required:
-        - user_id
-      properties:
-        user_id:
-          type: integer
-          format: int64
-    LogoutData:
-      type: object
-      required:
-        - reason
-      properties:
-        reason:
-          type: string
-    "##);
+                  - Logout
+          discriminator:
+            propertyName: kind
+        LoginData:
+          type: object
+          required:
+          - user_id
+          properties:
+            user_id:
+              type: integer
+              format: int64
+        LogoutData:
+          type: object
+          required:
+          - reason
+          properties:
+            reason:
+              type: string
+    ");
 }

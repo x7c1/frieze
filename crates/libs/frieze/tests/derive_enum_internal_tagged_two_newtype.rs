@@ -9,6 +9,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 #[derive(Schema, Serialize, Deserialize)]
 #[allow(dead_code)]
 struct LoginData {
@@ -39,48 +41,54 @@ fn renders_as_one_of_with_internal_tag_allof() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Event:
-      oneOf:
-        - allOf:
-            - $ref: "#/components/schemas/LoginData"
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Event:
+          oneOf:
+          - allOf:
+            - $ref: '#/components/schemas/LoginData'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Login
-        - allOf:
-            - $ref: "#/components/schemas/LogoutData"
+                  - Login
+          - allOf:
+            - $ref: '#/components/schemas/LogoutData'
             - type: object
               required:
-                - kind
+              - kind
               properties:
                 kind:
                   type: string
                   enum:
-                    - Logout
-      discriminator:
-        propertyName: kind
-    LoginData:
-      type: object
-      required:
-        - user_id
-        - session
-      properties:
-        user_id:
-          type: integer
-          format: int64
-        session:
-          type: string
-    LogoutData:
-      type: object
-      required:
-        - reason
-      properties:
-        reason:
-          type: string
-    "##);
+                  - Logout
+          discriminator:
+            propertyName: kind
+        LoginData:
+          type: object
+          required:
+          - user_id
+          - session
+          properties:
+            user_id:
+              type: integer
+              format: int64
+            session:
+              type: string
+        LogoutData:
+          type: object
+          required:
+          - reason
+          properties:
+            reason:
+              type: string
+    ");
 }

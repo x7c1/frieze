@@ -33,6 +33,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[frieze::frieze(namespace)]
 pub mod v1 {
     use frieze::Schema;
@@ -57,16 +59,22 @@ fn namespace_folds_into_oas_key() {
     // `local_name = "v1"` for the `#[frieze(namespace)]` site, and
     // `User::name()` walks the module path
     // `"derive_namespace_simple::v1"`, keeping the `v1` segment.
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    v1.User:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        v1.User:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+    ");
 }
 
 // Reference `Schema` so the `use` import is not flagged as unused

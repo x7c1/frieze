@@ -7,6 +7,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 struct User {
@@ -28,23 +30,29 @@ fn ref_field_with_description_wraps_in_all_of_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r###"
-    Profile:
-      type: object
-      required:
-        - user
-      properties:
-        user:
-          description: The user account this profile belongs to.
-          allOf:
-            - $ref: "#/components/schemas/User"
-    User:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    "###);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Profile:
+          type: object
+          required:
+          - user
+          properties:
+            user:
+              description: The user account this profile belongs to.
+              allOf:
+              - $ref: '#/components/schemas/User'
+        User:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+    ");
 }

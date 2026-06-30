@@ -18,6 +18,7 @@
 
 #![cfg(feature = "inventory")]
 
+mod common;
 mod inner {
     use frieze::Schema;
 
@@ -43,14 +44,20 @@ fn facade_pattern_keeps_bare_oas_key() {
     // `"Foo"` unchanged. The `mod inner` lives at module path
     // `derive_namespace_facade_pattern::inner`, but `inner` is not a
     // declared namespace, so it is dropped during the prefix walk.
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    Foo:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Foo:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+    ");
 }

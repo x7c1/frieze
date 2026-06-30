@@ -5,6 +5,8 @@
 
 use frieze::Schema;
 
+mod common;
+
 #[derive(Schema)]
 #[allow(dead_code)]
 enum Color {
@@ -22,15 +24,21 @@ fn variant_docs_only_render_as_bullet_list_description() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
-    Color:
-      type: string
-      description: |-
-        - Red: The crimson hue.
-        - Blue: The deep blue.
-      enum:
-      - Red
-      - Green
-      - Blue
-    "#);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Color:
+          type: string
+          description: |-
+            - Red: The crimson hue.
+            - Blue: The deep blue.
+          enum:
+          - Red
+          - Green
+          - Blue
+    ");
 }

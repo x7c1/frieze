@@ -6,11 +6,12 @@ Generate OpenAPI Schema Objects from Rust types via `#[derive(Schema)]`.
 
 ## Quick start
 
-`frieze` derives a schema description from a plain Rust struct and lets
-you render it as YAML.
+`frieze` derives a schema description from a plain Rust struct and
+hands you back a complete OpenAPI document you can render to YAML or
+JSON.
 
 ```rust
-use frieze::{Maybe, Schema};
+use frieze::{Info, Maybe, Schema};
 use serde::{Deserialize, Serialize};
 
 /// A registered user of the system.
@@ -38,8 +39,32 @@ let schemas = frieze::schemas()
     .add::<User>()
     .build()
     .expect("schemas build should succeed");
-println!("{}", frieze::to_yaml(&schemas));
+let document = frieze::from_schemas(
+    Info { title: "My API".into(), version: "1.0.0".into(), ..Default::default() },
+    schemas,
+);
+println!("{}", frieze::to_yaml(&document));
 ```
+
+The same `OasDocument` value is format-neutral — render it to JSON
+through serde directly when needed:
+
+```rust
+let json = serde_json::to_string_pretty(&document)?;
+```
+
+When the user already has a hand-written OAS document fragment
+(`info`, `paths`, `tags`, vendor extensions), `frieze::compose` merges
+schemas into it without disturbing the rest:
+
+```rust
+let partial: frieze::OasDocument = serde_yaml::from_str(&yaml)?;
+let document = frieze::compose(partial, schemas)?;
+```
+
+`compose` rejects partials that already carry entries under
+`components.schemas`: the Rust types collected by `SchemasBuilder` are
+the single source of truth for that slot.
 
 A `///` doc comment on the struct or on any field becomes the OAS
 `description` for that schema or property — written once in Rust,

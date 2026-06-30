@@ -11,6 +11,7 @@
 
 #![cfg(feature = "inventory")]
 
+mod common;
 #[frieze::frieze(namespace)]
 pub mod v1 {
     use frieze::Schema;
@@ -46,21 +47,27 @@ fn distinct_namespaces_resolve_same_bare_name() {
         .build()
         .expect("namespace disambiguation prevents OAS key collision");
 
-    insta::assert_yaml_snapshot!(frieze::to_value(&s), @r##"
-    v1.User:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: integer
-          format: int64
-    v2.User:
-      type: object
-      required:
-        - uuid
-      properties:
-        uuid:
-          type: string
-    "##);
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        v1.User:
+          type: object
+          required:
+          - id
+          properties:
+            id:
+              type: integer
+              format: int64
+        v2.User:
+          type: object
+          required:
+          - uuid
+          properties:
+            uuid:
+              type: string
+    ");
 }

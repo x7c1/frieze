@@ -5,6 +5,8 @@
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
+mod common;
+
 /// Lifecycle state of an entity.
 #[derive(Schema, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -23,16 +25,22 @@ fn variant_bullet_names_use_post_rename_form() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(frieze::to_yaml(&s), @r#"
-    Status:
-      type: string
-      description: |-
-        Lifecycle state of an entity.
+    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    openapi: X.Y.Z
+    info:
+      title: snapshot test
+      version: 0.0.0
+    components:
+      schemas:
+        Status:
+          type: string
+          description: |-
+            Lifecycle state of an entity.
 
-        - active: The entity is currently active.
-        - inactive_since: The entity is no longer active.
-      enum:
-      - active
-      - inactive_since
-    "#);
+            - active: The entity is currently active.
+            - inactive_since: The entity is no longer active.
+          enum:
+          - active
+          - inactive_since
+    ");
 }
