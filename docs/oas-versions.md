@@ -4,6 +4,70 @@
 build. The version is selected by a Cargo feature on the `frieze`
 facade crate.
 
+## Runtime handle: `OasVersion`
+
+Alongside the compile-time feature gate, the crate exposes an
+[`OasVersion`] enum (in `frieze-openapi`, re-exported through the
+`frieze` facade) that carries the major.minor discriminant at runtime:
+
+```rust
+use frieze::OasVersion;
+
+let v = OasVersion::V3_0;
+assert_eq!(v.openapi_string(), "3.0.3");
+```
+
+Every parsed `OasDocument` has an `oas_version: OasVersion` field
+lifted from its `openapi:` string at deserialize time; the wire-format
+patch string (e.g. `"3.0.5"`, `"3.1.1"`) is preserved verbatim in
+`OasDocument.openapi`. `OasVersion` never appears on the wire —
+serialization skips it (`#[serde(skip)]`) so the wire format is
+unchanged.
+
+The parser is patch-tolerant: any `3.0.x` string parses to
+`OasVersion::V3_0` and any `3.1.x` parses to `OasVersion::V3_1`, so
+documents authored against future patch releases (3.0.5, 3.1.1, ...)
+continue to load. The bare `3.0` / `3.1` forms are also accepted.
+Anything outside the supported range surfaces as
+`OasVersionParseError::Unsupported` from
+`OasVersion::parse_from_openapi`; an empty `openapi:` field surfaces
+as `OasVersionParseError::Empty`.
+
+## Composition entry points
+
+Both composition entry points thread the runtime discriminant through
+their signatures:
+
+```rust
+pub fn from_schemas(
+    info: Info,
+    schemas: Schemas,
+    version: OasVersion,
+) -> Result<OasDocument, Error>;
+
+pub fn compose(partial: OasDocument, schemas: Schemas) -> Result<OasDocument, Error>;
+```
+
+`from_schemas` takes the target version explicitly. `compose` derives
+it from `partial.oas_version` (populated at parse time).
+
+### Transition guard
+
+While the `Serialize` implementations in `frieze-openapi` remain
+cfg-gated on the `oas-3-0` / `oas-3-1` features, both entry points
+reject any [`OasVersion`] that does not match the version the current
+build was compiled for. A mismatch returns
+`Error::UnsupportedOasVersion { got: <version-string> }` before any
+serialization begins — this prevents an `openapi: 3.1.0` header from
+being paired with 3.0-style `nullable: true` in the body (or vice
+versa).
+
+The guard is a temporary preparation step: once `Serialize` becomes
+runtime-dispatched on `oas_version`, the mismatch check is removed
+and both versions become emit-able from a single build. The current
+`OasVersion` enum, `oas_version` field, and error variant already
+carry the shape that future refactor will consume.
+
 ## Feature flags
 
 | Feature   | OAS version | Default | Nullability encoding         |

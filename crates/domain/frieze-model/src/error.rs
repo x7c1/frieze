@@ -124,4 +124,22 @@ pub enum Error {
          OAS document."
     )]
     PartialAlreadyHasSchemas { count: usize },
+    /// The OpenAPI document's `openapi` field is missing or empty. This
+    /// error surfaces from the composition entry points when the caller
+    /// hands them a document that does not carry an OAS version at all
+    /// — the version discriminant is required for shape dispatch.
+    #[error("OpenAPI document is missing required 'openapi' field")]
+    MissingOasVersion,
+    /// The OpenAPI document's `openapi` field has an unsupported value,
+    /// or the caller asked for an OAS version that this build cannot
+    /// emit. Currently supported: `3.0.x`, `3.1.x`.
+    ///
+    /// Emitted by the composition entry points when the caller's
+    /// requested [`crate::Schema`]-serialising version does not match
+    /// the OAS version this crate build was compiled for. The active
+    /// build's serializers are cfg-gated on the `oas-3-0` / `oas-3-1`
+    /// features, so a mismatch would produce inconsistent output —
+    /// this error catches that before serialization begins.
+    #[error("Unsupported OAS version: '{got}'. Supported: 3.0.x, 3.1.x")]
+    UnsupportedOasVersion { got: String },
 }

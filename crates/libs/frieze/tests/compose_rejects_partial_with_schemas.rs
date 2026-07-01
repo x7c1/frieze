@@ -14,13 +14,22 @@ struct User {
     id: i64,
 }
 
+/// The OAS version string this build was compiled to emit. Used to
+/// stitch a version-matching `openapi:` header onto the partial YAML
+/// below, so the transition guard in `compose` accepts the document
+/// under both `oas-3-0` and `oas-3-1` builds — this test's contract
+/// is about the schemas-count check, not about version dispatch.
+#[cfg(feature = "oas-3-0")]
+const OPENAPI_HEADER: &str = "openapi: 3.0.3\n";
+#[cfg(feature = "oas-3-1")]
+const OPENAPI_HEADER: &str = "openapi: 3.1.0\n";
+
 /// A partial whose `components.schemas` map carries two hand-written
 /// entries. The two entries are intentionally not registered as Rust
 /// types: the failure must surface from the existence of the entries
 /// themselves, not from any collision check between them and the
 /// builder-collected schemas.
-const PARTIAL_WITH_HAND_WRITTEN_SCHEMAS: &str = "\
-openapi: 3.0.3
+const PARTIAL_BODY: &str = "\
 info:
   title: Has schemas
   version: 0.1.0
@@ -35,8 +44,9 @@ components:
 
 #[test]
 fn compose_rejects_partial_that_already_carries_schemas() {
-    let partial: OasDocument = serde_yaml::from_str(PARTIAL_WITH_HAND_WRITTEN_SCHEMAS)
-        .expect("partial YAML must parse as OasDocument");
+    let yaml = format!("{OPENAPI_HEADER}{PARTIAL_BODY}");
+    let partial: OasDocument =
+        serde_yaml::from_str(&yaml).expect("partial YAML must parse as OasDocument");
 
     let schemas: frieze::Schemas = frieze::schemas()
         .add::<User>()

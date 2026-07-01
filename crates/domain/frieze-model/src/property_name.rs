@@ -1,12 +1,15 @@
 //! A validated, non-empty property name.
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::Error;
 
 /// A non-empty property name.
 ///
 /// Constructed via [`PropertyName::new`]; the inner string is private so the
 /// "non-empty" invariant cannot be bypassed.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct PropertyName(String);
 
 impl PropertyName {
@@ -27,6 +30,20 @@ impl PropertyName {
 impl AsRef<str> for PropertyName {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl From<PropertyName> for String {
+    fn from(value: PropertyName) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<String> for PropertyName {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 

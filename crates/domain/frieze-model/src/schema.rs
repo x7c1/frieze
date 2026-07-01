@@ -1,5 +1,7 @@
 //! The top-level [`Schema`] sum stored in [`crate::Schemas`].
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::Error;
 use crate::object_schema::ObjectSchema;
 use crate::one_of_schema::{OneOfSchema, OneOfVariant};
@@ -28,7 +30,7 @@ use crate::string_enum_schema::StringEnumSchema;
 /// `Schemas::add::<i64>()` at compile time, and the boundary conversion
 /// in `frieze-usecase::to_value` skips Scalar entries as a defensive
 /// secondary guard.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Schema {
     /// A standard ("object-typed") schema with at least one property.
     Object(ObjectSchema),
@@ -121,5 +123,117 @@ impl Schema {
             Schema::OneOf(o) => Schema::OneOf(o.with_description(description)),
             Schema::Scalar(s) => Schema::Scalar(s.with_description(description)),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::one_of_schema::OneOfVariant;
+    use crate::presence::Presence;
+    use crate::property::Property;
+    use crate::property_name::PropertyName;
+    use crate::property_type::PropertyType;
+    use crate::schema_name::SchemaName;
+
+    fn roundtrip_json(schema: &Schema) {
+        let json = serde_json::to_string(schema).expect("serialize must succeed");
+        let restored: Schema = serde_json::from_str(&json).expect("deserialize must succeed");
+        assert_eq!(*schema, restored, "roundtrip mismatch for {schema:?}");
+    }
+
+    #[test]
+    fn object_schema_roundtrips_via_serde_json() {
+        let schema = Schema::new_object(
+            "User",
+            vec![
+                Property::new("id", PropertyType::Int64, Presence::Required).unwrap(),
+                Property::new(
+                    "name",
+                    PropertyType::Nullable(Box::new(PropertyType::String)),
+                    Presence::Optional,
+                )
+                .unwrap()
+                .with_description(Some("display name".into())),
+            ],
+        )
+        .unwrap();
+        roundtrip_json(&schema);
+    }
+
+    #[test]
+    fn string_enum_schema_roundtrips_via_serde_json() {
+        let schema = Schema::new_string_enum(
+            "Status",
+            vec!["Active".into(), "Inactive".into(), "Banned".into()],
+        )
+        .unwrap()
+        .with_description(Some("lifecycle state".into()));
+        roundtrip_json(&schema);
+    }
+
+    #[test]
+    fn one_of_schema_roundtrips_via_serde_json() {
+        let schema = Schema::new_one_of(
+            "Event",
+            "kind",
+            vec![
+                OneOfVariant::new("Login", SchemaName::new("LoginData").unwrap()),
+                OneOfVariant::new("Logout", SchemaName::new("LogoutData").unwrap())
+                    .with_description(Some("user has ended a session".into())),
+            ],
+        )
+        .unwrap();
+        roundtrip_json(&schema);
+    }
+
+    #[test]
+    fn scalar_schema_roundtrips_via_serde_json() {
+        let schema = Schema::new_scalar(PropertyType::Int64)
+            .unwrap()
+            .with_description(Some("a 64-bit signed integer".into()));
+        roundtrip_json(&schema);
+    }
+
+    #[test]
+    fn schema_name_roundtrips_through_string() {
+        let name = SchemaName::new("User.v2").unwrap();
+        let json = serde_json::to_string(&name).unwrap();
+        assert_eq!(json, "\"User.v2\"");
+        let restored: SchemaName = serde_json::from_str(&json).unwrap();
+        assert_eq!(name, restored);
+    }
+
+    #[test]
+    fn property_name_roundtrips_through_string() {
+        let name = PropertyName::new("id").unwrap();
+        let json = serde_json::to_string(&name).unwrap();
+        assert_eq!(json, "\"id\"");
+        let restored: PropertyName = serde_json::from_str(&json).unwrap();
+        assert_eq!(name, restored);
+    }
+
+    #[test]
+    fn scalar_schema_rejects_composite_property_type_on_deserialize() {
+        // The wire-shape twin can carry any `PropertyType`, but the
+        // constructor invariant rejects composites — deserialize must
+        // surface that as an error rather than silently building an
+        // invalid `ScalarSchema`.
+        let json = r#"{"Scalar":{"property_type":{"Array":"Int64"}}}"#;
+        let err = serde_json::from_str::<Schema>(json).unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("scalar schema requires a leaf PropertyType"),
+            "expected leaf-only invariant error, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn schema_name_rejects_invalid_input_on_deserialize() {
+        // The validation on `SchemaName::new` must fire from the
+        // deserialize path too, not just the direct constructor.
+        let json = "\"has space\"";
+        let err = serde_json::from_str::<SchemaName>(json).unwrap_err();
+        assert!(err.to_string().contains("must match"));
     }
 }

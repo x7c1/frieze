@@ -1,6 +1,8 @@
 //! A validated string-enum schema: a non-empty name plus a non-empty list
 //! of distinct, non-empty variant values.
 
+use serde::{Deserialize, Serialize};
+
 use crate::description::normalize_description;
 use crate::error::Error;
 use crate::schema_name::SchemaName;
@@ -20,7 +22,7 @@ use crate::schema_name::SchemaName;
 /// documented invariants on a value built via struct-literal or
 /// post-construction mutation is the caller's responsibility — the
 /// constructor is the only place that checks them.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StringEnumSchema {
     pub name: SchemaName,
     pub values: Vec<String>,

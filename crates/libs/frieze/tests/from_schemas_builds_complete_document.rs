@@ -9,12 +9,24 @@
 
 use std::collections::BTreeMap;
 
-use frieze::{from_schemas, Info, Schema};
+use frieze::{from_schemas, Info, OasVersion, Schema};
 
 #[derive(Schema)]
 #[allow(dead_code)]
 struct User {
     id: i64,
+}
+
+/// The OAS version the current build was compiled to emit.
+fn active_oas_version() -> OasVersion {
+    #[cfg(feature = "oas-3-0")]
+    {
+        OasVersion::V3_0
+    }
+    #[cfg(feature = "oas-3-1")]
+    {
+        OasVersion::V3_1
+    }
 }
 
 fn snapshot_info() -> Info {
@@ -33,7 +45,8 @@ fn from_schemas_routes_schemas_through_components() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    let document = from_schemas(snapshot_info(), schemas);
+    let document = from_schemas(snapshot_info(), schemas, active_oas_version())
+        .expect("from_schemas with active OAS version must succeed");
 
     // The document carries the supplied `Info` verbatim.
     assert_eq!(document.info.title, "Generated API");

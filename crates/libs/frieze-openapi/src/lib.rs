@@ -44,5 +44,8 @@ pub use components::Components;
 mod info;
 pub use info::Info;
 
+mod oas_version;
+pub use oas_version::{OasVersion, OasVersionParseError};
+
 mod oas_document;
 pub use oas_document::OasDocument;

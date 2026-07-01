@@ -13,6 +13,8 @@
 //! `Scalar` arm in the boundary conversion (`frieze-usecase::to_value`)
 //! provides the defensive secondary skip.
 
+use serde::{Deserialize, Serialize};
+
 use crate::description::normalize_description;
 use crate::error::Error;
 use crate::property_type::PropertyType;
@@ -25,10 +27,44 @@ use crate::property_type::PropertyType;
 /// constructor: a `pub` field would let callers build a `ScalarSchema`
 /// holding `PropertyType::Reference`, which violates the leaf-only
 /// invariant the consuming side relies on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "ScalarSchemaRaw", into = "ScalarSchemaRaw")]
 pub struct ScalarSchema {
     property_type: PropertyType,
     description: Option<String>,
+}
+
+/// Wire-shape twin of [`ScalarSchema`].
+///
+/// Serde-derived so the outer [`ScalarSchema`] can keep its
+/// leaf-only invariant on the private `property_type` field: the
+/// deserialize path funnels through [`ScalarSchema::new`] via
+/// [`TryFrom`], rejecting composite variants exactly as the public
+/// constructor does. On the serialize side, the twin captures a
+/// clone of the outer fields — [`ScalarSchema`] is not consumed
+/// during rendering.
+#[derive(Serialize, Deserialize)]
+struct ScalarSchemaRaw {
+    property_type: PropertyType,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
+}
+
+impl From<ScalarSchema> for ScalarSchemaRaw {
+    fn from(schema: ScalarSchema) -> Self {
+        Self {
+            property_type: schema.property_type,
+            description: schema.description,
+        }
+    }
+}
+
+impl TryFrom<ScalarSchemaRaw> for ScalarSchema {
+    type Error = Error;
+
+    fn try_from(raw: ScalarSchemaRaw) -> Result<Self, Self::Error> {
+        Ok(Self::new(raw.property_type)?.with_description(raw.description))
+    }
 }
 
 impl ScalarSchema {

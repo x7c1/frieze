@@ -1,5 +1,7 @@
 //! Whether a property is required to appear on the wire or may be omitted.
 
+use serde::{Deserialize, Serialize};
+
 /// Whether a property's key is required to appear in the serialized object.
 ///
 /// `Presence` is the **presence** axis of optionality — it controls the
@@ -21,7 +23,7 @@
 /// The derive in `frieze-macros` chooses a `Presence` based on the Rust
 /// field shape plus serde attributes; see the macro crate docs for the
 /// mapping table.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Presence {
     /// The property key must be present in the serialized object. The
     /// schema lists the field name under `required`.

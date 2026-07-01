@@ -1,5 +1,7 @@
 //! A validated property attached to a schema.
 
+use serde::{Deserialize, Serialize};
+
 use crate::description::normalize_description;
 use crate::error::Error;
 use crate::presence::Presence;
@@ -23,7 +25,7 @@ use crate::property_type::PropertyType;
 /// a value built via struct-literal or post-construction mutation is the
 /// caller's responsibility — the constructor is the only place that checks
 /// them.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Property {
     pub name: PropertyName,
     /// `ty` follows the Rust AST convention (e.g. `syn::Field::ty`, the `ty`

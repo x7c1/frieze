@@ -1,5 +1,7 @@
 //! A validated schema name.
 
+use serde::{Deserialize, Serialize};
+
 use crate::error::Error;
 
 /// A validated schema name suitable for use as a key under
@@ -16,7 +18,8 @@ use crate::error::Error;
 /// The pattern mirrors the OpenAPI Specification's restriction on
 /// component map keys; emitting an unrestricted name would produce YAML
 /// that valid OAS toolchains would reject downstream.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(try_from = "String", into = "String")]
 pub struct SchemaName(String);
 
 impl SchemaName {
@@ -49,6 +52,20 @@ impl SchemaName {
 impl AsRef<str> for SchemaName {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl From<SchemaName> for String {
+    fn from(value: SchemaName) -> Self {
+        value.0
+    }
+}
+
+impl TryFrom<String> for SchemaName {
+    type Error = Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::new(value)
     }
 }
 

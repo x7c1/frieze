@@ -1,5 +1,7 @@
 //! The enum of property types currently supported by the derive.
 
+use serde::{Deserialize, Serialize};
+
 use crate::schema_name::SchemaName;
 
 /// Maps a [`SchemaName`] to its primitive leaf [`PropertyType`] if the
@@ -68,7 +70,7 @@ pub fn primitive_property_type_for(name: &SchemaName) -> Option<PropertyType> {
 ///
 /// `Copy` is intentionally NOT derived because `Array(Box<PropertyType>)`
 /// and `Nullable(Box<PropertyType>)` own heap memory.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PropertyType {
     /// Maps to OpenAPI `type: integer, format: int32`.
     Int32,

@@ -9,6 +9,8 @@
 //! at [`crate::Schemas`]-building time, since at construction time we do
 //! not yet know which sibling schemas have been registered.
 
+use serde::{Deserialize, Serialize};
+
 use crate::description::normalize_description;
 use crate::error::Error;
 use crate::schema_name::SchemaName;
@@ -31,7 +33,7 @@ use crate::schema_name::SchemaName;
 ///
 /// The fields are `pub` because the type's contract is its shape, not
 /// behavior. Mutating after construction is the caller's responsibility.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OneOfVariant {
     pub wire_name: String,
     pub inner: SchemaName,
@@ -73,7 +75,7 @@ impl OneOfVariant {
 /// The "inner reference points at a struct schema" invariant is
 /// **cross-schema** and therefore checked at
 /// [`crate::Schemas`]-build time, not here.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OneOfSchema {
     pub name: SchemaName,
     pub tag: String,

@@ -16,8 +16,16 @@ struct User {
     name: String,
 }
 
-const PARTIAL: &str = "\
-openapi: 3.0.3
+/// The OAS version string this build was compiled to emit. The partial
+/// YAML below is stitched together with this prefix so the transition
+/// guard in `compose` accepts it under both `oas-3-0` and `oas-3-1`
+/// builds.
+#[cfg(feature = "oas-3-0")]
+const OPENAPI_HEADER: &str = "openapi: 3.0.3\n";
+#[cfg(feature = "oas-3-1")]
+const OPENAPI_HEADER: &str = "openapi: 3.1.0\n";
+
+const PARTIAL_BODY: &str = "\
 info:
   title: Example API
   version: 1.0.0
@@ -33,10 +41,15 @@ x-codegen-info:
   generator: frieze
 ";
 
+fn partial_yaml() -> String {
+    format!("{OPENAPI_HEADER}{PARTIAL_BODY}")
+}
+
 #[test]
 fn compose_merges_schemas_into_partial_and_preserves_other_sections() {
+    let yaml = partial_yaml();
     let partial: OasDocument =
-        serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as OasDocument");
+        serde_yaml::from_str(&yaml).expect("partial YAML must parse as OasDocument");
 
     let schemas: frieze::Schemas = frieze::schemas()
         .add::<User>()
@@ -89,8 +102,9 @@ fn compose_preserves_empty_components_when_no_schemas_registered() {
     // keys, or an empty schemas map) keeps that slot intact. The
     // boundary writes only into `components.schemas` and leaves the
     // surrounding shape alone.
+    let yaml = partial_yaml();
     let partial: OasDocument =
-        serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as OasDocument");
+        serde_yaml::from_str(&yaml).expect("partial YAML must parse as OasDocument");
 
     let schemas: frieze::Schemas = frieze::schemas()
         .build()
