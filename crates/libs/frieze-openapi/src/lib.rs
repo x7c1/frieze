@@ -44,5 +44,5 @@ pub use components::Components;
 mod info;
 pub use info::Info;
 
-mod oas_document;
-pub use oas_document::OasDocument;
+mod document;
+pub use document::Document;

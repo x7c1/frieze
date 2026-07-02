@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use frieze::{from_schemas, to_yaml, Info, Schemas};
 
-/// Wraps a `Schemas` collection in a minimal `OasDocument` for snapshot
+/// Wraps a `Schemas` collection in a minimal `Document` for snapshot
 /// tests, then renders it to YAML.
 ///
 /// The wrapping `Info` uses fixed `title` / `version` values so the

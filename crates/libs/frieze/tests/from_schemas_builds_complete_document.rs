@@ -1,4 +1,4 @@
-//! `from_schemas` builds a complete `OasDocument` from an `Info` value
+//! `from_schemas` builds a complete `Document` from an `Info` value
 //! and a `Schemas` collection, with no partial to merge against. The
 //! resulting document is format-neutral — it can be rendered to YAML
 //! or JSON without re-running the schema pipeline.
@@ -56,10 +56,10 @@ fn from_schemas_routes_schemas_through_components() {
     // Format-neutral: the same document round-trips through YAML and
     // JSON without loss.
     let yaml = frieze::to_yaml(&document);
-    let from_yaml: frieze::OasDocument =
+    let from_yaml: frieze::Document =
         serde_yaml::from_str(&yaml).expect("YAML round-trip must succeed");
     let json = serde_json::to_string_pretty(&document).expect("JSON serialize must succeed");
-    let from_json: frieze::OasDocument =
+    let from_json: frieze::Document =
         serde_json::from_str(&json).expect("JSON round-trip must succeed");
     assert_eq!(from_yaml, from_json);
 }

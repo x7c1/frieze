@@ -6,7 +6,7 @@
 //! authors locate the offending entries; the test pins both the
 //! variant and the count.
 
-use frieze::{compose, Error, OasDocument, Schema};
+use frieze::{compose, Document, Error, Schema};
 
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -35,8 +35,8 @@ components:
 
 #[test]
 fn compose_rejects_partial_that_already_carries_schemas() {
-    let partial: OasDocument = serde_yaml::from_str(PARTIAL_WITH_HAND_WRITTEN_SCHEMAS)
-        .expect("partial YAML must parse as OasDocument");
+    let partial: Document = serde_yaml::from_str(PARTIAL_WITH_HAND_WRITTEN_SCHEMAS)
+        .expect("partial YAML must parse as Document");
 
     let schemas: frieze::Schemas = frieze::schemas()
         .add::<User>()

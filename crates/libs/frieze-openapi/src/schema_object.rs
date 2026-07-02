@@ -35,7 +35,7 @@ use crate::string_enum_schema::StringEnumSchema;
 /// that happens to mention a `tag` / `variants` / `values` field at the
 /// schema level may be claimed by the wrong variant. The intent here is
 /// only to let frieze-produced documents survive a YAML/JSON round-trip
-/// through [`crate::OasDocument`]. Full external-input robustness will
+/// through [`crate::Document`]. Full external-input robustness will
 /// arrive with the dedicated canonical (de)serializers in a later step.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(untagged)]

@@ -1,22 +1,22 @@
-//! Renders an [`OasDocument`] as a YAML string.
+//! Renders an [`Document`] as a YAML string.
 
-use frieze_openapi::OasDocument;
+use frieze_openapi::Document;
 
-/// Renders a complete [`OasDocument`] as a YAML string in the canonical
+/// Renders a complete [`Document`] as a YAML string in the canonical
 /// key order.
 ///
 /// Equivalent to `serde_yaml::to_string(document).unwrap()`. The unwrap
-/// is safe because every `Serialize` impl in the `OasDocument` tree is
+/// is safe because every `Serialize` impl in the `Document` tree is
 /// total — every reachable type either uses an auto-derive or a
 /// handwritten impl whose `serialize_*` calls cannot fail on a
 /// well-formed value.
 ///
 /// This is the format-neutral output entry point on the YAML side. For
-/// JSON, callers route the same `OasDocument` through `serde_json`
+/// JSON, callers route the same `Document` through `serde_json`
 /// directly:
 ///
 /// ```ignore
-/// let doc: OasDocument = frieze::compose(partial, schemas)?;
+/// let doc: Document = frieze::compose(partial, schemas)?;
 /// let yaml = frieze::to_yaml(&doc);
 /// let json = serde_json::to_string_pretty(&doc)?;
 /// ```
@@ -42,7 +42,7 @@ use frieze_openapi::OasDocument;
 /// `serialize_str` impl selects `ScalarStyle::Literal` whenever the
 /// input contains a `\n`. Replacing the YAML backend in the future
 /// would need to preserve this rule explicitly.
-pub fn to_yaml(document: &OasDocument) -> String {
+pub fn to_yaml(document: &Document) -> String {
     serde_yaml::to_string(document)
-        .expect("frieze: serializing a finite OasDocument tree to YAML cannot fail")
+        .expect("frieze: serializing a finite Document tree to YAML cannot fail")
 }

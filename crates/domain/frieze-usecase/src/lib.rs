@@ -5,7 +5,7 @@
 //! schemas into a validated [`frieze_model::Schemas`], the private boundary
 //! conversion from `frieze-model` to `frieze-openapi` (in [`boundary`]),
 //! and the composition entry points ([`compose`], [`from_schemas`]) that
-//! produce a complete [`frieze_openapi::OasDocument`] ready for
+//! produce a complete [`frieze_openapi::Document`] ready for
 //! serialization.
 //!
 //! # Feature flags

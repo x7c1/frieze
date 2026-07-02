@@ -1,6 +1,6 @@
 //! The OpenAPI document root.
 //!
-//! [`OasDocument`] is the top-level type that carries an entire OpenAPI
+//! [`Document`] is the top-level type that carries an entire OpenAPI
 //! specification in memory. It is the format-neutral hand-off between
 //! the schema-producing side of frieze (which populates
 //! `components.schemas`) and the eventual output renderers — the same
@@ -34,7 +34,7 @@ use crate::info::Info;
 /// [`BTreeMap`] so the ordering of those keys on the wire is
 /// deterministic.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct OasDocument {
+pub struct Document {
     /// The OAS version string (e.g. `"3.0.3"`, `"3.1.0"`).
     pub openapi: String,
     pub info: Info,
@@ -60,8 +60,8 @@ pub struct OasDocument {
     pub extensions: BTreeMap<String, serde_json::Value>,
 }
 
-impl OasDocument {
-    /// Constructs a complete [`OasDocument`] from an [`Info`] and a
+impl Document {
+    /// Constructs a complete [`Document`] from an [`Info`] and a
     /// [`Components`] whose `schemas` map has been pre-populated.
     ///
     /// The resulting document has empty `paths`, no `servers`, etc.; the
@@ -137,10 +137,10 @@ mod tests {
     #[test]
     fn round_trips_through_yaml() {
         let yaml = sample_yaml();
-        let first: OasDocument = serde_yaml::from_str(yaml).expect("first parse must succeed");
+        let first: Document = serde_yaml::from_str(yaml).expect("first parse must succeed");
         let reserialized =
             serde_yaml::to_string(&first).expect("serializing back to YAML must succeed");
-        let second: OasDocument =
+        let second: Document =
             serde_yaml::from_str(&reserialized).expect("second parse must succeed");
         assert_eq!(first, second);
     }
@@ -150,9 +150,9 @@ mod tests {
         // Same source, but routed through JSON: parse YAML once, then
         // serialize to JSON, parse the JSON, and compare.
         let yaml = sample_yaml();
-        let first: OasDocument = serde_yaml::from_str(yaml).expect("first parse must succeed");
+        let first: Document = serde_yaml::from_str(yaml).expect("first parse must succeed");
         let json = serde_json::to_string_pretty(&first).expect("serializing to JSON must succeed");
-        let second: OasDocument =
+        let second: Document =
             serde_json::from_str(&json).expect("parsing back from JSON must succeed");
         assert_eq!(first, second);
     }
@@ -170,7 +170,7 @@ mod tests {
             }),
         );
 
-        let document = OasDocument {
+        let document = Document {
             openapi: "3.0.3".to_string(),
             info: Info {
                 title: "Programmatic".to_string(),
@@ -192,7 +192,7 @@ mod tests {
 
         let yaml = serde_yaml::to_string(&document)
             .expect("serializing constructed document must succeed");
-        let parsed: OasDocument =
+        let parsed: Document =
             serde_yaml::from_str(&yaml).expect("parsing back constructed document must succeed");
         assert_eq!(document, parsed);
     }

@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize, Serializer};
 /// `enum: [<wire_name>]` constraint inside the same `allOf` arm.
 ///
 /// The auto-derived `Serialize` / `Deserialize` here are only used to
-/// carry this type as data inside the round-tripped [`crate::OasDocument`];
+/// carry this type as data inside the round-tripped [`crate::Document`];
 /// the canonical OAS arm rendering (the `allOf: [{$ref}, {tag-property
 /// object}]` shape) is produced by the handwritten `Serialize` impl on
 /// [`OneOfSchema`], which composes each arm itself rather than calling
@@ -39,7 +39,7 @@ pub struct OneOfVariant {
 /// produced upstream in `frieze-macros`.
 ///
 /// `Deserialize` is auto-derived (used only for round-tripping through
-/// [`crate::OasDocument`]); the matching `Serialize` impl is handwritten
+/// [`crate::Document`]); the matching `Serialize` impl is handwritten
 /// further down to produce the canonical OAS `oneOf` shape.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct OneOfSchema {

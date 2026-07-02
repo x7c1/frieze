@@ -4,10 +4,10 @@
 //!
 //! End-to-end coverage of the user's typical flow: hand-written partial
 //! OAS document on disk + Rust types annotated with `#[derive(Schema)]`,
-//! glued together by `compose` to produce a complete `OasDocument` ready
+//! glued together by `compose` to produce a complete `Document` ready
 //! to be serialised back to YAML or JSON.
 
-use frieze::{compose, to_yaml, OasDocument, Schema};
+use frieze::{compose, to_yaml, Document, Schema};
 
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -35,8 +35,8 @@ x-codegen-info:
 
 #[test]
 fn compose_merges_schemas_into_partial_and_preserves_other_sections() {
-    let partial: OasDocument =
-        serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as OasDocument");
+    let partial: Document =
+        serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as Document");
 
     let schemas: frieze::Schemas = frieze::schemas()
         .add::<User>()
@@ -89,8 +89,8 @@ fn compose_preserves_empty_components_when_no_schemas_registered() {
     // keys, or an empty schemas map) keeps that slot intact. The
     // boundary writes only into `components.schemas` and leaves the
     // surrounding shape alone.
-    let partial: OasDocument =
-        serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as OasDocument");
+    let partial: Document =
+        serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as Document");
 
     let schemas: frieze::Schemas = frieze::schemas()
         .build()
