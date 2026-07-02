@@ -21,7 +21,7 @@ struct User {
 
 #[test]
 fn individual_field_rename_takes_precedence_over_rename_all() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");

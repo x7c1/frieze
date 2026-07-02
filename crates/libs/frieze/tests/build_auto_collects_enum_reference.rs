@@ -25,11 +25,15 @@ struct User {
 
 #[test]
 fn add_root_auto_collects_enum_reference() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("derived `register_into` auto-registers `Status` through the field walk");
 
-    let names: Vec<&str> = s.by_name.keys().map(frieze::SchemaName::as_str).collect();
+    let names: Vec<&str> = s
+        .by_name
+        .keys()
+        .map(frieze_model::SchemaName::as_str)
+        .collect();
     assert_eq!(names, vec!["Status", "User"]);
 }

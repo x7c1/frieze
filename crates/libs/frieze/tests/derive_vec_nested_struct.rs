@@ -19,7 +19,7 @@ struct Team {
 
 #[test]
 fn vec_of_nested_struct_renders_array_of_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Team>()
         .add::<User>()
         .build()

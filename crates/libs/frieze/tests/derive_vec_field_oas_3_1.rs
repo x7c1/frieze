@@ -18,7 +18,7 @@ struct Tag {
 
 #[test]
 fn vec_field_renders_as_type_array_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Tag>()
         .build()
         .expect("schemas build should succeed for valid input");

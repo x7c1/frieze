@@ -32,7 +32,7 @@ pub enum Error {
     /// Two schemas were registered under the same name but with
     /// different content.
     ///
-    /// Reachable through `frieze_usecase::SchemasBuilder::push_unique`
+    /// Reachable through `frieze::SchemasBuilder::push_unique`
     /// (and therefore through `SchemasBuilder::add`) when two roots
     /// produce the same registration name but disagree on their body —
     /// e.g. two distinct Rust types renamed to the same OAS name, or a
@@ -62,7 +62,7 @@ pub enum Error {
     },
     /// A `$ref` resolution failure detected by
     /// [`crate::Schemas`]-consuming code (typically
-    /// `frieze_usecase::SchemasBuilder::build`).
+    /// `frieze::SchemasBuilder::build`).
     ///
     /// Reachable only through the low-level API: code that uses
     /// `#[derive(Schema)]` together with `SchemasBuilder::add` /

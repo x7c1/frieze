@@ -34,11 +34,18 @@ struct Profile {
 
 #[test]
 fn add_root_auto_collects_generic_instance() {
-    let s: frieze::Schemas = frieze::schemas().add::<Profile>().build().expect(
-        "derived `register_into` auto-registers `Container<User>` and `User` \
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
+        .add::<Profile>()
+        .build()
+        .expect(
+            "derived `register_into` auto-registers `Container<User>` and `User` \
              through the field walk",
-    );
+        );
 
-    let names: Vec<&str> = s.by_name.keys().map(frieze::SchemaName::as_str).collect();
+    let names: Vec<&str> = s
+        .by_name
+        .keys()
+        .map(frieze_model::SchemaName::as_str)
+        .collect();
     assert_eq!(names, vec!["Profile", "User", "User_Container"]);
 }

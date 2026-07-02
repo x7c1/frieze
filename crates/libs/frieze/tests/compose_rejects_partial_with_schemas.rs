@@ -6,7 +6,10 @@
 //! authors locate the offending entries; the test pins both the
 //! variant and the count.
 
-use frieze::{compose, Document, Error, Schema};
+use frieze::Schema;
+use frieze_model::Error;
+use frieze_openapi::Document;
+use frieze_usecase::compose;
 
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -38,7 +41,7 @@ fn compose_rejects_partial_that_already_carries_schemas() {
     let partial: Document = serde_yaml::from_str(PARTIAL_WITH_HAND_WRITTEN_SCHEMAS)
         .expect("partial YAML must parse as Document");
 
-    let schemas: frieze::Schemas = frieze::schemas()
+    let schemas: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");

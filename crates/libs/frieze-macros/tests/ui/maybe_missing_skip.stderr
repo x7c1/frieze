@@ -1,5 +1,5 @@
 error: frieze: `Maybe<T>` field `avatar_url` requires both `#[serde(default)]` and `#[serde(skip_serializing_if = "Maybe::is_missing")]`. Add: #[serde(default, skip_serializing_if = "Maybe::is_missing")]
- --> tests/ui/maybe_missing_both.rs:6:17
+ --> tests/ui/maybe_missing_skip.rs:8:17
   |
-6 |     avatar_url: Maybe<String>,
+8 |     avatar_url: Maybe<String>,
   |                 ^^^^^^^^^^^^^

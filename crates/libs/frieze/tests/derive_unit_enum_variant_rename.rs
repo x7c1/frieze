@@ -17,7 +17,7 @@ enum Status {
 
 #[test]
 fn variant_rename_rewrites_the_enum_value() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Status>()
         .build()
         .expect("schemas build should succeed for valid input");

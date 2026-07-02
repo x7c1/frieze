@@ -24,7 +24,7 @@ enum Single {
 
 #[test]
 fn single_variant_internal_tagged_still_emits_one_of() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Single>()
         .add::<OnlyData>()
         .build()

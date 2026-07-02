@@ -19,7 +19,7 @@ enum Color {
 
 #[test]
 fn variant_docs_only_render_as_bullet_list_description() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Color>()
         .build()
         .expect("schemas build should succeed for valid input");

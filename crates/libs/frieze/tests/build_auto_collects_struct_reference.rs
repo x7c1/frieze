@@ -27,11 +27,15 @@ struct Workspace {
 
 #[test]
 fn add_root_auto_collects_nested_struct_reference() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Workspace>()
         .build()
         .expect("derived `register_into` auto-registers `Profile` through the field walk");
 
-    let names: Vec<&str> = s.by_name.keys().map(frieze::SchemaName::as_str).collect();
+    let names: Vec<&str> = s
+        .by_name
+        .keys()
+        .map(frieze_model::SchemaName::as_str)
+        .collect();
     assert_eq!(names, vec!["Profile", "Workspace"]);
 }

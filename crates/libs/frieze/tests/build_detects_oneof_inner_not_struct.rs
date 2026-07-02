@@ -4,8 +4,8 @@
 //! is the first line of defence, but the model-side check guards
 //! handcrafted `Schema::new_one_of` callers too.
 
+use frieze::SchemasBuilder;
 use frieze_model::{Error, OneOfVariant, Schema, SchemaName};
-use frieze_usecase::SchemasBuilder;
 
 #[test]
 fn rejects_oneof_variant_targeting_string_enum() {
@@ -15,7 +15,7 @@ fn rejects_oneof_variant_targeting_string_enum() {
     // is bypassed here by hand-implementing the trait, so the runtime
     // build check is what enforces "inner must be a struct schema".
     struct DummyStatus;
-    impl frieze_usecase::Schema for DummyStatus {
+    impl frieze::Schema for DummyStatus {
         fn name() -> String {
             "Status".to_string()
         }
@@ -23,13 +23,13 @@ fn rejects_oneof_variant_targeting_string_enum() {
             Schema::new_string_enum("Status", vec!["Active".into(), "Inactive".into()]).unwrap()
         }
     }
-    impl frieze_usecase::IsStructSchema for DummyStatus {}
-    impl frieze_usecase::Register for DummyStatus {}
-    impl frieze_usecase::IsRegistrable for DummyStatus {}
+    impl frieze::IsStructSchema for DummyStatus {}
+    impl frieze::Register for DummyStatus {}
+    impl frieze::IsRegistrable for DummyStatus {}
     // Intentionally implement `IsStructSchema` on DummyStatus so the
     // macro-side check is bypassed; the runtime check still fires.
     struct DummyEvent;
-    impl frieze_usecase::Schema for DummyEvent {
+    impl frieze::Schema for DummyEvent {
         fn name() -> String {
             "Event".to_string()
         }
@@ -45,8 +45,8 @@ fn rejects_oneof_variant_targeting_string_enum() {
             .unwrap()
         }
     }
-    impl frieze_usecase::Register for DummyEvent {}
-    impl frieze_usecase::IsRegistrable for DummyEvent {}
+    impl frieze::Register for DummyEvent {}
+    impl frieze::IsRegistrable for DummyEvent {}
     let err = SchemasBuilder::new()
         .add::<DummyEvent>()
         .add::<DummyStatus>()
@@ -67,7 +67,7 @@ fn rejects_oneof_variant_targeting_other_oneof() {
     // A oneOf cannot point at another oneOf — the synthesized tag
     // field has nothing to merge into.
     struct DummyInnerStruct;
-    impl frieze_usecase::Schema for DummyInnerStruct {
+    impl frieze::Schema for DummyInnerStruct {
         fn name() -> String {
             "InnerStruct".to_string()
         }
@@ -84,12 +84,12 @@ fn rejects_oneof_variant_targeting_other_oneof() {
             .unwrap()
         }
     }
-    impl frieze_usecase::IsStructSchema for DummyInnerStruct {}
-    impl frieze_usecase::Register for DummyInnerStruct {}
-    impl frieze_usecase::IsRegistrable for DummyInnerStruct {}
+    impl frieze::IsStructSchema for DummyInnerStruct {}
+    impl frieze::Register for DummyInnerStruct {}
+    impl frieze::IsRegistrable for DummyInnerStruct {}
 
     struct DummyInner;
-    impl frieze_usecase::Schema for DummyInner {
+    impl frieze::Schema for DummyInner {
         fn name() -> String {
             "Inner".to_string()
         }
@@ -105,12 +105,12 @@ fn rejects_oneof_variant_targeting_other_oneof() {
             .unwrap()
         }
     }
-    impl frieze_usecase::IsStructSchema for DummyInner {}
-    impl frieze_usecase::Register for DummyInner {}
-    impl frieze_usecase::IsRegistrable for DummyInner {}
+    impl frieze::IsStructSchema for DummyInner {}
+    impl frieze::Register for DummyInner {}
+    impl frieze::IsRegistrable for DummyInner {}
 
     struct DummyOuter;
-    impl frieze_usecase::Schema for DummyOuter {
+    impl frieze::Schema for DummyOuter {
         fn name() -> String {
             "Outer".to_string()
         }
@@ -123,8 +123,8 @@ fn rejects_oneof_variant_targeting_other_oneof() {
             .unwrap()
         }
     }
-    impl frieze_usecase::Register for DummyOuter {}
-    impl frieze_usecase::IsRegistrable for DummyOuter {}
+    impl frieze::Register for DummyOuter {}
+    impl frieze::IsRegistrable for DummyOuter {}
     let err = SchemasBuilder::new()
         .add::<DummyOuter>()
         .add::<DummyInner>()

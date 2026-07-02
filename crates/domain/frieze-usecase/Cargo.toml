@@ -4,21 +4,14 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Use cases for frieze: Schema trait, builder, and OAS boundary conversion."
+description = "Use cases for frieze: OAS boundary conversion and document composition."
 
 [features]
-default = ["oas-3-0", "inventory"]
+default = ["oas-3-0"]
 oas-3-0 = ["frieze-openapi/oas-3-0"]
 oas-3-1 = ["frieze-openapi/oas-3-1"]
-# `inventory`-based collection (on by default): enables
-# `SchemasBuilder::from_inventory()` and the `SchemaRoot` submission
-# channel that the derive macro's expansion targets via the facade's
-# `__private::inventory_submit!` wrapper. Disable with
-# `default-features = false` for no_std / WASM / embedded targets.
-inventory = ["dep:inventory"]
 
 [dependencies]
 frieze-model.workspace = true
 frieze-openapi.workspace = true
 indexmap.workspace = true
-inventory = { workspace = true, optional = true }

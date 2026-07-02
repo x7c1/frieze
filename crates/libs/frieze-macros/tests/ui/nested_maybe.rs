@@ -1,4 +1,5 @@
-use frieze::{Maybe, Schema};
+use frieze::Schema;
+use frieze_model::Maybe;
 
 #[derive(Schema)]
 struct S {

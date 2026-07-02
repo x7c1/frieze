@@ -47,7 +47,7 @@ struct Foo {
 
 #[test]
 fn from_inventory_walks_into_generic_field() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         .build()
         .expect("inventory + transitive walk produces a closed schemas set");

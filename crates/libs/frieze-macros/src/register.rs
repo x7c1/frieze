@@ -26,7 +26,7 @@ use crate::ty::{unwrap_maybe, unwrap_option, unwrap_vec};
 /// invoked.
 ///
 /// These three wrappers intentionally lack `Schema` / `Register`
-/// impls in `frieze-usecase` (`Vec<i64>` has no OAS-level concept,
+/// impls in the `frieze` crate (`Vec<i64>` has no OAS-level concept,
 /// etc.), so the derive must reach past them. Other parametrised types
 /// (`Page<T>`, `Box<T>`, ...) implement the traits directly and are
 /// returned unchanged — `Box<T>` / `Rc<T>` / `Arc<T>` even delegate
@@ -55,16 +55,16 @@ pub(crate) fn register_into_body(inner_types: &[&Type]) -> TokenStream {
     let calls = inner_types.iter().map(|ty| {
         let target = strip_collection_wrappers(ty);
         quote! {
-            <#target as ::frieze::__private::frieze_usecase::Register>::register_into(builder);
+            <#target as ::frieze::__private::Register>::register_into(builder);
         }
     });
     quote! {
         if builder.contains_name(
-            &<Self as ::frieze::__private::frieze_usecase::Schema>::name(),
+            &<Self as ::frieze::__private::Schema>::name(),
         ) {
             return;
         }
-        builder.push_unique(<Self as ::frieze::__private::frieze_usecase::Schema>::schema());
+        builder.push_unique(<Self as ::frieze::__private::Schema>::schema());
         #( #calls )*
     }
 }
@@ -73,12 +73,13 @@ pub(crate) fn register_into_body(inner_types: &[&Type]) -> TokenStream {
 /// input.
 ///
 /// The submission is unconditional from the macro's perspective: the
-/// facade's `__private::inventory_submit!` wrapper decides whether the
-/// emitted call has runtime effect (under `#[cfg(feature = "inventory")]`,
-/// it expands to a real `inventory::submit!`; otherwise to nothing).
-/// Splitting the feature gate to the facade keeps `frieze-macros` from
-/// having to know the consumer crate's feature state, which it has no
-/// way to learn at proc-macro expansion time.
+/// `frieze` crate's `__private::inventory_submit!` wrapper decides
+/// whether the emitted call has runtime effect (under
+/// `#[cfg(feature = "inventory")]`, it expands to a real
+/// `inventory::submit!`; otherwise to nothing). Splitting the feature
+/// gate to the `frieze` crate keeps `frieze-macros` from having to
+/// know the consumer crate's feature state, which it has no way to
+/// learn at proc-macro expansion time.
 ///
 /// Generic inputs (`generics.params` non-empty) get `TokenStream::new()`
 /// instead: `inventory::submit!` lowers to a `static` initializer and
@@ -100,7 +101,7 @@ pub(crate) fn inventory_submit_token(type_ident: &Ident, generics: &syn::Generic
     quote! {
         ::frieze::__private::inventory_submit! {
             #type_name,
-            <#type_ident as ::frieze::__private::frieze_usecase::Register>::register_into
+            <#type_ident as ::frieze::__private::Register>::register_into
         }
     }
 }

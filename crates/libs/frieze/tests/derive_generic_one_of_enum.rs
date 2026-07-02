@@ -51,7 +51,7 @@ fn event_argument_order_is_significant() {
 
 #[test]
 fn event_renders_with_inlined_primitive_inners() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Event<i64, String>>()
         .add::<Container<i64>>()
         .add::<Container<String>>()

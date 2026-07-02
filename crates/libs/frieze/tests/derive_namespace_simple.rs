@@ -48,7 +48,7 @@ pub mod v1 {
 
 #[test]
 fn namespace_folds_into_oas_key() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         .build()
         .expect("inventory iteration produces a closed schemas set");

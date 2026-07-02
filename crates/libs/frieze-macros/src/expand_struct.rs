@@ -103,8 +103,7 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
     let mut impl_generics_storage = ast.generics.clone();
     for param in impl_generics_storage.params.iter_mut() {
         if let GenericParam::Type(type_param) = param {
-            let bound: syn::TypeParamBound =
-                syn::parse_quote!(::frieze::__private::frieze_usecase::Schema);
+            let bound: syn::TypeParamBound = syn::parse_quote!(::frieze::__private::Schema);
             type_param.bounds.push(bound);
         }
     }
@@ -113,8 +112,7 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
     let mut register_generics_storage = ast.generics.clone();
     for param in register_generics_storage.params.iter_mut() {
         if let GenericParam::Type(type_param) = param {
-            let bound: syn::TypeParamBound =
-                syn::parse_quote!(::frieze::__private::frieze_usecase::Register);
+            let bound: syn::TypeParamBound = syn::parse_quote!(::frieze::__private::Register);
             type_param.bounds.push(bound);
         }
     }
@@ -130,13 +128,13 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
     let inventory_submit = inventory_submit_token(ident, &ast.generics);
 
     let expanded = quote! {
-        impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
+        impl #impl_generics ::frieze::__private::Schema for #ident #ty_generics #where_clause {
             fn name() -> ::std::string::String {
                 #name_body
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
                 ::frieze::__private::frieze_model::Schema::new_object(
-                    <Self as ::frieze::__private::frieze_usecase::Schema>::name(),
+                    <Self as ::frieze::__private::Schema>::name(),
                     ::std::vec![ #( #property_exprs ),* ],
                 )
                 .expect("frieze: derived schema satisfies invariants by construction")
@@ -146,9 +144,9 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
         // Registration contract: the derived `register_into` walks each
         // field type's `register_into` so dependencies are collected
         // transitively.
-        impl #register_impl_generics ::frieze::__private::frieze_usecase::Register for #ident #ty_generics #register_where_clause {
+        impl #register_impl_generics ::frieze::__private::Register for #ident #ty_generics #register_where_clause {
             fn register_into(
-                builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
+                builder: &mut ::frieze::__private::SchemasBuilder,
             ) {
                 #register_body
             }
@@ -157,11 +155,11 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
         // Enums never receive this impl, so a `oneOf` newtype variant
         // referencing an enum-derived type is rejected at compile time
         // by the bound check emitted in `expand_enum`.
-        impl #impl_generics ::frieze::__private::frieze_usecase::IsStructSchema for #ident #ty_generics #where_clause {}
+        impl #impl_generics ::frieze::__private::IsStructSchema for #ident #ty_generics #where_clause {}
         // Marker impl: a struct-derived `Schema` is registrable on a
         // `Schemas` collection. Primitive scalars never receive this
         // impl, so `Schemas::add::<i64>()` is rejected at compile time.
-        impl #register_impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #register_where_clause {}
+        impl #register_impl_generics ::frieze::__private::IsRegistrable for #ident #ty_generics #register_where_clause {}
 
         #inventory_submit
     };
@@ -236,7 +234,7 @@ fn composed_name_body(generics: &syn::Generics, base_name: &str) -> TokenStream 
     }
     format_str.push_str(base_name);
     let args = type_param_idents.iter().map(|t| {
-        quote! { <#t as ::frieze::__private::frieze_usecase::Schema>::name() }
+        quote! { <#t as ::frieze::__private::Schema>::name() }
     });
     quote! {
         ::frieze::__private::compose_schema_name(

@@ -6,7 +6,9 @@
 
 use std::collections::BTreeMap;
 
-use frieze::{from_schemas, to_yaml, Info, Schemas};
+use frieze_model::Schemas;
+use frieze_openapi::{to_yaml, Info};
+use frieze_usecase::from_schemas;
 
 /// Wraps a `Schemas` collection in a minimal `Document` for snapshot
 /// tests, then renders it to YAML.

@@ -67,9 +67,8 @@
 //! is rejected at compile time: without the pair, the three-state
 //! missing / null / present mapping collapses on the wire.
 //!
-//! The expansion routes every reference to the supporting crates through the
-//! `frieze::__private` module so downstream users only need to depend on the
-//! `frieze` facade crate.
+//! The expansion routes every reference through the `frieze::__private`
+//! module so downstream users only need to depend on the `frieze` crate.
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;

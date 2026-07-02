@@ -34,7 +34,7 @@ enum Event {
 
 #[test]
 fn renders_as_one_of_with_internal_tag_allof() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Event>()
         .add::<LoginData>()
         .add::<LogoutData>()

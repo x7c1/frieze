@@ -13,3 +13,13 @@ proc-macro = true
 syn.workspace = true
 quote.workspace = true
 proc-macro2.workspace = true
+
+[dev-dependencies]
+# The trybuild UI tests exercise the expansion end-to-end, so they need
+# the runtime crates the emitted code resolves against. A dev-dependency
+# back onto `frieze` is fine: dev-dependencies do not participate in the
+# publishable dependency graph, so no cycle is introduced.
+frieze.workspace = true
+frieze-model.workspace = true
+serde.workspace = true
+trybuild.workspace = true

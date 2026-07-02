@@ -37,12 +37,16 @@ struct Outer {
 
 #[test]
 fn add_root_auto_collects_generic_enum_instance() {
-    let s: frieze::Schemas = frieze::schemas().add::<Outer>().build().expect(
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new().add::<Outer>().build().expect(
         "derived `register_into` auto-registers `Event<i64, String>` and its \
              variant-inner instantiations through the field walk",
     );
 
-    let names: Vec<&str> = s.by_name.keys().map(frieze::SchemaName::as_str).collect();
+    let names: Vec<&str> = s
+        .by_name
+        .keys()
+        .map(frieze_model::SchemaName::as_str)
+        .collect();
     assert_eq!(
         names,
         vec![

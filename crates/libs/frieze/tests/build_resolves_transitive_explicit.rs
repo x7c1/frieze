@@ -26,13 +26,17 @@ struct Workspace {
 
 #[test]
 fn explicit_transitive_registration_resolves_all_refs() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Workspace>()
         .add::<Profile>()
         .add::<User>()
         .build()
         .expect("explicit registration should resolve all references");
 
-    let names: Vec<&str> = s.by_name.keys().map(frieze::SchemaName::as_str).collect();
+    let names: Vec<&str> = s
+        .by_name
+        .keys()
+        .map(frieze_model::SchemaName::as_str)
+        .collect();
     assert_eq!(names, vec!["Profile", "User", "Workspace"]);
 }

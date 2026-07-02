@@ -7,7 +7,9 @@
 //! glued together by `compose` to produce a complete `Document` ready
 //! to be serialised back to YAML or JSON.
 
-use frieze::{compose, to_yaml, Document, Schema};
+use frieze::Schema;
+use frieze_openapi::{to_yaml, Document};
+use frieze_usecase::compose;
 
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -38,7 +40,7 @@ fn compose_merges_schemas_into_partial_and_preserves_other_sections() {
     let partial: Document =
         serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as Document");
 
-    let schemas: frieze::Schemas = frieze::schemas()
+    let schemas: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");
@@ -92,7 +94,7 @@ fn compose_preserves_empty_components_when_no_schemas_registered() {
     let partial: Document =
         serde_yaml::from_str(PARTIAL).expect("partial YAML must parse as Document");
 
-    let schemas: frieze::Schemas = frieze::schemas()
+    let schemas: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .build()
         .expect("empty builder must produce empty Schemas");
 

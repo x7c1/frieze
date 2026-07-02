@@ -21,7 +21,7 @@ struct User {
 
 #[test]
 fn vec_of_enum_field_renders_as_array_of_refs() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .add::<Status>()
         .build()

@@ -25,7 +25,7 @@ struct Profile {
 
 #[test]
 fn option_nested_with_skip_renders_plain_ref_and_optional_presence() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .add::<User>()
         .build()

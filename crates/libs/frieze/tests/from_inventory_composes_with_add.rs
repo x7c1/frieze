@@ -44,7 +44,7 @@ struct Page<T> {
 
 #[test]
 fn from_inventory_composes_with_explicit_generic_root() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         // `Page<Bar>` cannot ride the inventory channel (`Page<T>` is
         // generic) and no inventory-submitted type's field reaches it.

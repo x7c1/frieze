@@ -21,7 +21,7 @@ struct User {
 
 #[test]
 fn option_with_skip_serializing_if_renders_optional_non_nullable_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");

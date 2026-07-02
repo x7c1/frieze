@@ -27,7 +27,7 @@ struct Tree {
 
 #[test]
 fn recursive_struct_emits_self_referential_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Tree>()
         .build()
         .expect("schemas build should succeed for a self-referential type");

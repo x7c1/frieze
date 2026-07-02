@@ -29,7 +29,7 @@ struct Listings {
 
 #[test]
 fn vec_generic_renders_as_array_of_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Listings>()
         .add::<Page<User>>()
         .add::<User>()

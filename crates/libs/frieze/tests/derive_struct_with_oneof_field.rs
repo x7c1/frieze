@@ -39,7 +39,7 @@ struct Audit {
 
 #[test]
 fn struct_field_of_oneof_type_renders_as_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Audit>()
         .add::<Event>()
         .add::<LoginData>()

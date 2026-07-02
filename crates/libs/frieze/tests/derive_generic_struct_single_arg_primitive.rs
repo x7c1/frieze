@@ -41,7 +41,7 @@ fn container_bool_name_uses_suffix_form() {
 
 #[test]
 fn container_i64_inlines_primitive_value() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Container<i64>>()
         .build()
         .expect("schemas build succeeds without a registered `Int64`");
@@ -66,7 +66,7 @@ fn container_i64_inlines_primitive_value() {
 
 #[test]
 fn container_string_inlines_primitive_value() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Container<String>>()
         .build()
         .expect("schemas build succeeds without a registered `String`");
@@ -90,7 +90,7 @@ fn container_string_inlines_primitive_value() {
 
 #[test]
 fn container_bool_inlines_primitive_value() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Container<bool>>()
         .build()
         .expect("schemas build succeeds without a registered `Boolean`");

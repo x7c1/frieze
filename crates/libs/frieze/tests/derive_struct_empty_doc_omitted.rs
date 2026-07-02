@@ -21,7 +21,7 @@ struct User {
 
 #[test]
 fn whitespace_only_doc_comment_emits_no_description_key() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");

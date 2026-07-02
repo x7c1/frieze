@@ -52,7 +52,7 @@ struct Root {
 
 #[test]
 fn from_inventory_collects_every_derived_root() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         .build()
         .expect("inventory iteration produces a closed schemas set");

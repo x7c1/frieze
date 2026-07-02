@@ -27,7 +27,7 @@ use crate::boundary::to_openapi;
 ///
 /// `partial` MUST NOT already contain any entries under
 /// `components.schemas`; the single source of truth for schemas is the
-/// Rust types collected via [`crate::SchemasBuilder`]. If
+/// Rust types collected via `frieze::SchemasBuilder`. If
 /// `partial.components.schemas` is non-empty, returns
 /// [`Error::PartialAlreadyHasSchemas`].
 ///

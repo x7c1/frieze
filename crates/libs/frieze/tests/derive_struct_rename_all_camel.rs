@@ -17,7 +17,7 @@ struct User {
 
 #[test]
 fn struct_rename_all_camel_case_renames_every_field() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");

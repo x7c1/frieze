@@ -24,7 +24,7 @@ struct Profile {
 
 #[test]
 fn option_ref_with_description_carries_description_on_all_of_wrap_under_oas_3_0() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .add::<Image>()
         .build()

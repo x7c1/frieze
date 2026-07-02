@@ -38,7 +38,7 @@ struct Foo {
 
 #[test]
 fn single_add_auto_collects_generic_instance() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Foo>()
         .build()
         .expect("transitive `register_into` collects `Page<Bar>` and `Bar` automatically");

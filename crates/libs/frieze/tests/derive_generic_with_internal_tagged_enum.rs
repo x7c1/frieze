@@ -31,7 +31,7 @@ enum Event {
 
 #[test]
 fn generic_inner_in_internal_tagged_enum() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Event>()
         .add::<Container<User>>()
         .add::<User>()

@@ -20,7 +20,7 @@ enum Status {
 
 #[test]
 fn missing_variant_docs_are_omitted_from_the_bullet_list() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Status>()
         .build()
         .expect("schemas build should succeed for valid input");

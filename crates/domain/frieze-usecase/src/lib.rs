@@ -1,12 +1,13 @@
 //! Use cases for frieze.
 //!
-//! Defines the [`Schema`] / [`Register`] traits that user types implement
-//! (typically through the derive macro in `frieze-macros`), the
-//! [`SchemasBuilder`] that collects schemas into a validated
-//! [`frieze_model::Schemas`], the private boundary conversion from
-//! `frieze-model` to `frieze-openapi` (in [`boundary`]), and the
-//! composition entry points ([`compose`], [`from_schemas`]) that produce
-//! a complete [`frieze_openapi::Document`] ready for serialization.
+//! Owns the private boundary conversion from `frieze-model` to
+//! `frieze-openapi` (in [`boundary`]) and the composition entry points
+//! ([`compose`], [`from_schemas`]) that produce a complete
+//! [`frieze_openapi::Document`] ready for serialization.
+//!
+//! The user-facing contract traits (`Schema` / `Register`) and the
+//! `SchemasBuilder` registry live in the `frieze` crate; this crate
+//! consumes the [`frieze_model::Schemas`] aggregate they produce.
 //!
 //! # Feature flags
 //!
@@ -24,26 +25,6 @@ compile_error!(
 compile_error!(
     "frieze: one of features `oas-3-0` or `oas-3-1` must be enabled (default is `oas-3-0`)."
 );
-
-mod schema;
-pub use schema::{IsStructSchema, Schema};
-
-mod register;
-pub use register::{IsRegistrable, Register};
-
-mod primitive_schema_impls;
-mod wrapper_impls;
-
-mod schemas_builder;
-pub use schemas_builder::SchemasBuilder;
-
-#[cfg(feature = "inventory")]
-mod inventory;
-#[cfg(feature = "inventory")]
-pub use inventory::{Namespace, SchemaRoot};
-
-mod naming;
-pub use naming::compose_schema_name;
 
 mod boundary;
 

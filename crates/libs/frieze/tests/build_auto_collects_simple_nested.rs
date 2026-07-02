@@ -25,7 +25,7 @@ struct Foo {
 
 #[test]
 fn single_add_auto_collects_transitive_struct() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Foo>()
         .build()
         .expect("transitive `register_into` collects the nested `User` automatically");

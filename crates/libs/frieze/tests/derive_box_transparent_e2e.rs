@@ -28,7 +28,7 @@ struct Owner {
 
 #[test]
 fn box_field_renders_as_inner_ref_with_no_box_entry() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Owner>()
         .add::<User>()
         .build()
