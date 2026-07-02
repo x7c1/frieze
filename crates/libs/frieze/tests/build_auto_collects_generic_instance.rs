@@ -1,11 +1,11 @@
 //! End-to-end: a single `add::<Foo>()` auto-collects a generic
 //! instantiation (`Page<Bar>`) and its inner argument (`Bar`) through
-//! the transitive `Schema::register_into` walk.
+//! the transitive `Register::register_into` walk.
 //!
 //! Why this matters: `inventory` cannot carry generic types in a
 //! `static` (Rust's language limitation), but the derived
 //! `register_into` is a regular monomorphic function — so when `Foo`'s
-//! derive emits `<Page<Bar> as Schema>::register_into(builder)` it is
+//! derive emits `<Page<Bar> as Register>::register_into(builder)` it is
 //! `Page<Bar>`'s own derived body (with `T = Bar`) that runs at
 //! runtime, registers itself as `Bar_Page`, and recurses into `Bar`.
 //! The end result is that adding only the non-generic root pulls in

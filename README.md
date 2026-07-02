@@ -11,7 +11,9 @@ hands you back a complete OpenAPI document you can render to YAML or
 JSON.
 
 ```rust
-use frieze::{Info, Maybe, Schema};
+use frieze::{Schema, SchemasBuilder};
+use frieze_model::Maybe;
+use frieze_openapi::Info;
 use serde::{Deserialize, Serialize};
 
 /// A registered user of the system.
@@ -35,18 +37,26 @@ struct User {
     tags: Vec<Option<String>>,
 }
 
-let schemas = frieze::schemas()
+let schemas = SchemasBuilder::new()
     .add::<User>()
     .build()
     .expect("schemas build should succeed");
-let document = frieze::from_schemas(
+let document = frieze_usecase::from_schemas(
     Info { title: "My API".into(), version: "1.0.0".into(), ..Default::default() },
     schemas,
 );
-println!("{}", frieze::to_yaml(&document));
+println!("{}", frieze_openapi::to_yaml(&document));
 ```
 
-The same `OasDocument` value is format-neutral — render it to JSON
+The `frieze` crate owns the pieces user types interact with — the
+`Schema` / `Register` traits, `#[derive(Schema)]`, and the
+`SchemasBuilder` registry. Document assembly lives in the companion
+crates: `frieze-openapi` holds the OAS wire types (`Document`, `Info`,
+...) and `to_yaml`, `frieze-usecase` holds `compose` / `from_schemas`,
+and `frieze-model` holds the validated domain types (`Maybe`,
+`Schemas`, `Error`, ...). Depend on the ones you use directly.
+
+The same `Document` value is format-neutral — render it to JSON
 through serde directly when needed:
 
 ```rust
@@ -54,12 +64,12 @@ let json = serde_json::to_string_pretty(&document)?;
 ```
 
 When the user already has a hand-written OAS document fragment
-(`info`, `paths`, `tags`, vendor extensions), `frieze::compose` merges
-schemas into it without disturbing the rest:
+(`info`, `paths`, `tags`, vendor extensions), `frieze_usecase::compose`
+merges schemas into it without disturbing the rest:
 
 ```rust
-let partial: frieze::OasDocument = serde_yaml::from_str(&yaml)?;
-let document = frieze::compose(partial, schemas)?;
+let partial: frieze_openapi::Document = serde_yaml::from_str(&yaml)?;
+let document = frieze_usecase::compose(partial, schemas)?;
 ```
 
 `compose` rejects partials that already carry entries under
@@ -105,13 +115,13 @@ table and the version-specific shapes for nullable references.
 
 ## Auto-collection via `inventory`
 
-`Schemas::builder().from_inventory()` is available out of the box —
+`SchemasBuilder::new().from_inventory()` is available out of the box —
 the `inventory` Cargo feature is on by default. Every non-generic
 `#[derive(Schema)]` type is collected automatically, so a single call
 is enough for the typical web-API server case:
 
 ```rust
-let schemas = frieze::schemas()
+let schemas = frieze::SchemasBuilder::new()
     .from_inventory()
     .build()?;
 ```
@@ -137,7 +147,7 @@ Two genuine cases require chaining `add::<T>()` after
    with `add::<Page<Bar>>()`.
 
    ```rust
-   let schemas = frieze::schemas()
+   let schemas = frieze::SchemasBuilder::new()
        .from_inventory()
        .add::<Page<Bar>>() // unreachable from any inventory-submitted root
        .build()?;
@@ -145,8 +155,9 @@ Two genuine cases require chaining `add::<T>()` after
 
 2. **Hand-written `impl Schema` for foreign types.** Types from
    external crates cannot carry `#[derive(Schema)]`, so they never
-   submit to `inventory`. Provide a hand-written `impl Schema` and
-   register it via `add::<ForeignType>()`.
+   submit to `inventory`. Provide hand-written `impl Schema` /
+   `impl Register` / `impl IsRegistrable` blocks and register the type
+   via `add::<ForeignType>()`.
 
 `inventory` aggregates per binary, so every test in a given test
 binary observes the same submission set. Tests that need an isolated
@@ -161,7 +172,7 @@ opt out by disabling the default features:
 frieze = { version = "...", default-features = false, features = ["oas-3-0"] }
 ```
 
-With the feature off, `Schemas::builder().from_inventory()` is no
+With the feature off, `SchemasBuilder::new().from_inventory()` is no
 longer available and the derive macro's `inventory_submit!` expansion
 becomes a no-op. Register schemas explicitly via `add::<T>()` instead.
 

@@ -1,6 +1,6 @@
 //! A generic-struct instantiation (`Container<User>`) used as a
 //! struct-field type is auto-registered through the derived
-//! `Schema::register_into`: adding only `Profile` pulls in
+//! `Register::register_into`: adding only `Profile` pulls in
 //! `Container<User>` (composed name `User_Container`) and `User`
 //! without explicit second / third `add` calls.
 //!
@@ -9,7 +9,7 @@
 //! resolves automatically. Each derive-site's `register_into` walks
 //! its syntactically-visible field types, including the concrete
 //! `Container<User>` instantiation, so the monomorphic
-//! `<Container<User> as Schema>::register_into` fires at runtime and
+//! `<Container<User> as Register>::register_into` fires at runtime and
 //! registers itself plus `User`.
 
 use frieze::Schema;

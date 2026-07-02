@@ -1,5 +1,5 @@
 //! `SchemasBuilder::add::<T>()` auto-collects every struct reachable
-//! from `T`'s field types through the derived `Schema::register_into`.
+//! from `T`'s field types through the derived `Register::register_into`.
 //! Adding only the root `Workspace` is enough — `Profile` follows
 //! transitively without an explicit second `add` call.
 //!

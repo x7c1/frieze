@@ -1,6 +1,6 @@
 //! A generic-enum instantiation (`Event<i64, String>`) used as a
 //! struct-field type is auto-registered through the derived
-//! `Schema::register_into`: adding only the root `Outer` is enough
+//! `Register::register_into`: adding only the root `Outer` is enough
 //! for the builder to discover the composed enum schema
 //! (`Int64_String_Event`) plus every variant-inner type
 //! (`Container<i64>`, `Container<String>`).
@@ -9,7 +9,7 @@
 //! under transitive `register_into` the enum-instance reference resolves
 //! automatically. The enum derive emits a `register_into` body that
 //! recurses into each variant's inner type, so the monomorphic
-//! `<Event<i64, String> as Schema>::register_into` fires at runtime
+//! `<Event<i64, String> as Register>::register_into` fires at runtime
 //! and registers `Container<i64>` and `Container<String>`.
 
 use frieze::Schema;

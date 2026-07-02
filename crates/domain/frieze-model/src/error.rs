@@ -67,7 +67,7 @@ pub enum Error {
     /// Reachable only through the low-level API: code that uses
     /// `#[derive(Schema)]` together with `SchemasBuilder::add` /
     /// `SchemasBuilder::push_unique` never triggers this error
-    /// because the derived [`Schema::register_into`] walks each field
+    /// because the derived [`Register::register_into`] walks each field
     /// type and registers transitive dependencies automatically.
     ///
     /// Two situations still raise the error:
@@ -83,7 +83,7 @@ pub enum Error {
     /// Recovery is the same in both cases: register the missing type
     /// (`SchemasBuilder::add::<MissingType>()`), or override
     /// `register_into` on the manual `impl Schema` to call
-    /// `<MissingType as Schema>::register_into(builder)`.
+    /// `<MissingType as Register>::register_into(builder)`.
     #[error(
         "schema `{0}` is referenced but not registered (add it via \
          `SchemasBuilder::add::<...>()`, or override `register_into` \

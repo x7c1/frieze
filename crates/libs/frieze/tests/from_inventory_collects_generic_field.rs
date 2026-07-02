@@ -11,7 +11,7 @@
 //! (`Foo` and `Bar`); `Page<T>` is generic and intentionally not
 //! submitted (Rust's `static` cannot hold generic types). At runtime,
 //! `from_inventory()` invokes `Foo::register_into`, which emits the
-//! syntactic call `<Page<Bar> as Schema>::register_into(builder)`.
+//! syntactic call `<Page<Bar> as Register>::register_into(builder)`.
 //! `Page<Bar>` is monomorphized at compile time, so the call resolves
 //! to `Page<Bar>`'s own `register_into` body, registering itself as
 //! `Bar_Page` and recursing into `Bar` (which the idempotent guard

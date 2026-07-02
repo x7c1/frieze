@@ -1,5 +1,5 @@
 //! A struct field typed by a derived enum is auto-registered through
-//! the derived `Schema::register_into`: adding only the struct root
+//! the derived `Register::register_into`: adding only the struct root
 //! `User` pulls in `Status` without a second `add::<Status>()` call.
 //!
 //! This used to assert `Error::UnresolvedReference(Status)`; under

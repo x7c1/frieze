@@ -122,7 +122,7 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
     let name_body = composed_name_body(&ast.generics, &base_name);
     let register_body = register_into_body(&field_types);
     // Non-generic struct: emit one `inventory::submit!` site so the
-    // type appears as a root in `Schemas::builder().from_inventory()`.
+    // type appears as a root in `SchemasBuilder::new().from_inventory()`.
     // Generic structs produce an empty token stream — see
     // `inventory_submit_token` for the rationale.
     let inventory_submit = inventory_submit_token(ident, &ast.generics);

@@ -1,6 +1,6 @@
 //! End-to-end: a single `add::<Foo>()` produces the full transitive
 //! closure for a simple two-level struct graph. The derive emits a
-//! `Schema::register_into` body that walks each field type's
+//! `Register::register_into` body that walks each field type's
 //! `register_into`, so the nested `User` is registered automatically
 //! through the field walk on `Foo.user`.
 //!
