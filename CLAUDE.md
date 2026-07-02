@@ -16,27 +16,31 @@ crates/
     frieze-cli           # bin: compose / validate (future)
   domain/
     frieze-model         # Domain types whose invariants are enforced by the type system
-    frieze-usecase       # Schema trait, Schemas builder, boundary conversion, use cases
+    frieze-usecase       # Boundary conversion and document composition (compose / from_schemas)
   libs/
-    frieze-openapi       # Plain representation of the OpenAPI Specification
+    frieze-openapi       # Plain representation of the OpenAPI Specification (+ to_yaml)
     frieze-macros        # proc-macro crate
-    frieze               # Facade crate for end users
+    frieze               # User-facing API: Schema / Register traits + SchemasBuilder registry
 ```
 
 ## Dependency direction and invariants
 
 ```
-frieze-cli       -> frieze-usecase
-frieze-usecase   -> frieze-model, frieze-openapi
-frieze-macros    -> frieze-usecase
-frieze (facade)  -> all of the above
+frieze-cli     -> frieze-usecase
+frieze-usecase -> frieze-model, frieze-openapi
+frieze         -> frieze-model, frieze-macros
 ```
+
+(`frieze-macros` has no runtime dependency on the other crates: the
+tokens it emits resolve through `::frieze::__private`. `frieze` also
+dev-depends on `frieze-openapi` / `frieze-usecase` for its integration
+tests, forwarding the `oas-3-0` / `oas-3-1` features to them.)
 
 1. `frieze-model` depends on nothing else within frieze (and minimally on external crates).
 2. `frieze-openapi` does not know about `frieze-model` or `frieze-usecase`.
 3. Only `frieze-usecase` performs the boundary conversion between `frieze-openapi` and `frieze-model`.
 4. `frieze-model` types use private fields + constructor functions; they cannot be built via struct literals.
-5. `frieze-macros` only touches the `Schema` trait defined in `frieze-usecase`; it never constructs `frieze-openapi` or `frieze-model` types directly.
+5. `frieze-macros` only touches the `Schema` / `Register` traits and the `__private` helpers defined in `frieze`; it never constructs `frieze-openapi` types, and reaches `frieze-model` constructors only through `::frieze::__private`.
 
 ## Terminology
 

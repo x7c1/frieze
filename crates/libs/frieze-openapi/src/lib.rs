@@ -44,5 +44,8 @@ pub use components::Components;
 mod info;
 pub use info::Info;
 
-mod oas_document;
-pub use oas_document::OasDocument;
+mod document;
+pub use document::Document;
+
+mod to_yaml;
+pub use to_yaml::to_yaml;

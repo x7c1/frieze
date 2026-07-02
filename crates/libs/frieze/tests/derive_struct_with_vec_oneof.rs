@@ -37,7 +37,7 @@ struct Audit {
 
 #[test]
 fn vec_of_oneof_field_renders_as_array_of_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Audit>()
         .add::<Event>()
         .add::<LoginData>()

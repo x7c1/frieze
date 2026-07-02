@@ -22,7 +22,7 @@ struct Team {
 
 #[test]
 fn vec_of_option_nested_renders_array_of_nullable_ref_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Team>()
         .add::<User>()
         .build()

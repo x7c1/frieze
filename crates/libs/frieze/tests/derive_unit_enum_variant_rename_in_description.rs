@@ -22,7 +22,7 @@ enum Status {
 
 #[test]
 fn variant_bullet_names_use_individual_rename_when_present() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Status>()
         .build()
         .expect("schemas build should succeed for valid input");

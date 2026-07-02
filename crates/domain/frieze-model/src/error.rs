@@ -32,7 +32,7 @@ pub enum Error {
     /// Two schemas were registered under the same name but with
     /// different content.
     ///
-    /// Reachable through `frieze_usecase::SchemasBuilder::push_unique`
+    /// Reachable through `frieze::SchemasBuilder::push_unique`
     /// (and therefore through `SchemasBuilder::add`) when two roots
     /// produce the same registration name but disagree on their body —
     /// e.g. two distinct Rust types renamed to the same OAS name, or a
@@ -62,12 +62,12 @@ pub enum Error {
     },
     /// A `$ref` resolution failure detected by
     /// [`crate::Schemas`]-consuming code (typically
-    /// `frieze_usecase::SchemasBuilder::build`).
+    /// `frieze::SchemasBuilder::build`).
     ///
     /// Reachable only through the low-level API: code that uses
     /// `#[derive(Schema)]` together with `SchemasBuilder::add` /
     /// `SchemasBuilder::push_unique` never triggers this error
-    /// because the derived [`Schema::register_into`] walks each field
+    /// because the derived [`Register::register_into`] walks each field
     /// type and registers transitive dependencies automatically.
     ///
     /// Two situations still raise the error:
@@ -83,7 +83,7 @@ pub enum Error {
     /// Recovery is the same in both cases: register the missing type
     /// (`SchemasBuilder::add::<MissingType>()`), or override
     /// `register_into` on the manual `impl Schema` to call
-    /// `<MissingType as Schema>::register_into(builder)`.
+    /// `<MissingType as Register>::register_into(builder)`.
     #[error(
         "schema `{0}` is referenced but not registered (add it via \
          `SchemasBuilder::add::<...>()`, or override `register_into` \

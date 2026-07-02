@@ -34,7 +34,7 @@ struct Outer {
 
 #[test]
 fn build_resolves_reference_to_generic_enum_instance() {
-    let _ = frieze::schemas()
+    let _ = frieze::SchemasBuilder::new()
         .add::<Outer>()
         .add::<Event<i64, String>>()
         .add::<Container<i64>>()

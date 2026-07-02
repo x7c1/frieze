@@ -20,12 +20,16 @@ struct User {
 
 #[test]
 fn explicit_enum_registration_resolves_the_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .add::<Status>()
         .build()
         .expect("explicit registration should resolve the enum reference");
 
-    let names: Vec<&str> = s.by_name.keys().map(frieze::SchemaName::as_str).collect();
+    let names: Vec<&str> = s
+        .by_name
+        .keys()
+        .map(frieze_model::SchemaName::as_str)
+        .collect();
     assert_eq!(names, vec!["Status", "User"]);
 }

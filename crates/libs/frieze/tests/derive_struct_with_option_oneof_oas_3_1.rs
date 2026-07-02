@@ -38,7 +38,7 @@ struct Audit {
 
 #[test]
 fn option_oneof_field_wraps_with_oneof_null() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Audit>()
         .add::<Event>()
         .add::<LoginData>()

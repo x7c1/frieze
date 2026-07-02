@@ -36,7 +36,7 @@ fn pair_argument_order_is_significant() {
 
 #[test]
 fn pair_two_primitives_inlines_both_fields() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Pair<i32, f64>>()
         .build()
         .expect("schemas build inlines both primitive references");

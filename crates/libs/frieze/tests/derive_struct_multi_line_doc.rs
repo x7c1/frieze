@@ -7,7 +7,7 @@
 //! `description` carries in practice.
 //!
 //! The snapshot below pins that contract end-to-end through the
-//! user-facing `frieze::to_yaml` boundary, so regressions in either the
+//! user-facing `frieze_openapi::to_yaml` boundary, so regressions in either the
 //! Value tree or the YAML backend are caught.
 
 use frieze::Schema;
@@ -24,7 +24,7 @@ struct Note {
 
 #[test]
 fn multi_line_doc_comment_emits_as_literal_block_scalar() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Note>()
         .build()
         .expect("schemas build should succeed for valid input");

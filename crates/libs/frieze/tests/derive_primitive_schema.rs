@@ -26,7 +26,7 @@ fn primitive_schema_is_scalar_variant() {
     // The Scalar variant is the only path by which primitives are
     // expressible in `frieze_model::Schema`; the leaf PropertyType
     // matches the Rust scalar.
-    use frieze::PropertyType;
+    use frieze_model::PropertyType;
     use frieze_model::{ScalarSchema, Schema as ModelSchema};
 
     let cases: &[(ModelSchema, PropertyType)] = &[

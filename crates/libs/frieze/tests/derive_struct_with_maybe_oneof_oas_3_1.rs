@@ -9,7 +9,8 @@
 
 #![cfg(feature = "oas-3-1")]
 
-use frieze::{Maybe, Schema};
+use frieze::Schema;
+use frieze_model::Maybe;
 use serde::{Deserialize, Serialize};
 
 mod common;
@@ -44,7 +45,7 @@ struct Audit {
 
 #[test]
 fn maybe_oneof_field_wraps_with_oneof_null_and_drops_required() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Audit>()
         .add::<Event>()
         .add::<LoginData>()

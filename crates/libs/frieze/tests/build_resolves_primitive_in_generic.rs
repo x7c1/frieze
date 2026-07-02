@@ -25,7 +25,7 @@ struct Container<T> {
 
 #[test]
 fn build_succeeds_for_container_over_i64() {
-    let _ = frieze::schemas()
+    let _ = frieze::SchemasBuilder::new()
         .add::<Container<i64>>()
         .build()
         .expect("schemas build should resolve the inner `Int64` reference inline");
@@ -33,7 +33,7 @@ fn build_succeeds_for_container_over_i64() {
 
 #[test]
 fn build_succeeds_for_container_over_string() {
-    let _ = frieze::schemas()
+    let _ = frieze::SchemasBuilder::new()
         .add::<Container<String>>()
         .build()
         .expect("schemas build should resolve the inner `String` reference inline");
@@ -41,7 +41,7 @@ fn build_succeeds_for_container_over_string() {
 
 #[test]
 fn build_succeeds_for_container_over_bool() {
-    let _ = frieze::schemas()
+    let _ = frieze::SchemasBuilder::new()
         .add::<Container<bool>>()
         .build()
         .expect("schemas build should resolve the inner `Boolean` reference inline");

@@ -87,7 +87,7 @@ pub(crate) fn inner_to_property_type_expr(
 
 /// Maps a Rust scalar field type to the matching
 /// `frieze_model::PropertyType`, emitted as a path that resolves through
-/// the facade re-export.
+/// `frieze::__private`.
 ///
 /// Falls through to [`reference_property_type_expr`] when the type is a
 /// single-segment, unparametrised identifier that isn't a known scalar —
@@ -150,7 +150,7 @@ fn reference_property_type_expr(ty: &Type) -> Result<TokenStream, syn::Error> {
     Ok(quote! {
         ::frieze::__private::frieze_model::PropertyType::Reference(
             ::frieze::__private::frieze_model::SchemaName::new(
-                <#ty as ::frieze::__private::frieze_usecase::Schema>::name()
+                <#ty as ::frieze::__private::Schema>::name()
             )
             .expect("frieze: referenced schema name violates the OAS component-name pattern")
         )

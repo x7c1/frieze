@@ -30,7 +30,7 @@ pub mod v1 {
 
 #[test]
 fn nested_namespaces_chain_with_dots() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         .build()
         .expect("inventory iteration produces a closed schemas set");

@@ -5,7 +5,7 @@ use frieze_model::{
     primitive_property_type_for, Error, PropertyType, Schema as ModelSchema, SchemaName, Schemas,
 };
 
-use crate::schema::{IsRegistrable, Schema};
+use crate::register::{IsRegistrable, Register};
 
 /// In-progress collection of schemas.
 ///
@@ -32,12 +32,12 @@ impl SchemasBuilder {
     ///
     /// `T` must implement [`IsRegistrable`] — this rejects primitive
     /// scalars at compile time (`Schemas::add::<i64>()` fails to
-    /// compile), since primitive scalars implement [`Schema`] only so
-    /// they can appear as generic arguments and are not standalone OAS
-    /// schema entries. `#[derive(Schema)]` emits the `IsRegistrable`
-    /// impl for struct and enum inputs.
+    /// compile), since primitive scalars implement [`crate::Schema`] /
+    /// [`Register`] only so they can appear as generic arguments and
+    /// are not standalone OAS schema entries. `#[derive(Schema)]` emits
+    /// the `IsRegistrable` impl for struct and enum inputs.
     ///
-    /// The traversal is performed by [`Schema::register_into`]: the
+    /// The traversal is performed by [`Register::register_into`]: the
     /// derived impl walks each field type's `register_into`, so a single
     /// `add::<Foo>()` call pulls in `Foo` together with every nested
     /// struct / enum / generic instance reachable from `Foo`'s fields.
@@ -45,7 +45,7 @@ impl SchemasBuilder {
     /// root reachable through multiple paths, leaves only one entry per
     /// name in the resulting `Schemas`.
     pub fn add<T: IsRegistrable>(mut self) -> Self {
-        <T as Schema>::register_into(&mut self);
+        <T as Register>::register_into(&mut self);
         self
     }
 
@@ -58,7 +58,7 @@ impl SchemasBuilder {
     /// [`Schemas::new`] anyway.
     ///
     /// This is the idempotent push primitive used by
-    /// [`Schema::register_into`] (both the default impl and the
+    /// [`Register::register_into`] (both the default impl and the
     /// derive-emitted override) so the same root reached through
     /// multiple paths or via a self-referential cycle (`struct Tree
     /// { children: Vec<Box<Tree>> }`) collapses to a single entry.
@@ -97,7 +97,7 @@ impl SchemasBuilder {
     /// Returns `true` if a previously-pushed schema has the same
     /// registration name as `name`.
     ///
-    /// The derive-emitted [`Schema::register_into`] uses this as the
+    /// The derive-emitted [`Register::register_into`] uses this as the
     /// early-return guard at the top of the body: `if
     /// builder.contains_name(&Self::name()) { return; }` short-circuits
     /// recursion through self-referential types and multi-path arrival
@@ -269,11 +269,12 @@ mod tests {
     use crate::schema::Schema;
     use frieze_model::{Error, Presence, Property, PropertyType, SchemaName};
 
-    /// `DummyUser` and `DummyProfile` deliberately omit a `register_into`
-    /// override: the default trait impl pushes only `Self`, so these
-    /// hand-written `impl Schema`s exercise the non-recursive default
-    /// path and let us assert the low-level behaviour (silent dedup,
-    /// unresolved-reference detection) without depending on the derive.
+    /// `DummyUser` and `DummyProfile` deliberately leave their
+    /// `impl Register` blocks empty: the default `register_into` pushes
+    /// only `Self`, so these hand-written impls exercise the
+    /// non-recursive default path and let us assert the low-level
+    /// behaviour (silent dedup, unresolved-reference detection) without
+    /// depending on the derive.
     struct DummyUser;
 
     impl Schema for DummyUser {
@@ -291,6 +292,7 @@ mod tests {
             .unwrap()
         }
     }
+    impl Register for DummyUser {}
     impl IsRegistrable for DummyUser {}
 
     #[test]
@@ -330,6 +332,7 @@ mod tests {
             .unwrap()
         }
     }
+    impl Register for DummyProfile {}
     impl IsRegistrable for DummyProfile {}
 
     #[test]
@@ -370,6 +373,7 @@ mod tests {
             .unwrap()
         }
     }
+    impl Register for DummyUserAlt {}
     impl IsRegistrable for DummyUserAlt {}
 
     #[test]
@@ -404,10 +408,10 @@ mod tests {
         // dangles and the builder fails fast.
         //
         // This exercises the path where `UnresolvedReference` is still
-        // raised: hand-written `impl Schema`s that reference other types
-        // but do not override `register_into` to walk their dependencies.
-        // Code using `#[derive(Schema)]` never lands here because the
-        // derived `register_into` walks each field type.
+        // raised: hand-written impls that reference other types but do
+        // not override `Register::register_into` to walk their
+        // dependencies. Code using `#[derive(Schema)]` never lands here
+        // because the derived `register_into` walks each field type.
         let err = SchemasBuilder::new()
             .add::<DummyProfile>()
             .build()

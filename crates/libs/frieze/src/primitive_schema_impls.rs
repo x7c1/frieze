@@ -1,16 +1,16 @@
-//! [`Schema`] implementations for primitive scalar types (`i32`, `i64`,
-//! `u32`, `u64`, `f32`, `f64`, `bool`, `String`).
+//! [`Schema`] / [`Register`] implementations for primitive scalar types
+//! (`i32`, `i64`, `u32`, `u64`, `f32`, `f64`, `bool`, `String`).
 //!
-//! Primitive scalars implement [`Schema`] so they can appear as generic
-//! arguments — `Box<i64>`, `Page<String>`, etc. — and let generic
-//! derive output keep a uniform `T: Schema` trait bound across struct,
+//! Primitive scalars implement [`Schema`] and [`Register`] so they can
+//! appear as generic arguments — `Box<i64>`, `Page<String>`, etc. — and
+//! let generic derive output keep uniform trait bounds across struct,
 //! enum, and primitive arguments.
 //!
 //! Primitives intentionally **do not** implement [`crate::IsRegistrable`].
 //! This is the compile-time guard that rejects
 //! `Schemas::add::<i64>()` — primitives are not standalone OAS schema
-//! entries. The [`crate::Schema::Scalar`] arm in
-//! [`crate::to_value::to_openapi`] is the defensive secondary guard.
+//! entries. The `Schema::Scalar` arm in the boundary conversion is the
+//! defensive secondary guard.
 //!
 //! Schema names follow OAS type/format conventions:
 //!
@@ -27,6 +27,7 @@
 
 use frieze_model::{PropertyType, Schema as ModelSchema};
 
+use crate::register::Register;
 use crate::schema::Schema;
 use crate::schemas_builder::SchemasBuilder;
 
@@ -43,15 +44,16 @@ macro_rules! impl_primitive_schema {
                 ModelSchema::new_scalar(PropertyType::$variant)
                     .expect(PRIMITIVE_SCALAR_INVARIANT_MSG)
             }
+        }
+        impl Register for $ty {
             fn register_into(_builder: &mut SchemasBuilder) {
                 // Primitive scalars are inlined at the boundary
-                // conversion in `to_value` and never registered as
-                // standalone entries under `#/components/schemas`. The
-                // override stays a no-op so transitive
-                // `register_into` calls from derived schemas can be
-                // emitted uniformly (`<#ty as Schema>::register_into`)
-                // without the macro special-casing primitive field
-                // types.
+                // conversion and never registered as standalone
+                // entries under `#/components/schemas`. The override
+                // stays a no-op so transitive `register_into` calls
+                // from derived schemas can be emitted uniformly
+                // (`<#ty as Register>::register_into`) without the
+                // macro special-casing primitive field types.
             }
         }
     };

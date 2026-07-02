@@ -17,7 +17,7 @@ use crate::schema_type::SchemaType;
 /// the serialised form aligned.
 ///
 /// `Deserialize` is auto-derived solely to let this type ride along
-/// inside the round-tripped [`crate::OasDocument`]. The matching
+/// inside the round-tripped [`crate::Document`]. The matching
 /// `Serialize` impl is handwritten further down to produce the canonical
 /// OAS `{type, description?, enum}` key order.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]

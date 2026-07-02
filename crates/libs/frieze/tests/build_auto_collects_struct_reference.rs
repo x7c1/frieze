@@ -1,5 +1,5 @@
 //! `SchemasBuilder::add::<T>()` auto-collects every struct reachable
-//! from `T`'s field types through the derived `Schema::register_into`.
+//! from `T`'s field types through the derived `Register::register_into`.
 //! Adding only the root `Workspace` is enough — `Profile` follows
 //! transitively without an explicit second `add` call.
 //!
@@ -27,11 +27,15 @@ struct Workspace {
 
 #[test]
 fn add_root_auto_collects_nested_struct_reference() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Workspace>()
         .build()
         .expect("derived `register_into` auto-registers `Profile` through the field walk");
 
-    let names: Vec<&str> = s.by_name.keys().map(frieze::SchemaName::as_str).collect();
+    let names: Vec<&str> = s
+        .by_name
+        .keys()
+        .map(frieze_model::SchemaName::as_str)
+        .collect();
     assert_eq!(names, vec!["Profile", "Workspace"]);
 }

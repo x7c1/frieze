@@ -15,7 +15,7 @@ enum Status {
 
 #[test]
 fn enum_top_doc_only_renders_without_variant_list() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Status>()
         .build()
         .expect("schemas build should succeed for valid input");

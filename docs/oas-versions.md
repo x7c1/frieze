@@ -1,8 +1,9 @@
 # OAS versions
 
 `frieze` targets exactly **one** OpenAPI Specification version per
-build. The version is selected by a Cargo feature on the `frieze`
-facade crate.
+build. The version is selected by a Cargo feature; the `frieze` crate
+forwards `oas-3-0` / `oas-3-1` to the crates that encode the version
+(`frieze-openapi`, and `frieze-usecase` on top of it).
 
 ## Feature flags
 

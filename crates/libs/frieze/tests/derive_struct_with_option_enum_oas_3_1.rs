@@ -23,7 +23,7 @@ struct User {
 
 #[test]
 fn option_enum_field_renders_as_nullable_ref_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .add::<Status>()
         .build()

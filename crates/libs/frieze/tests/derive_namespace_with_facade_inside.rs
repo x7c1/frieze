@@ -36,7 +36,7 @@ type _ForceReachable = v1::Foo;
 
 #[test]
 fn intermediate_non_namespace_mod_is_collapsed() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         .build()
         .expect("inventory iteration produces a closed schemas set");

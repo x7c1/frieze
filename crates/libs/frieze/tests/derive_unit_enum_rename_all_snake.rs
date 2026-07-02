@@ -17,7 +17,7 @@ enum Status {
 
 #[test]
 fn rename_all_snake_case_lowercases_and_underscores_variants() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Status>()
         .build()
         .expect("schemas build should succeed for valid input");

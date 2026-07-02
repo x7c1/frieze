@@ -21,13 +21,13 @@ use crate::string_enum_schema::StringEnumSchema;
 /// a variant surfaces a compile error at every consumption site.
 ///
 /// [`Schema::Scalar`] exists so primitive Rust types (`i32`, `String`,
-/// etc.) can implement the `frieze_usecase::Schema` trait and appear as
+/// etc.) can implement the `frieze::Schema` trait and appear as
 /// generic arguments (`Box<i64>`, `Page<String>`). Scalar schemas are
 /// **not** registered under `#/components/schemas` — the
-/// `IsRegistrable` marker trait in `frieze-usecase` rejects
+/// `IsRegistrable` marker trait in the `frieze` crate rejects
 /// `Schemas::add::<i64>()` at compile time, and the boundary conversion
-/// in `frieze-usecase::to_value` skips Scalar entries as a defensive
-/// secondary guard.
+/// in `frieze-usecase` skips Scalar entries as a defensive secondary
+/// guard.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Schema {
     /// A standard ("object-typed") schema with at least one property.

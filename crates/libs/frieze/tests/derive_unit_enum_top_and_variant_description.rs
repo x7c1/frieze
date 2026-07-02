@@ -18,7 +18,7 @@ enum Status {
 
 #[test]
 fn enum_top_and_all_variant_docs_compose_into_description() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Status>()
         .build()
         .expect("schemas build should succeed for valid input");

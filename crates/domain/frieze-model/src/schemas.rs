@@ -29,8 +29,8 @@ impl Schemas {
     /// [`Schema::Scalar`] entries are silently filtered: scalar schemas
     /// have no registration name (see [`Schema::name`]) and are never
     /// emitted under `#/components/schemas`. The primary guard against
-    /// scalar registration is the `IsRegistrable` marker trait in
-    /// `frieze-usecase` (compile-time); this filter is the defensive
+    /// scalar registration is the `IsRegistrable` marker trait in the
+    /// `frieze` crate (compile-time); this filter is the defensive
     /// secondary guard at the domain layer.
     pub fn new(schemas: Vec<Schema>) -> Result<Self, Error> {
         let mut by_name: BTreeMap<SchemaName, Schema> = BTreeMap::new();

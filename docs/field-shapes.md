@@ -83,7 +83,7 @@ combinations map to the following Rust shapes:
   derive inspects that attribute and switches branches accordingly.
 - **`Maybe<T>` is the dedicated three-state type** for "missing / null /
   present" — the one combination not expressible by `Option<T>` alone.
-  Re-exported as `frieze::Maybe`. Add
+  Defined in `frieze-model` (`use frieze_model::Maybe;`). Add
   `#[serde(default, skip_serializing_if = "Maybe::is_missing")]` on the
   field to make missing-key handling work in both directions.
 - **Nullability lives on the type tree** (`PropertyType::Nullable`),
@@ -192,13 +192,15 @@ is equivalent to `Schemas::add::<UserStruct>()`.
 appear in serialisable API shapes — a real REST handler typically
 takes the lock, clones, then serializes, rather than serializing
 through the lock guard. If the need arises later, the blanket impl
-pattern in `frieze-usecase::wrapper_impls` is the template to follow.
+pattern in the `frieze` crate's `wrapper_impls` is the template to
+follow.
 
 ## Generic types
 
 `#[derive(Schema)]` accepts type parameters on the input struct and
-emits an `impl Schema for Foo<T>` that requires `T: Schema` (the bound
-is synthesised automatically, alongside the user's `where` clause).
+emits an `impl Schema for Foo<T>` that requires `T: Schema`, plus an
+`impl Register for Foo<T>` that requires `T: Register` (the bounds are
+synthesised automatically, alongside the user's `where` clause).
 The schema name and the schema body are both computed at
 monomorphisation time: each specific instantiation
 (`Page<User>`, `Container<i64>`, ...) is a separate entry under
@@ -271,7 +273,7 @@ Each generic instantiation is a distinct schema entry and must be
 registered on the builder explicitly:
 
 ```rust
-frieze::schemas()
+frieze::SchemasBuilder::new()
     .add::<Page<User>>()    // registers `User_Page`
     .add::<User>()          // registers `User`
     .build()?;
@@ -365,7 +367,7 @@ distinct schema entry and must be registered explicitly alongside the
 enum:
 
 ```rust
-frieze::schemas()
+frieze::SchemasBuilder::new()
     .add::<Event<i64, String>>()    // registers `Int64_String_Event`
     .add::<Container<i64>>()        // registers `Int64_Container`
     .add::<Container<String>>()     // registers `String_Container`

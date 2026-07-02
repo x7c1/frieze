@@ -37,7 +37,7 @@ fn container_of_container_of_string_name_collapses_recursively() {
 
 #[test]
 fn container_of_container_of_i64_registers_two_layers() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Container<Container<i64>>>()
         .add::<Container<i64>>()
         .build()

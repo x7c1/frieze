@@ -33,9 +33,9 @@ pub(crate) fn unwrap_vec(ty: &Type) -> Option<&Type> {
 /// If `ty` syntactically names `Maybe<T>` (via `Maybe`, `frieze::Maybe`,
 /// or `frieze_model::Maybe`), returns `T`.
 ///
-/// Plain `Maybe` is the form users get from `use frieze::Maybe;` (the
-/// facade re-export); the longer paths cover users who reach into the
-/// underlying crates directly.
+/// Plain `Maybe` is the form users get from `use frieze_model::Maybe;`;
+/// the qualified forms cover users who spell out the defining crate at
+/// the field type.
 pub(crate) fn unwrap_maybe(ty: &Type) -> Option<&Type> {
     unwrap_single_generic(
         ty,

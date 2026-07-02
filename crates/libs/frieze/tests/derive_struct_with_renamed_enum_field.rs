@@ -25,7 +25,7 @@ struct User {
 
 #[test]
 fn renamed_field_keeps_referenced_enum_rename_all_intact() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Lifecycle>()
         .add::<User>()
         .build()
