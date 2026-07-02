@@ -46,3 +46,6 @@ pub use info::Info;
 
 mod document;
 pub use document::Document;
+
+mod to_yaml;
+pub use to_yaml::to_yaml;

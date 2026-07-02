@@ -112,7 +112,6 @@ dependencies = [
  "frieze-openapi",
  "indexmap",
  "inventory",
- "serde_yaml",
 ]
 
 [[package]]

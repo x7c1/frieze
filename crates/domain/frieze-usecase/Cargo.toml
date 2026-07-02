@@ -22,4 +22,3 @@ frieze-model.workspace = true
 frieze-openapi.workspace = true
 indexmap.workspace = true
 inventory = { workspace = true, optional = true }
-serde_yaml.workspace = true

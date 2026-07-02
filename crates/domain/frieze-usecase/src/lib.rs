@@ -46,6 +46,3 @@ mod boundary;
 
 mod compose;
 pub use compose::{compose, from_schemas};
-
-mod to_yaml;
-pub use to_yaml::to_yaml;

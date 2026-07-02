@@ -1,6 +1,6 @@
-//! Renders an [`Document`] as a YAML string.
+//! Renders a [`Document`] as a YAML string.
 
-use frieze_openapi::Document;
+use crate::document::Document;
 
 /// Renders a complete [`Document`] as a YAML string in the canonical
 /// key order.
@@ -16,8 +16,8 @@ use frieze_openapi::Document;
 /// directly:
 ///
 /// ```ignore
-/// let doc: Document = frieze::compose(partial, schemas)?;
-/// let yaml = frieze::to_yaml(&doc);
+/// let doc: Document = frieze_usecase::compose(partial, schemas)?;
+/// let yaml = frieze_openapi::to_yaml(&doc);
 /// let json = serde_json::to_string_pretty(&doc)?;
 /// ```
 ///
