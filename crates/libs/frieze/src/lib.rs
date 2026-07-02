@@ -12,7 +12,7 @@
 //! the `inventory` Cargo feature is on by default. Every non-generic
 //! `#[derive(Schema)]` type is registered into the per-binary
 //! `inventory` linker section and iterated when `from_inventory()` is
-//! called; the derived `Schema::register_into` walks each root's
+//! called; the derived `Register::register_into` walks each root's
 //! transitive dependency graph (including generic field instantiations
 //! such as `Page<Bar>`) automatically.
 //!
@@ -27,7 +27,7 @@ pub use frieze_model::{
     Error, Maybe, Presence, Property, PropertyName, PropertyType, SchemaName, Schemas,
 };
 pub use frieze_openapi::{to_yaml, Components, Document, Info};
-pub use frieze_usecase::{compose, from_schemas, Schema, SchemasBuilder};
+pub use frieze_usecase::{compose, from_schemas, Register, Schema, SchemasBuilder};
 
 /// Convenience entry point: returns a fresh [`SchemasBuilder`].
 ///
@@ -40,7 +40,7 @@ pub fn schemas() -> SchemasBuilder {
 /// schema root to the `inventory` collection channel.
 ///
 /// The derive emits a call of the form
-/// `::frieze::__private::inventory_submit! { "TypeName", <TypeName as ::frieze::Schema>::register_into }`
+/// `::frieze::__private::inventory_submit! { "TypeName", <TypeName as ::frieze::Register>::register_into }`
 /// for every non-generic struct or enum input. The macro routes the
 /// pair through the facade so that:
 ///

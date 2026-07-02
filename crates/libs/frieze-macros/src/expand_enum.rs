@@ -250,6 +250,10 @@ fn expand_string_enum(
     let mut impl_generics_storage = generics.clone();
     push_schema_bound(&mut impl_generics_storage);
     let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
+    let mut register_generics_storage = generics.clone();
+    push_register_bound(&mut register_generics_storage);
+    let (register_impl_generics, _, register_where_clause) =
+        register_generics_storage.split_for_impl();
     let name_body = composed_name_body(generics, &base_name);
     // Unit-only enums have no inner types to recurse into; the body
     // collapses to the idempotent guard plus a single `push_unique`.
@@ -272,6 +276,10 @@ fn expand_string_enum(
                 .expect("frieze: derived enum schema satisfies invariants by construction")
                 .with_description(#composed_description_expr)
             }
+        }
+        // Registration contract: unit-only enums have no dependencies,
+        // so the body is the idempotent guard plus a single push.
+        impl #register_impl_generics ::frieze::__private::frieze_usecase::Register for #ident #ty_generics #register_where_clause {
             fn register_into(
                 builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
             ) {
@@ -280,7 +288,7 @@ fn expand_string_enum(
         }
         // Marker impl: an enum-derived `Schema` is registrable on a
         // `Schemas` collection.
-        impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
+        impl #register_impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #register_where_clause {}
 
         #inventory_submit
     };
@@ -436,6 +444,10 @@ fn expand_one_of(
     let mut impl_generics_storage = generics.clone();
     push_schema_bound(&mut impl_generics_storage);
     let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
+    let mut register_generics_storage = generics.clone();
+    push_register_bound(&mut register_generics_storage);
+    let (register_impl_generics, _, register_where_clause) =
+        register_generics_storage.split_for_impl();
     let name_body = composed_name_body(generics, &base_name);
 
     let (inner_bound_checks, outer_bound_checks): (TokenStream, TokenStream) = if has_generics {
@@ -444,9 +456,8 @@ fn expand_one_of(
         (quote! {}, quote! { #( #struct_bound_checks )* })
     };
 
-    // Each `oneOf` variant carries an inner struct type; the derived
-    // `register_into` recurses into every one so adding the enum root
-    // pulls all variant-inner schemas in transitively.
+    // Inner types feeding the derived `register_into` body — see the
+    // emitted `impl Register` below.
     let variant_inner_types: Vec<&Type> = inner_entries.iter().map(|(_, ty, _, _)| ty).collect();
     let register_body = register_into_body(&variant_inner_types);
     // Non-generic oneOf enum: emit one `inventory::submit!` site.
@@ -470,6 +481,12 @@ fn expand_one_of(
                 .expect("frieze: derived oneOf schema satisfies invariants by construction")
                 .with_description(#composed_description_expr)
             }
+        }
+        // Registration contract: each `oneOf` variant carries an inner
+        // struct type; the derived `register_into` recurses into every
+        // one so adding the enum root pulls all variant-inner schemas
+        // in transitively.
+        impl #register_impl_generics ::frieze::__private::frieze_usecase::Register for #ident #ty_generics #register_where_clause {
             fn register_into(
                 builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
             ) {
@@ -478,7 +495,7 @@ fn expand_one_of(
         }
         // Marker impl: an enum-derived `Schema` is registrable on a
         // `Schemas` collection.
-        impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
+        impl #register_impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #register_where_clause {}
 
         #outer_bound_checks
         #inventory_submit
@@ -606,6 +623,20 @@ fn push_schema_bound(generics: &mut Generics) {
         if let GenericParam::Type(type_param) = param {
             let bound: syn::TypeParamBound =
                 syn::parse_quote!(::frieze::__private::frieze_usecase::Schema);
+            type_param.bounds.push(bound);
+        }
+    }
+}
+
+/// Push the synthesised `T: Register` bound onto every type parameter
+/// in `generics` — used for the `Register` / `IsRegistrable` impls,
+/// whose bodies delegate to each inner type's
+/// `Register::register_into`.
+fn push_register_bound(generics: &mut Generics) {
+    for param in generics.params.iter_mut() {
+        if let GenericParam::Type(type_param) = param {
+            let bound: syn::TypeParamBound =
+                syn::parse_quote!(::frieze::__private::frieze_usecase::Register);
             type_param.bounds.push(bound);
         }
     }

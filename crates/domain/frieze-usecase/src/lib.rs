@@ -1,12 +1,12 @@
 //! Use cases for frieze.
 //!
-//! Defines the [`Schema`] trait that user types implement (typically through
-//! the derive macro in `frieze-macros`), the [`SchemasBuilder`] that collects
-//! schemas into a validated [`frieze_model::Schemas`], the private boundary
-//! conversion from `frieze-model` to `frieze-openapi` (in [`boundary`]),
-//! and the composition entry points ([`compose`], [`from_schemas`]) that
-//! produce a complete [`frieze_openapi::Document`] ready for
-//! serialization.
+//! Defines the [`Schema`] / [`Register`] traits that user types implement
+//! (typically through the derive macro in `frieze-macros`), the
+//! [`SchemasBuilder`] that collects schemas into a validated
+//! [`frieze_model::Schemas`], the private boundary conversion from
+//! `frieze-model` to `frieze-openapi` (in [`boundary`]), and the
+//! composition entry points ([`compose`], [`from_schemas`]) that produce
+//! a complete [`frieze_openapi::Document`] ready for serialization.
 //!
 //! # Feature flags
 //!
@@ -26,7 +26,10 @@ compile_error!(
 );
 
 mod schema;
-pub use schema::{IsRegistrable, IsStructSchema, Schema};
+pub use schema::{IsStructSchema, Schema};
+
+mod register;
+pub use register::{IsRegistrable, Register};
 
 mod primitive_schema_impls;
 mod wrapper_impls;

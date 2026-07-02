@@ -1,10 +1,10 @@
 //! Shared helpers for emitting the body of
-//! `frieze::Schema::register_into` from `#[derive(Schema)]`.
+//! `frieze::Register::register_into` from `#[derive(Schema)]`.
 //!
 //! The derived `register_into` walks the syntactic field / variant
 //! types of the input, peels off the wrapper layers
 //! (`Vec<T>` / `Option<T>` / `Maybe<T>`) that do not implement
-//! [`Schema`] themselves, and emits a `<#inner as Schema>::register_into(builder)`
+//! `Schema` themselves, and emits a `<#inner as Register>::register_into(builder)`
 //! call for every terminal type. Multi-parameter generics
 //! (`Page<Bar>`, `Pair<i32, f64>`, ...) are passed through as whole
 //! types so the monomorphic instance's own derived `register_into`
@@ -25,10 +25,10 @@ use crate::ty::{unwrap_maybe, unwrap_option, unwrap_vec};
 /// to find the terminal inner type whose `register_into` should be
 /// invoked.
 ///
-/// These three wrappers intentionally lack a `Schema` impl in
-/// `frieze-usecase` (`Vec<i64>` has no OAS-level concept, etc.), so
-/// the derive must reach past them. Other parametrised types
-/// (`Page<T>`, `Box<T>`, ...) implement `Schema` directly and are
+/// These three wrappers intentionally lack `Schema` / `Register`
+/// impls in `frieze-usecase` (`Vec<i64>` has no OAS-level concept,
+/// etc.), so the derive must reach past them. Other parametrised types
+/// (`Page<T>`, `Box<T>`, ...) implement the traits directly and are
 /// returned unchanged — `Box<T>` / `Rc<T>` / `Arc<T>` even delegate
 /// their `register_into` to the inner type, so the macro never has to
 /// special-case them.
@@ -55,7 +55,7 @@ pub(crate) fn register_into_body(inner_types: &[&Type]) -> TokenStream {
     let calls = inner_types.iter().map(|ty| {
         let target = strip_collection_wrappers(ty);
         quote! {
-            <#target as ::frieze::__private::frieze_usecase::Schema>::register_into(builder);
+            <#target as ::frieze::__private::frieze_usecase::Register>::register_into(builder);
         }
     });
     quote! {
@@ -85,7 +85,7 @@ pub(crate) fn register_into_body(inner_types: &[&Type]) -> TokenStream {
 /// Rust `static`s cannot hold generic types. Generic instances are
 /// still picked up transitively at runtime when a non-generic root's
 /// field walk reaches the concrete instantiation
-/// (`<Page<Bar> as Schema>::register_into`), so dropping the explicit
+/// (`<Page<Bar> as Register>::register_into`), so dropping the explicit
 /// submission for generic inputs loses no coverage.
 pub(crate) fn inventory_submit_token(type_ident: &Ident, generics: &syn::Generics) -> TokenStream {
     // Lifetime and const-generic parameters are rejected up-front by
@@ -100,7 +100,7 @@ pub(crate) fn inventory_submit_token(type_ident: &Ident, generics: &syn::Generic
     quote! {
         ::frieze::__private::inventory_submit! {
             #type_name,
-            <#type_ident as ::frieze::__private::frieze_usecase::Schema>::register_into
+            <#type_ident as ::frieze::__private::frieze_usecase::Register>::register_into
         }
     }
 }

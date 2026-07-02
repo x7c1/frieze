@@ -7,14 +7,14 @@
 //! on this crate), so every such entry lands in the `inventory` linker
 //! section and [`SchemasBuilder::from_inventory`] walks them all,
 //! invoking each entry's `register_fn` to drive the transitive
-//! [`crate::Schema::register_into`] walk rooted at the submitted type.
+//! [`crate::Register::register_into`] walk rooted at the submitted type.
 //!
 //! Generic types (`Page<T>`) cannot be inventory entries — Rust's
 //! `static` cannot hold generic types, so the derive emits no submission
 //! for them. They are still auto-collected transitively when a
 //! non-generic root's field references the concrete instantiation
 //! (`struct Foo { page: Page<Bar> }`): the derived `register_into` walks
-//! into `<Page<Bar> as Schema>::register_into` at runtime.
+//! into `<Page<Bar> as Register>::register_into` at runtime.
 //!
 //! This module is compiled only under `#[cfg(feature = "inventory")]`,
 //! which remains a gate so consumers that opt out (via
@@ -34,7 +34,7 @@ pub struct SchemaRoot {
     /// The schema's registration name as known at derive time
     /// (`<T as Schema>::name()` for a non-generic `T`).
     pub name: &'static str,
-    /// Function pointer to `<T as Schema>::register_into`.
+    /// Function pointer to `<T as Register>::register_into`.
     /// `SchemasBuilder::from_inventory` invokes this on every iterated
     /// entry to drive the transitive registration walk.
     pub register_fn: fn(&mut SchemasBuilder),

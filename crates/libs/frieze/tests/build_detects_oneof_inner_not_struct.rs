@@ -24,6 +24,7 @@ fn rejects_oneof_variant_targeting_string_enum() {
         }
     }
     impl frieze_usecase::IsStructSchema for DummyStatus {}
+    impl frieze_usecase::Register for DummyStatus {}
     impl frieze_usecase::IsRegistrable for DummyStatus {}
     // Intentionally implement `IsStructSchema` on DummyStatus so the
     // macro-side check is bypassed; the runtime check still fires.
@@ -44,6 +45,7 @@ fn rejects_oneof_variant_targeting_string_enum() {
             .unwrap()
         }
     }
+    impl frieze_usecase::Register for DummyEvent {}
     impl frieze_usecase::IsRegistrable for DummyEvent {}
     let err = SchemasBuilder::new()
         .add::<DummyEvent>()
@@ -83,6 +85,7 @@ fn rejects_oneof_variant_targeting_other_oneof() {
         }
     }
     impl frieze_usecase::IsStructSchema for DummyInnerStruct {}
+    impl frieze_usecase::Register for DummyInnerStruct {}
     impl frieze_usecase::IsRegistrable for DummyInnerStruct {}
 
     struct DummyInner;
@@ -103,6 +106,7 @@ fn rejects_oneof_variant_targeting_other_oneof() {
         }
     }
     impl frieze_usecase::IsStructSchema for DummyInner {}
+    impl frieze_usecase::Register for DummyInner {}
     impl frieze_usecase::IsRegistrable for DummyInner {}
 
     struct DummyOuter;
@@ -119,6 +123,7 @@ fn rejects_oneof_variant_targeting_other_oneof() {
             .unwrap()
         }
     }
+    impl frieze_usecase::Register for DummyOuter {}
     impl frieze_usecase::IsRegistrable for DummyOuter {}
     let err = SchemasBuilder::new()
         .add::<DummyOuter>()

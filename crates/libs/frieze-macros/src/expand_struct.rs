@@ -3,13 +3,15 @@
 //! Walks each field once, classifying it via [`crate::field::parse_field`]
 //! and computing its wire name through [`crate::rename::wire_name`], then
 //! emits the `impl Schema` that constructs a `Schema::new_object(...)` at
-//! runtime.
+//! runtime, together with the `impl Register` that walks each field
+//! type's `register_into`.
 //!
 //! # Generic structs
 //!
 //! When the input carries type parameters (`struct Page<T> { ... }`), the
 //! derive propagates them onto the emitted `impl` blocks with a
-//! synthesised `T: Schema` bound on every type parameter (alongside the
+//! synthesised `T: Schema` bound (a `T: Register` bound on the
+//! registration-side impls) on every type parameter (alongside the
 //! user's own `where` clause, which is preserved verbatim), and the
 //! generated `name()` composes the schema name from each parameter's
 //! name in the **suffix** form `<Arg1>_<Arg2>_..._<BaseName>` —
@@ -93,6 +95,11 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
     // `Schema` bound onto every type parameter so that `Container<T>`
     // requires `T: Schema` automatically. The user's `where` clause is
     // preserved verbatim through `split_for_impl()`.
+    //
+    // The `Register` / `IsRegistrable` impls get their own generics
+    // storage with a `Register` bound instead: their bodies delegate to
+    // each field type's `Register::register_into`, so requiring only
+    // `T: Schema` there would not compile.
     let mut impl_generics_storage = ast.generics.clone();
     for param in impl_generics_storage.params.iter_mut() {
         if let GenericParam::Type(type_param) = param {
@@ -102,6 +109,17 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
         }
     }
     let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
+
+    let mut register_generics_storage = ast.generics.clone();
+    for param in register_generics_storage.params.iter_mut() {
+        if let GenericParam::Type(type_param) = param {
+            let bound: syn::TypeParamBound =
+                syn::parse_quote!(::frieze::__private::frieze_usecase::Register);
+            type_param.bounds.push(bound);
+        }
+    }
+    let (register_impl_generics, _, register_where_clause) =
+        register_generics_storage.split_for_impl();
 
     let name_body = composed_name_body(&ast.generics, &base_name);
     let register_body = register_into_body(&field_types);
@@ -124,6 +142,11 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
                 .expect("frieze: derived schema satisfies invariants by construction")
                 .with_description(#struct_description_expr)
             }
+        }
+        // Registration contract: the derived `register_into` walks each
+        // field type's `register_into` so dependencies are collected
+        // transitively.
+        impl #register_impl_generics ::frieze::__private::frieze_usecase::Register for #ident #ty_generics #register_where_clause {
             fn register_into(
                 builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
             ) {
@@ -138,7 +161,7 @@ pub(crate) fn expand_struct(ast: &DeriveInput) -> Result<TokenStream, syn::Error
         // Marker impl: a struct-derived `Schema` is registrable on a
         // `Schemas` collection. Primitive scalars never receive this
         // impl, so `Schemas::add::<i64>()` is rejected at compile time.
-        impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
+        impl #register_impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #register_where_clause {}
 
         #inventory_submit
     };
