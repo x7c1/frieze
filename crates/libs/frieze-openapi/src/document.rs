@@ -16,10 +16,11 @@
 
 use std::collections::BTreeMap;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 
 use crate::components::Components;
 use crate::info::Info;
+use crate::serialize::Versioned;
 use crate::version::Version;
 
 /// An OpenAPI document.
@@ -52,7 +53,13 @@ use crate::version::Version;
 /// syntax are responsible for keeping the two fields consistent; the
 /// library's own constructor ([`Document::from_components`]) does so
 /// automatically.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+///
+/// Serde attributes on the fields below would be dead weight: the
+/// `Deserialize` derive routes through [`DocumentRaw`] (via
+/// `try_from`), and the `Serialize` impl is handwritten further down
+/// (it dispatches on `oas_version` at runtime), so neither side reads
+/// field-level attributes on this struct.
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 #[serde(try_from = "DocumentRaw")]
 pub struct Document {
     /// The OAS version string (e.g. `"3.0.3"`, `"3.1.0"`).
@@ -60,29 +67,35 @@ pub struct Document {
     /// Major.minor discriminant lifted from [`Self::openapi`] at
     /// deserialize time. Not serialized — the wire format only carries
     /// the `openapi` string.
-    #[serde(skip)]
     pub oas_version: Version,
     pub info: Info,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub servers: Option<serde_json::Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub paths: Option<serde_json::Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub components: Option<Components>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub security: Option<serde_json::Value>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tags: Option<serde_json::Value>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "externalDocs"
-    )]
     pub external_docs: Option<serde_json::Value>,
     /// Vendor extensions (`x-*`) and any other top-level field not yet
     /// modelled. Round-trips verbatim.
-    #[serde(flatten)]
     pub extensions: BTreeMap<String, serde_json::Value>,
+}
+
+/// Serializes the document in the OAS wire form of the version it
+/// declares.
+///
+/// The impl wraps the document in the crate-private versioned emitter
+/// keyed by [`Self::oas_version`] (see the `serialize` module), so
+/// `serde_yaml::to_string(&doc)` / `serde_json::to_string(&doc)` /
+/// [`crate::to_yaml`] all emit the OAS 3.0 or 3.1 shape the document
+/// asks for — per document, at runtime. `oas_version` itself never
+/// appears on the wire; only the verbatim `openapi` string does.
+impl Serialize for Document {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        Versioned::new(self, self.oas_version).serialize(serializer)
+    }
 }
 
 impl Document {

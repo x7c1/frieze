@@ -1,6 +1,6 @@
 //! The top-level OpenAPI Schema Object sum supported by the current derive.
 
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 
 use crate::object_schema::ObjectSchema;
 use crate::one_of_schema::OneOfSchema;
@@ -20,9 +20,15 @@ use crate::string_enum_schema::StringEnumSchema;
 ///
 /// # Serde representation
 ///
-/// `#[serde(untagged)]` is used so that the variant is recovered from the
-/// shape of the input. The variant order below is also the deserializer's
-/// trial order — most-specific first:
+/// The derived `Serialize` / `Deserialize` here are the canonical
+/// (version-neutral) form: `#[serde(untagged)]` serializes the active
+/// variant transparently through its own derived (canonical) impl, and
+/// recovers the variant from the shape of the input. The OAS wire form
+/// is emitted by the versioned dispatcher in the `serialize` module,
+/// which [`crate::Document`] routes through automatically.
+///
+/// The variant order below is the deserializer's trial order —
+/// most-specific first:
 ///
 /// - [`SchemaObject::OneOf`] — chosen when the payload has the required
 ///   `tag` and `variants` fields of an internally-tagged `oneOf` arm.
@@ -36,8 +42,8 @@ use crate::string_enum_schema::StringEnumSchema;
 /// schema level may be claimed by the wrong variant. The intent here is
 /// only to let frieze-produced documents survive a YAML/JSON round-trip
 /// through [`crate::Document`]. Full external-input robustness will
-/// arrive with the dedicated canonical (de)serializers in a later step.
-#[derive(Debug, Clone, PartialEq, Deserialize)]
+/// arrive with dedicated canonical (de)serializers in a later step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum SchemaObject {
     /// A `oneOf` schema with a top-level `discriminator` block, derived
@@ -54,20 +60,4 @@ pub enum SchemaObject {
     /// per-property shape (`$ref`, scalar `type` + `format`, array,
     /// nullable composition).
     Object(ObjectSchema),
-}
-
-/// Dispatch-only `Serialize` impl: delegates straight to the active
-/// variant's handwritten serializer so each variant controls its own
-/// canonical OAS key order.
-impl Serialize for SchemaObject {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match self {
-            SchemaObject::OneOf(one_of) => one_of.serialize(serializer),
-            SchemaObject::StringEnum(string_enum) => string_enum.serialize(serializer),
-            SchemaObject::Object(object) => object.serialize(serializer),
-        }
-    }
 }

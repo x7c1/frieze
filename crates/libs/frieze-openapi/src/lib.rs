@@ -47,6 +47,8 @@ pub use info::Info;
 mod document;
 pub use document::Document;
 
+mod serialize;
+
 mod version;
 pub use version::{Version, VersionParseError};
 
