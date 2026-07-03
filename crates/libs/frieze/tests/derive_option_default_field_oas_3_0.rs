@@ -3,8 +3,6 @@
 //! `docs/field-shapes.md`). The field name stays in the `required` array;
 //! the value-level `nullable` marker is emitted on the inner schema.
 
-#![cfg(feature = "oas-3-0")]
-
 use frieze::Schema;
 
 mod common;
@@ -23,7 +21,7 @@ fn option_default_renders_required_and_nullable_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

@@ -1,7 +1,7 @@
 //! `Vec<Page<User>>` field: the generic-instantiation `Page<User>` is
 //! treated as a struct reference inside the array's `items`.
 //!
-//! Identical output under `oas-3-0` and `oas-3-1`.
+//! Identical output under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

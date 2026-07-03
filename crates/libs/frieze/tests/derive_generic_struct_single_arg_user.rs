@@ -3,7 +3,7 @@
 //! `Page<User>` produces `User_Page` and registers cleanly alongside
 //! `User`.
 //!
-//! Identical output under `oas-3-0` and `oas-3-1`.
+//! Identical output under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

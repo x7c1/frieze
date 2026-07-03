@@ -2,8 +2,6 @@
 //! OAS 3.1 nullable-reference wrap as `Option<U>` over a struct or a
 //! string-enum: `{oneOf: [{$ref: E}, {type: "null"}]}`.
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 use serde::{Deserialize, Serialize};
 
@@ -46,7 +44,7 @@ fn option_oneof_field_wraps_with_oneof_null() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

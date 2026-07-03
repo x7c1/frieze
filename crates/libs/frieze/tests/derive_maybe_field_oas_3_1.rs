@@ -1,8 +1,6 @@
 //! `Maybe<T>` under OAS 3.1: the field is dropped from `required` and the
 //! inner schema's `type` becomes a 2-element sequence `[<base>, "null"]`.
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 use frieze_model::Maybe;
 use serde::{Deserialize, Serialize};
@@ -23,7 +21,7 @@ fn maybe_field_renders_optional_and_type_null_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

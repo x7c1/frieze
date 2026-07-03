@@ -2,8 +2,6 @@
 //! OAS 3.1 emits the `oneOf` + `{type: "null"}` wrap — the same wrap
 //! used for nullable nested-struct references.
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 
 mod common;
@@ -29,7 +27,7 @@ fn option_enum_field_renders_as_nullable_ref_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

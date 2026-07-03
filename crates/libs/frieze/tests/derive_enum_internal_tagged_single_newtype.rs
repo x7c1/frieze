@@ -2,7 +2,7 @@
 //! `oneOf + discriminator` shape; `oneOf` may carry a single arm, and
 //! the discriminator block emits `propertyName` only (no `mapping`).
 //!
-//! The output is identical under both `oas-3-0` and `oas-3-1`.
+//! The output is identical under both OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

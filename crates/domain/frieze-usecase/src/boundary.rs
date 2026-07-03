@@ -7,16 +7,53 @@
 //! this layer — `compose`, `from_schemas`, and any output renderer —
 //! operates on `frieze-openapi` types only.
 //!
-//! The conversion is intentionally local to the use-case crate (and not
-//! re-exported) so the dependency direction stays
-//! `frieze-usecase → frieze-model, frieze-openapi` without leaking
-//! domain types out through the public API.
+//! The conversion is a pure, **version-neutral** data mapping: it
+//! records intent (`reference`, `description`, `nullable`) as plain
+//! fields on the produced [`ObjectSchema`]s and never applies the OAS
+//! 3.0 / 3.1 encoding split. That split (nullable encoding,
+//! `$ref`-sibling handling) is applied at serialization time by
+//! `frieze-openapi`, dispatching on the document's `oas_version`.
+//!
+//! The per-schema conversion is intentionally local to the use-case
+//! crate; only the aggregate entry point
+//! ([`components_from_schemas`]) is re-exported, so the dependency
+//! direction stays `frieze-usecase → frieze-model, frieze-openapi`
+//! without leaking domain types out through the public API.
 
-use frieze_model::{primitive_property_type_for, Property, PropertyType, Schema, SchemaName};
+use frieze_model::{
+    primitive_property_type_for, Property, PropertyType, Schema, SchemaName, Schemas,
+};
 use frieze_openapi::{
-    ObjectSchema, OneOfSchema, OneOfVariant, SchemaObject, SchemaType, StringEnumSchema,
+    Components, ObjectSchema, OneOfSchema, OneOfVariant, SchemaObject, SchemaType, StringEnumSchema,
 };
 use indexmap::IndexMap;
+
+/// Converts a [`Schemas`] collection into the version-neutral,
+/// canonical [`Components`] value.
+///
+/// Each registered schema is mapped through the boundary conversion
+/// and inserted under `components.schemas`, keyed by its registration
+/// name, in the collection's canonical (alphabetical) order. The
+/// result carries no OAS-version-specific encoding: nullability and
+/// `$ref`-companion intents are stored as plain fields, and the OAS
+/// 3.0 / 3.1 wire shapes are produced later, at serialization time,
+/// from the version of whichever `Document` the components end up in.
+///
+/// Because the canonical form is version-neutral, it is also the
+/// interchange format between processes: serializing the returned
+/// [`Components`] with its derived `Serialize` (e.g. via
+/// `serde_json::to_writer`) produces a dump that another process can
+/// parse back with the derived `Deserialize` and compose into
+/// documents of any supported OAS version.
+pub fn components_from_schemas(schemas: &Schemas) -> Components {
+    let mut components = Components::default();
+    for (name, schema) in &schemas.by_name {
+        if let Some(object) = to_openapi(schema) {
+            components.schemas.insert(name.as_str().to_string(), object);
+        }
+    }
+    components
+}
 
 /// Boundary conversion: validated domain schema -> plain OAS schema object.
 ///
@@ -30,7 +67,7 @@ use indexmap::IndexMap;
 /// emitted under `#/components/schemas`. The primary guard is the
 /// `IsRegistrable` marker trait (compile-time); this `None` arm is the
 /// defensive secondary guard at the boundary.
-pub(crate) fn to_openapi(schema: &Schema) -> Option<SchemaObject> {
+fn to_openapi(schema: &Schema) -> Option<SchemaObject> {
     match schema {
         Schema::Object(object) => Some(SchemaObject::Object(object_schema_from_model(object))),
         Schema::StringEnum(string_enum) => Some(SchemaObject::StringEnum(
@@ -98,62 +135,18 @@ fn property_to_object_schema(property: &Property) -> ObjectSchema {
 }
 
 /// Attaches a property-level description to the object schema returned
-/// by [`property_type_to_object_schema`], honouring the four-case
-/// `(description, nullable)` matrix against `$ref` siblings:
+/// by [`property_type_to_object_schema`].
 ///
-/// |              | not nullable                 | nullable                                  |
-/// |--------------|------------------------------|-------------------------------------------|
-/// | no descr.    | bare `$ref` (no change)      | `{allOf: [{$ref}], nullable: true}` (3.0) / `{oneOf: [{$ref}, {null}]}` (3.1) |
-/// | with descr.  | OAS 3.0: `{description, allOf: [{$ref}]}` / OAS 3.1: `{$ref, description}` | description attaches to the existing wrap |
-///
-/// The "nullable" cases hand us a schema whose `reference` is already
-/// `None` (the reference now lives inside `all_of` / `one_of`), so the
-/// description simply rides on the outer wrapper. The "not nullable +
-/// description + reference" case differs between OAS versions: under
-/// 3.0 we have to wrap because `$ref` siblings are ignored on the wire,
-/// but under 3.1 a sibling `description` is valid so the renderer emits
-/// it next to the `$ref`.
-fn attach_description(schema: ObjectSchema, description: Option<&str>) -> ObjectSchema {
-    let description = match description {
-        Some(d) if !d.is_empty() => d.to_string(),
-        _ => return schema,
-    };
-    match (schema.reference.is_some(), is_oas_3_0()) {
-        // Bare `$ref` + description under OAS 3.0 — siblings are
-        // silently ignored, so we wrap the reference in `allOf` and
-        // put the description on the outer schema.
-        (true, true) => ObjectSchema {
-            description: Some(description),
-            all_of: Some(vec![schema]),
-            ..ObjectSchema::empty()
-        },
-        // Bare `$ref` + description under OAS 3.1 — sibling keys are
-        // permitted, so we keep the `$ref` schema and attach the
-        // description directly. The renderer emits both siblings.
-        (true, false) => {
-            let mut out = schema;
-            out.description = Some(description);
-            out
-        }
-        // Non-`$ref` schema (scalar, array, `allOf` wrap for
-        // `Option<Reference>` under 3.0, `oneOf` wrap under 3.1) —
-        // description attaches directly.
-        (false, _) => {
-            let mut out = schema;
-            out.description = Some(description);
-            out
-        }
+/// In the canonical (version-neutral) form the description always
+/// attaches directly — even next to a `$ref`, where the OAS 3.0 wire
+/// would not allow a sibling key. The version-specific placement (the
+/// `allOf` wrap under 3.0, the plain sibling under 3.1) is applied at
+/// serialization time by `frieze-openapi`'s versioned emitter.
+fn attach_description(mut schema: ObjectSchema, description: Option<&str>) -> ObjectSchema {
+    if let Some(description) = description.filter(|d| !d.is_empty()) {
+        schema.description = Some(description.to_string());
     }
-}
-
-#[cfg(feature = "oas-3-0")]
-const fn is_oas_3_0() -> bool {
-    true
-}
-
-#[cfg(feature = "oas-3-1")]
-const fn is_oas_3_0() -> bool {
-    false
+    schema
 }
 
 /// Single mapping from a [`PropertyType`] to the matching object schema.
@@ -164,12 +157,12 @@ const fn is_oas_3_0() -> bool {
 /// appears. `Array(Nullable(...))` therefore makes the items nullable;
 /// `Nullable(Array(...))` makes the array itself nullable.
 ///
-/// [`PropertyType::Reference`] is rendered as a pure `$ref` schema; if
-/// the renderer's recursion finds itself wrapping a `Reference` in
-/// [`PropertyType::Nullable`], it falls through to the OAS-version-specific
-/// "nullable reference" shape ([`nullable_reference_object`]) rather than
-/// attempting to attach `nullable: true` directly to the `$ref` (which is
-/// invalid OAS).
+/// [`PropertyType::Reference`] is rendered as a pure `$ref` schema. A
+/// `Reference` wrapped in [`PropertyType::Nullable`] renders as that
+/// same `$ref` schema with the canonical `nullable` flag set — the
+/// version-specific "nullable reference" wire shape (`allOf` +
+/// `nullable: true` under OAS 3.0, `oneOf` against `{type: "null"}`
+/// under 3.1) is synthesized at serialization time.
 ///
 /// References whose name maps to one of the eight primitive scalar
 /// conventions ([`primitive_property_type_for`]) are **inlined** at the
@@ -197,21 +190,20 @@ fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
             };
         }
         PropertyType::Nullable(inner) => {
-            // A nullable reference cannot simply set `nullable: true` on a
-            // `$ref` schema object — `$ref` siblings are ignored in OAS 3.0
-            // and disallowed in 3.1. Use the version-specific wrap instead.
+            // In the canonical form, nullability is always the plain
+            // `nullable` flag — even on a `$ref` schema, where the OAS
+            // wire needs a version-specific wrap. Primitive references
+            // inline at the leaf first, so the flag lands on the
+            // resulting scalar shape.
             if let PropertyType::Reference(name) = inner.as_ref() {
-                // Primitive references inline at the leaf, so the
-                // "nullable reference" wrap is unnecessary: emit the
-                // scalar shape with the standard scalar nullability
-                // treatment (`nullable: true` under 3.0, `type` sequence
-                // under 3.1).
                 if let Some(prim) = primitive_property_type_for(name) {
                     let mut inner_schema = property_type_to_object_schema(&prim);
                     inner_schema.nullable = Some(true);
                     return inner_schema;
                 }
-                return nullable_reference_object(name);
+                let mut reference = reference_object(name);
+                reference.nullable = Some(true);
+                return reference;
             }
             let mut inner_schema = property_type_to_object_schema(inner);
             inner_schema.nullable = Some(true);
@@ -237,41 +229,6 @@ fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
 fn reference_object(name: &SchemaName) -> ObjectSchema {
     ObjectSchema {
         reference: Some(format!("#/components/schemas/{}", name.as_str())),
-        ..ObjectSchema::empty()
-    }
-}
-
-/// Builds the OAS-version-specific "nullable reference" object schema.
-///
-/// - OAS 3.0: `allOf: [{$ref}], nullable: true`. The `allOf` wrap is the
-///   idiomatic 3.0 escape hatch for siblings on a referencing schema.
-/// - OAS 3.1: `oneOf: [{$ref}, {type: "null"}]`. The `nullable` keyword
-///   was dropped in 3.1, and a sibling `$ref` would be rejected.
-///
-/// The `$ref` element is always first; the null sibling is second. This
-/// is purely for snapshot stability.
-#[cfg(feature = "oas-3-0")]
-fn nullable_reference_object(name: &SchemaName) -> ObjectSchema {
-    ObjectSchema {
-        all_of: Some(vec![reference_object(name)]),
-        nullable: Some(true),
-        ..ObjectSchema::empty()
-    }
-}
-
-#[cfg(feature = "oas-3-1")]
-fn nullable_reference_object(name: &SchemaName) -> ObjectSchema {
-    ObjectSchema {
-        one_of: Some(vec![
-            reference_object(name),
-            ObjectSchema {
-                // `type: "null"` is emitted by the `SchemaType::Null`
-                // variant's `Serialize` impl as the quoted string
-                // `"null"` (not the YAML null value).
-                ty: Some(SchemaType::Null),
-                ..ObjectSchema::empty()
-            },
-        ]),
         ..ObjectSchema::empty()
     }
 }

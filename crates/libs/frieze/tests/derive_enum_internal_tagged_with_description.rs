@@ -7,7 +7,7 @@
 //! Variant names in the bullets use the wire name (post `rename_all` /
 //! per-variant `rename`), aligning with the `oneOf` arms.
 //!
-//! The output is identical under both `oas-3-0` and `oas-3-1`.
+//! The output is identical under both OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

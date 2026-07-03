@@ -5,7 +5,8 @@
 //!
 //! The scratch-path counterpart to `compose`: when a caller has
 //! Rust-generated schemas but no hand-written OAS partial, this is the
-//! one-call entry point.
+//! one-call entry point. The OAS version is an explicit argument and
+//! is stamped onto the document as runtime data.
 
 use std::collections::BTreeMap;
 
@@ -19,18 +20,6 @@ struct User {
     id: i64,
 }
 
-/// The OAS version the current build was compiled to emit, matching
-/// the transition guard in `from_schemas`.
-#[cfg(feature = "oas-3-0")]
-fn compiled_version() -> Version {
-    Version::V3_0
-}
-
-#[cfg(feature = "oas-3-1")]
-fn compiled_version() -> Version {
-    Version::V3_1
-}
-
 fn snapshot_info() -> Info {
     Info {
         title: "Generated API".to_string(),
@@ -40,22 +29,23 @@ fn snapshot_info() -> Info {
     }
 }
 
-#[test]
-fn from_schemas_routes_schemas_through_components() {
-    let schemas: frieze_model::Schemas = frieze::SchemasBuilder::new()
+fn user_schemas() -> frieze_model::Schemas {
+    frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
-        .expect("schemas build should succeed for valid input");
+        .expect("schemas build should succeed for valid input")
+}
 
-    let document = from_schemas(snapshot_info(), schemas, compiled_version())
-        .expect("from_schemas with the compiled-in OAS version must succeed");
+#[test]
+fn from_schemas_routes_schemas_through_components() {
+    let document = from_schemas(snapshot_info(), user_schemas(), Version::V3_0);
 
     // The document carries the supplied `Info` verbatim, and both
     // version fields reflect the requested `Version`.
     assert_eq!(document.info.title, "Generated API");
     assert_eq!(document.info.version, "1.2.3");
-    assert_eq!(document.oas_version, compiled_version());
-    assert_eq!(document.openapi, compiled_version().openapi_string());
+    assert_eq!(document.oas_version, Version::V3_0);
+    assert_eq!(document.openapi, "3.0.3");
 
     // `components.schemas` is populated; sections the caller did not
     // supply (`paths`, `servers`, `tags`, vendor extensions) are
@@ -80,4 +70,16 @@ fn from_schemas_routes_schemas_through_components() {
     let from_json: frieze_openapi::Document =
         serde_json::from_str(&json).expect("JSON round-trip must succeed");
     assert_eq!(from_yaml, from_json);
+}
+
+#[test]
+fn from_schemas_accepts_either_version_in_the_same_build() {
+    // The version argument is runtime data — the same build serves
+    // both supported versions, and the stamped `openapi` string
+    // follows the argument.
+    for (version, expected_openapi) in [(Version::V3_0, "3.0.3"), (Version::V3_1, "3.1.0")] {
+        let document = from_schemas(snapshot_info(), user_schemas(), version);
+        assert_eq!(document.oas_version, version);
+        assert_eq!(document.openapi, expected_openapi);
+    }
 }

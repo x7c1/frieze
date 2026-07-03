@@ -4,8 +4,6 @@
 //! the value-level `"null"` marker is folded into the inner schema's
 //! `type` sequence under OAS 3.1.
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 
 mod common;
@@ -24,7 +22,7 @@ fn option_default_renders_required_and_nullable_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

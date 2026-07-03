@@ -3,8 +3,6 @@
 //! `oneOf: [$ref, {type: null}]` and the description sits on the
 //! `oneOf` wrapper, not inside the array.
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 
 mod common;
@@ -30,7 +28,7 @@ fn option_ref_with_description_carries_description_on_one_of_wrap_under_oas_3_1(
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

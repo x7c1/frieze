@@ -8,7 +8,7 @@
 //! `derive_recursive_struct.rs`; the field-type integration makes the
 //! `Vec<Box<Tree>>` parse path work.
 //!
-//! Identical output under `oas-3-0` and `oas-3-1`.
+//! Identical output under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

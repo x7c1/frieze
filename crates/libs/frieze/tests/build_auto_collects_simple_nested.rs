@@ -5,7 +5,7 @@
 //! through the field walk on `Foo.user`.
 //!
 //! This is the foundational case for the auto-collection feature in
-//! its smallest form. Identical output under `oas-3-0` and `oas-3-1`.
+//! its smallest form. Identical output under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

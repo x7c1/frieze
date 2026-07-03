@@ -18,7 +18,7 @@
 //!   no `components/schemas/Int64` / `components/schemas/String`
 //!   entry).
 //!
-//! The shape is identical under `oas-3-0` and `oas-3-1`.
+//! The shape is identical under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

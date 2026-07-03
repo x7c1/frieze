@@ -2,8 +2,6 @@
 //! OAS 3.1 build allows `$ref` to carry sibling keys directly — the
 //! `description` sits next to the `$ref` with no wrap.
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 
 mod common;
@@ -29,7 +27,7 @@ fn ref_field_with_description_emits_sibling_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

@@ -2,8 +2,6 @@
 //! required at the presence axis; the latter additionally folds `"null"`
 //! into the outer array's `type` sequence (not into the items').
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 
 mod common;
@@ -23,7 +21,7 @@ fn vec_field_renders_as_type_array_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

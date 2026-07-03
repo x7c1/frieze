@@ -4,7 +4,7 @@
 //! identifier (`UserLogin`) is invisible on the wire; the tag value is
 //! `user_login`.
 //!
-//! The output is identical under both `oas-3-0` and `oas-3-1`.
+//! The output is identical under both OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

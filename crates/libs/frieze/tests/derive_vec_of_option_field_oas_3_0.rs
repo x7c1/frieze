@@ -6,8 +6,6 @@
 //! `Property`, which is what makes per-element nullability for arrays
 //! expressible.
 
-#![cfg(feature = "oas-3-0")]
-
 use frieze::Schema;
 
 mod common;
@@ -26,7 +24,7 @@ fn vec_of_option_renders_nullable_items_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test
