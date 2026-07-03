@@ -44,7 +44,9 @@ let schemas = SchemasBuilder::new()
 let document = frieze_usecase::from_schemas(
     Info { title: "My API".into(), version: "1.0.0".into(), ..Default::default() },
     schemas,
-);
+    frieze_openapi::Version::V3_0,
+)
+.expect("requested OAS version should match the compiled feature");
 println!("{}", frieze_openapi::to_yaml(&document));
 ```
 
@@ -52,9 +54,10 @@ The `frieze` crate owns the pieces user types interact with — the
 `Schema` / `Register` traits, `#[derive(Schema)]`, and the
 `SchemasBuilder` registry. Document assembly lives in the companion
 crates: `frieze-openapi` holds the OAS wire types (`Document`, `Info`,
-...) and `to_yaml`, `frieze-usecase` holds `compose` / `from_schemas`,
-and `frieze-model` holds the validated domain types (`Maybe`,
-`Schemas`, `Error`, ...). Depend on the ones you use directly.
+`Version`, ...) and `to_yaml`, `frieze-usecase` holds `compose` /
+`from_schemas`, and `frieze-model` holds the validated domain types
+(`Maybe`, `Schemas`, `Error`, ...). Depend on the ones you use
+directly.
 
 The same `Document` value is format-neutral — render it to JSON
 through serde directly when needed:
@@ -109,9 +112,14 @@ single attribute.
 
 Pick exactly one of `oas-3-0` (default) or `oas-3-1` as a Cargo feature.
 The two encode nullability differently (`nullable: true` vs
-`type: [..., "null"]`) and are mutually exclusive. See
+`type: [..., "null"]`) and are mutually exclusive. The version also
+travels as data: `from_schemas` takes an explicit
+`frieze_openapi::Version`, and a parsed `Document` carries the version
+lifted from its `openapi:` field. For now the data-level version must
+match the compiled feature. See
 [`docs/oas-versions.md`](docs/oas-versions.md) for the full encoding
-table and the version-specific shapes for nullable references.
+table, the version-specific shapes for nullable references, and the
+runtime `Version` handle.
 
 ## Auto-collection via `inventory`
 

@@ -10,13 +10,25 @@
 use std::collections::BTreeMap;
 
 use frieze::Schema;
-use frieze_openapi::Info;
+use frieze_openapi::{Info, Version};
 use frieze_usecase::from_schemas;
 
 #[derive(Schema)]
 #[allow(dead_code)]
 struct User {
     id: i64,
+}
+
+/// The OAS version the current build was compiled to emit, matching
+/// the transition guard in `from_schemas`.
+#[cfg(feature = "oas-3-0")]
+fn compiled_version() -> Version {
+    Version::V3_0
+}
+
+#[cfg(feature = "oas-3-1")]
+fn compiled_version() -> Version {
+    Version::V3_1
 }
 
 fn snapshot_info() -> Info {
@@ -35,11 +47,15 @@ fn from_schemas_routes_schemas_through_components() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    let document = from_schemas(snapshot_info(), schemas);
+    let document = from_schemas(snapshot_info(), schemas, compiled_version())
+        .expect("from_schemas with the compiled-in OAS version must succeed");
 
-    // The document carries the supplied `Info` verbatim.
+    // The document carries the supplied `Info` verbatim, and both
+    // version fields reflect the requested `Version`.
     assert_eq!(document.info.title, "Generated API");
     assert_eq!(document.info.version, "1.2.3");
+    assert_eq!(document.oas_version, compiled_version());
+    assert_eq!(document.openapi, compiled_version().openapi_string());
 
     // `components.schemas` is populated; sections the caller did not
     // supply (`paths`, `servers`, `tags`, vendor extensions) are
