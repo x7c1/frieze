@@ -1,5 +1,5 @@
 error: frieze: Vec<Maybe<T>> is not allowed; array elements are always present on the wire. Use Vec<Option<T>> if elements may be null.
- --> tests/ui/vec_of_maybe.rs:5:8
+ --> tests/ui/vec_of_maybe.rs:6:8
   |
-5 |     x: Vec<Maybe<String>>,
+6 |     x: Vec<Maybe<String>>,
   |        ^^^^^^^^^^^^^^^^^^

@@ -21,7 +21,7 @@ struct Document {
 
 #[test]
 fn vec_of_option_renders_nullable_items_under_oas_3_0() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Document>()
         .build()
         .expect("schemas build should succeed for valid input");

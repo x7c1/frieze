@@ -25,7 +25,7 @@ struct Profile {
 
 #[test]
 fn nested_struct_renders_as_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .add::<User>()
         .build()

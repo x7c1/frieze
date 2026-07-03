@@ -39,7 +39,7 @@ enum Event {
 
 #[test]
 fn variant_doc_comments_compose_into_enum_description_bullets() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Event>()
         .add::<LoginData>()
         .add::<LogoutData>()

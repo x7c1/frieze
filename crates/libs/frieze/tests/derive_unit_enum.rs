@@ -18,7 +18,7 @@ enum Status {
 
 #[test]
 fn unit_enum_renders_as_string_enum() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Status>()
         .build()
         .expect("schemas build should succeed for valid input");

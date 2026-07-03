@@ -35,7 +35,7 @@ pub mod v1 {
 
 #[test]
 fn namespace_attr_is_passthrough_when_inventory_disabled() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<v1::User>()
         .build()
         .expect("schemas builder closes over `User` alone");

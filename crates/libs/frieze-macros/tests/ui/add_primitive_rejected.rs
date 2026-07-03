@@ -5,5 +5,5 @@
 // `#[diagnostic::on_unimplemented]` message attached to `IsRegistrable`.
 
 fn main() {
-    let _ = frieze::schemas().add::<i64>();
+    let _ = frieze::SchemasBuilder::new().add::<i64>();
 }

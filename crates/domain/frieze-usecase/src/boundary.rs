@@ -2,7 +2,7 @@
 //! plain OAS [`frieze_openapi::SchemaObject`].
 //!
 //! This module is the single bridge between the validated domain types
-//! produced by `frieze-model` (and assembled by [`SchemasBuilder`]) and
+//! produced by `frieze-model` (and assembled by `frieze::SchemasBuilder`) and
 //! the OAS-shaped types in `frieze-openapi`. Everything downstream of
 //! this layer — `compose`, `from_schemas`, and any output renderer —
 //! operates on `frieze-openapi` types only.

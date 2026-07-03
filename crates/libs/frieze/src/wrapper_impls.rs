@@ -1,6 +1,6 @@
-//! Blanket [`Schema`] / [`IsStructSchema`] / [`IsRegistrable`]
-//! implementations for owned wrapper types from `std`: [`Box`],
-//! [`std::rc::Rc`], and [`std::sync::Arc`].
+//! Blanket [`Schema`] / [`Register`] / [`IsStructSchema`] /
+//! [`IsRegistrable`] implementations for owned wrapper types from
+//! `std`: [`Box`], [`std::rc::Rc`], and [`std::sync::Arc`].
 //!
 //! These wrappers are **transparent** with respect to the OAS schema:
 //! `<Box<User> as Schema>::name()` returns `"User"`, and
@@ -26,7 +26,8 @@
 use std::rc::Rc;
 use std::sync::Arc;
 
-use crate::schema::{IsRegistrable, IsStructSchema, Schema};
+use crate::register::{IsRegistrable, Register};
+use crate::schema::{IsStructSchema, Schema};
 use crate::schemas_builder::SchemasBuilder;
 
 impl<T: Schema + ?Sized> Schema for Box<T> {
@@ -35,16 +36,6 @@ impl<T: Schema + ?Sized> Schema for Box<T> {
     }
     fn schema() -> frieze_model::Schema {
         <T as Schema>::schema()
-    }
-    fn register_into(builder: &mut SchemasBuilder) {
-        // Transparent wrappers share the inner type's schema entry
-        // (`Box<T>::name() == T::name()`), so we must funnel the
-        // transitive walk to the inner type's `register_into` rather
-        // than re-pushing the inner schema directly. This keeps
-        // `struct Tree { children: Vec<Box<Tree>> }` terminating: the
-        // recursive call eventually hits the `contains_name` guard at
-        // the top of `Tree::register_into`.
-        <T as Schema>::register_into(builder);
     }
 }
 
@@ -55,9 +46,6 @@ impl<T: Schema + ?Sized> Schema for Rc<T> {
     fn schema() -> frieze_model::Schema {
         <T as Schema>::schema()
     }
-    fn register_into(builder: &mut SchemasBuilder) {
-        <T as Schema>::register_into(builder);
-    }
 }
 
 impl<T: Schema + ?Sized> Schema for Arc<T> {
@@ -67,8 +55,30 @@ impl<T: Schema + ?Sized> Schema for Arc<T> {
     fn schema() -> frieze_model::Schema {
         <T as Schema>::schema()
     }
+}
+
+impl<T: Register + ?Sized> Register for Box<T> {
     fn register_into(builder: &mut SchemasBuilder) {
-        <T as Schema>::register_into(builder);
+        // Transparent wrappers share the inner type's schema entry
+        // (`Box<T>::name() == T::name()`), so we must funnel the
+        // transitive walk to the inner type's `register_into` rather
+        // than re-pushing the inner schema directly. This keeps
+        // `struct Tree { children: Vec<Box<Tree>> }` terminating: the
+        // recursive call eventually hits the `contains_name` guard at
+        // the top of `Tree::register_into`.
+        <T as Register>::register_into(builder);
+    }
+}
+
+impl<T: Register + ?Sized> Register for Rc<T> {
+    fn register_into(builder: &mut SchemasBuilder) {
+        <T as Register>::register_into(builder);
+    }
+}
+
+impl<T: Register + ?Sized> Register for Arc<T> {
+    fn register_into(builder: &mut SchemasBuilder) {
+        <T as Register>::register_into(builder);
     }
 }
 

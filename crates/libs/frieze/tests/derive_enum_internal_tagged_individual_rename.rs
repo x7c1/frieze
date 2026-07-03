@@ -33,7 +33,7 @@ enum Event {
 
 #[test]
 fn individual_rename_overrides_rename_all_for_tag_value() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Event>()
         .add::<LoginData>()
         .add::<LogoutData>()

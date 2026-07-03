@@ -48,7 +48,7 @@ fn either_two_user_structs_uses_suffix_form() {
 
 #[test]
 fn either_user_structs_render_through_refs() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Either<UserA, UserB>>()
         .add::<Container<UserA>>()
         .add::<Container<UserB>>()

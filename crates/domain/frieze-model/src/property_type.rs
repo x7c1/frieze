@@ -16,11 +16,11 @@ use crate::schema_name::SchemaName;
 ///
 /// This helper is the single source of truth used by:
 ///
-/// - the build-time reference walk in `frieze-usecase`, which treats a
-///   primitive-named reference as resolved without requiring a
+/// - the build-time reference walk in `frieze::SchemasBuilder`, which
+///   treats a primitive-named reference as resolved without requiring a
 ///   registered entry;
-/// - the boundary conversion in `frieze-usecase::to_value`, which
-///   inlines the leaf scalar shape (`{type: integer, format: int64}`,
+/// - the boundary conversion in `frieze-usecase`, which inlines the
+///   leaf scalar shape (`{type: integer, format: int64}`,
 ///   `{type: string}`, ...) at the reference position instead of
 ///   emitting a dangling `$ref: #/components/schemas/Int64`.
 ///
@@ -62,9 +62,9 @@ pub fn primitive_property_type_for(name: &SchemaName) -> Option<PropertyType> {
 /// [`PropertyType::Reference`] carries a [`SchemaName`] pointing at another
 /// schema registered in the surrounding [`crate::Schemas`] — this is how
 /// nested struct fields are expressed. Resolution (`name exists in the
-/// collection`) is enforced by `SchemasBuilder::build` in
-/// `frieze-usecase`, not by this enum: the value here only records *that*
-/// a reference was requested.
+/// collection`) is enforced by `SchemasBuilder::build` in the `frieze`
+/// crate, not by this enum: the value here only records *that* a
+/// reference was requested.
 ///
 /// `Copy` is intentionally NOT derived because `Array(Box<PropertyType>)`
 /// and `Nullable(Box<PropertyType>)` own heap memory.

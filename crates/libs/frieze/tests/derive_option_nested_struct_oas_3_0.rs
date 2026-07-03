@@ -24,7 +24,7 @@ struct Profile {
 
 #[test]
 fn option_nested_renders_as_nullable_ref_under_oas_3_0() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .add::<User>()
         .build()

@@ -24,7 +24,7 @@ struct Profile {
 
 #[test]
 fn ref_field_with_description_wraps_in_all_of_under_oas_3_0() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .add::<User>()
         .build()

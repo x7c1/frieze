@@ -44,7 +44,7 @@ fn node_i64_name_uses_suffix_form() {
 #[cfg(feature = "oas-3-0")]
 #[test]
 fn node_user_self_references_under_oas_3_0() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Node<User>>()
         .add::<User>()
         .build()
@@ -86,7 +86,7 @@ fn node_user_self_references_under_oas_3_0() {
 #[cfg(feature = "oas-3-1")]
 #[test]
 fn node_user_self_references_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Node<User>>()
         .add::<User>()
         .build()
@@ -133,7 +133,7 @@ fn node_i64_self_references_with_inline_primitive_under_oas_3_0() {
     // `$ref: Int64_Node`, exercising the self-reference path under a
     // primitive instantiation. No `Int64` entry is needed (or emitted)
     // for build to succeed.
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Node<i64>>()
         .build()
         .expect("schemas build should succeed for a recursive generic over a primitive");
@@ -164,7 +164,7 @@ fn node_i64_self_references_with_inline_primitive_under_oas_3_0() {
 #[cfg(feature = "oas-3-1")]
 #[test]
 fn node_i64_self_references_with_inline_primitive_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Node<i64>>()
         .build()
         .expect("schemas build should succeed for a recursive generic over a primitive");

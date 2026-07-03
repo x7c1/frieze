@@ -15,7 +15,7 @@ struct Numbers {
 
 #[test]
 fn numeric_fields_render_with_correct_type_format_minimum() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Numbers>()
         .build()
         .expect("schemas build should succeed for valid input");

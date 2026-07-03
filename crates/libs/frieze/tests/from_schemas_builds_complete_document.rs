@@ -1,4 +1,4 @@
-//! `from_schemas` builds a complete `OasDocument` from an `Info` value
+//! `from_schemas` builds a complete `Document` from an `Info` value
 //! and a `Schemas` collection, with no partial to merge against. The
 //! resulting document is format-neutral — it can be rendered to YAML
 //! or JSON without re-running the schema pipeline.
@@ -9,7 +9,9 @@
 
 use std::collections::BTreeMap;
 
-use frieze::{from_schemas, Info, Schema};
+use frieze::Schema;
+use frieze_openapi::Info;
+use frieze_usecase::from_schemas;
 
 #[derive(Schema)]
 #[allow(dead_code)]
@@ -28,7 +30,7 @@ fn snapshot_info() -> Info {
 
 #[test]
 fn from_schemas_routes_schemas_through_components() {
-    let schemas: frieze::Schemas = frieze::schemas()
+    let schemas: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");
@@ -55,11 +57,11 @@ fn from_schemas_routes_schemas_through_components() {
 
     // Format-neutral: the same document round-trips through YAML and
     // JSON without loss.
-    let yaml = frieze::to_yaml(&document);
-    let from_yaml: frieze::OasDocument =
+    let yaml = frieze_openapi::to_yaml(&document);
+    let from_yaml: frieze_openapi::Document =
         serde_yaml::from_str(&yaml).expect("YAML round-trip must succeed");
     let json = serde_json::to_string_pretty(&document).expect("JSON serialize must succeed");
-    let from_json: frieze::OasDocument =
+    let from_json: frieze_openapi::Document =
         serde_json::from_str(&json).expect("JSON round-trip must succeed");
     assert_eq!(from_yaml, from_json);
 }

@@ -20,7 +20,7 @@ struct Account {
 
 #[test]
 fn struct_rename_all_snake_case_is_noop_for_snake_case_idents() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Account>()
         .build()
         .expect("schemas build should succeed for valid input");

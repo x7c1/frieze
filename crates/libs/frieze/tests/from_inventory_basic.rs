@@ -1,13 +1,13 @@
-//! End-to-end: `Schemas::builder().from_inventory()` auto-collects
+//! End-to-end: `SchemasBuilder::new().from_inventory()` auto-collects
 //! every non-generic `#[derive(Schema)]` type linked into the test
 //! binary without any explicit `add::<T>()` calls.
 //!
 //! The derive emits an `inventory::submit!` site per non-generic input
-//! (struct or enum); the facade's `__private::inventory_submit!`
+//! (struct or enum); the `frieze` crate's `__private::inventory_submit!`
 //! wrapper turns that into a real submission when the `inventory`
 //! Cargo feature is on. `from_inventory()` then iterates every entry
 //! and invokes its `register_fn`, which runs the derived
-//! `Schema::register_into` and walks each field type transitively.
+//! `Register::register_into` and walks each field type transitively.
 //!
 //! Test-binary scoping: each `tests/*.rs` file compiles as its own
 //! binary, so the inventory iteration here only sees the types
@@ -52,7 +52,7 @@ struct Root {
 
 #[test]
 fn from_inventory_collects_every_derived_root() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         .build()
         .expect("inventory iteration produces a closed schemas set");

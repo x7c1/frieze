@@ -10,7 +10,7 @@
 //!   `discriminator: {propertyName: <tag>}` block and per-arm
 //!   `allOf: [{$ref: <inner>}, {synthetic tag-property object}]`. The
 //!   `discriminator.mapping` key is deliberately omitted — see the
-//!   rationale in `frieze-usecase::to_value::one_of_to_value`.
+//!   rationale in `frieze-usecase`'s boundary conversion (`one_of_from_model`).
 //!
 //! Shape rejection is partitioned across:
 //!
@@ -20,13 +20,13 @@
 //!   in OAS by the current frieze rules);
 //! - newtype inner that is a primitive / known wrapper (`Vec`,
 //!   `Option`, `Maybe`) / not a single-segment identifier →
-//!   compile-time error from [`extract_newtype_inner_ident`] in the
+//!   compile-time error from [`extract_newtype_inner_type`] in the
 //!   tag branch;
 //! - newtype inner that is an enum-derived type → compile-time error
 //!   from the per-variant `IsStructSchema` bound check (the marker
 //!   trait is implemented only for struct-derived `Schema`s; the
-//!   diagnostic message ships with the trait declaration in
-//!   `frieze-usecase::schema`);
+//!   diagnostic message ships with the trait declaration in the
+//!   `frieze` crate);
 //! - tag attribute on a unit-only enum / data-carrying variant
 //!   without tag / unit variant mixed into a tagged enum —
 //!   checked in [`expand_enum`] / [`expand_one_of`].
@@ -250,6 +250,10 @@ fn expand_string_enum(
     let mut impl_generics_storage = generics.clone();
     push_schema_bound(&mut impl_generics_storage);
     let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
+    let mut register_generics_storage = generics.clone();
+    push_register_bound(&mut register_generics_storage);
+    let (register_impl_generics, _, register_where_clause) =
+        register_generics_storage.split_for_impl();
     let name_body = composed_name_body(generics, &base_name);
     // Unit-only enums have no inner types to recurse into; the body
     // collapses to the idempotent guard plus a single `push_unique`.
@@ -260,27 +264,31 @@ fn expand_string_enum(
     let inventory_submit = inventory_submit_token(ident, generics);
 
     let expanded = quote! {
-        impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
+        impl #impl_generics ::frieze::__private::Schema for #ident #ty_generics #where_clause {
             fn name() -> ::std::string::String {
                 #name_body
             }
             fn schema() -> ::frieze::__private::frieze_model::Schema {
                 ::frieze::__private::frieze_model::Schema::new_string_enum(
-                    <Self as ::frieze::__private::frieze_usecase::Schema>::name(),
+                    <Self as ::frieze::__private::Schema>::name(),
                     ::std::vec![ #( #value_literals ),* ],
                 )
                 .expect("frieze: derived enum schema satisfies invariants by construction")
                 .with_description(#composed_description_expr)
             }
+        }
+        // Registration contract: unit-only enums have no dependencies,
+        // so the body is the idempotent guard plus a single push.
+        impl #register_impl_generics ::frieze::__private::Register for #ident #ty_generics #register_where_clause {
             fn register_into(
-                builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
+                builder: &mut ::frieze::__private::SchemasBuilder,
             ) {
                 #register_body
             }
         }
         // Marker impl: an enum-derived `Schema` is registrable on a
         // `Schemas` collection.
-        impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
+        impl #register_impl_generics ::frieze::__private::IsRegistrable for #ident #ty_generics #register_where_clause {}
 
         #inventory_submit
     };
@@ -378,7 +386,7 @@ fn expand_one_of(
                 ::frieze::__private::frieze_model::OneOfVariant::new(
                     #wire,
                     ::frieze::__private::frieze_model::SchemaName::new(
-                        <#inner_type as ::frieze::__private::frieze_usecase::Schema>::name()
+                        <#inner_type as ::frieze::__private::Schema>::name()
                     )
                     .expect("frieze: referenced schema name violates the OAS component-name pattern"),
                 )
@@ -413,7 +421,7 @@ fn expand_one_of(
                 quote_spanned! { *variant_span =>
                     {
                         const fn _frieze_assert_struct_schema<
-                            T: ::frieze::__private::frieze_usecase::IsStructSchema,
+                            T: ::frieze::__private::IsStructSchema,
                         >() {
                         }
                         _frieze_assert_struct_schema::<#inner_type>();
@@ -423,7 +431,7 @@ fn expand_one_of(
                 quote_spanned! { *variant_span =>
                     const _: () = {
                         const fn _frieze_assert_struct_schema<
-                            T: ::frieze::__private::frieze_usecase::IsStructSchema,
+                            T: ::frieze::__private::IsStructSchema,
                         >() {
                         }
                         _frieze_assert_struct_schema::<#inner_type>();
@@ -436,6 +444,10 @@ fn expand_one_of(
     let mut impl_generics_storage = generics.clone();
     push_schema_bound(&mut impl_generics_storage);
     let (impl_generics, ty_generics, where_clause) = impl_generics_storage.split_for_impl();
+    let mut register_generics_storage = generics.clone();
+    push_register_bound(&mut register_generics_storage);
+    let (register_impl_generics, _, register_where_clause) =
+        register_generics_storage.split_for_impl();
     let name_body = composed_name_body(generics, &base_name);
 
     let (inner_bound_checks, outer_bound_checks): (TokenStream, TokenStream) = if has_generics {
@@ -444,9 +456,8 @@ fn expand_one_of(
         (quote! {}, quote! { #( #struct_bound_checks )* })
     };
 
-    // Each `oneOf` variant carries an inner struct type; the derived
-    // `register_into` recurses into every one so adding the enum root
-    // pulls all variant-inner schemas in transitively.
+    // Inner types feeding the derived `register_into` body — see the
+    // emitted `impl Register` below.
     let variant_inner_types: Vec<&Type> = inner_entries.iter().map(|(_, ty, _, _)| ty).collect();
     let register_body = register_into_body(&variant_inner_types);
     // Non-generic oneOf enum: emit one `inventory::submit!` site.
@@ -454,7 +465,7 @@ fn expand_one_of(
     let inventory_submit = inventory_submit_token(ident, generics);
 
     let expanded = quote! {
-        impl #impl_generics ::frieze::__private::frieze_usecase::Schema for #ident #ty_generics #where_clause {
+        impl #impl_generics ::frieze::__private::Schema for #ident #ty_generics #where_clause {
             fn name() -> ::std::string::String {
                 #name_body
             }
@@ -463,22 +474,28 @@ fn expand_one_of(
                 // generic case — see `struct_bound_checks` above.
                 #inner_bound_checks
                 ::frieze::__private::frieze_model::Schema::new_one_of(
-                    <Self as ::frieze::__private::frieze_usecase::Schema>::name(),
+                    <Self as ::frieze::__private::Schema>::name(),
                     #tag_lit,
                     ::std::vec![ #( #variant_constructor_exprs ),* ],
                 )
                 .expect("frieze: derived oneOf schema satisfies invariants by construction")
                 .with_description(#composed_description_expr)
             }
+        }
+        // Registration contract: each `oneOf` variant carries an inner
+        // struct type; the derived `register_into` recurses into every
+        // one so adding the enum root pulls all variant-inner schemas
+        // in transitively.
+        impl #register_impl_generics ::frieze::__private::Register for #ident #ty_generics #register_where_clause {
             fn register_into(
-                builder: &mut ::frieze::__private::frieze_usecase::SchemasBuilder,
+                builder: &mut ::frieze::__private::SchemasBuilder,
             ) {
                 #register_body
             }
         }
         // Marker impl: an enum-derived `Schema` is registrable on a
         // `Schemas` collection.
-        impl #impl_generics ::frieze::__private::frieze_usecase::IsRegistrable for #ident #ty_generics #where_clause {}
+        impl #register_impl_generics ::frieze::__private::IsRegistrable for #ident #ty_generics #register_where_clause {}
 
         #outer_bound_checks
         #inventory_submit
@@ -495,9 +512,8 @@ fn expand_one_of(
 /// (`Container<i64>`) are accepted: the downstream `IsStructSchema`
 /// bound check verifies that the concrete instantiation is a struct
 /// schema. An `Inner` whose `Schema` is enum-derived (and therefore
-/// does not implement [`frieze_usecase::IsStructSchema`]) fails to
-/// compile with the `on_unimplemented` diagnostic attached to that
-/// trait.
+/// does not implement `frieze::IsStructSchema`) fails to compile with
+/// the `on_unimplemented` diagnostic attached to that trait.
 fn extract_newtype_inner_type(variant_ident: &Ident, inner: &Type) -> Result<Type, syn::Error> {
     // Known wrappers (`Option`, `Vec`, `Maybe`) cannot be the inner
     // of an internal-tagged newtype variant — they are not structs
@@ -604,8 +620,20 @@ fn reject_unsupported_generic_params(generics: &Generics, ident: &Ident) -> Resu
 fn push_schema_bound(generics: &mut Generics) {
     for param in generics.params.iter_mut() {
         if let GenericParam::Type(type_param) = param {
-            let bound: syn::TypeParamBound =
-                syn::parse_quote!(::frieze::__private::frieze_usecase::Schema);
+            let bound: syn::TypeParamBound = syn::parse_quote!(::frieze::__private::Schema);
+            type_param.bounds.push(bound);
+        }
+    }
+}
+
+/// Push the synthesised `T: Register` bound onto every type parameter
+/// in `generics` — used for the `Register` / `IsRegistrable` impls,
+/// whose bodies delegate to each inner type's
+/// `Register::register_into`.
+fn push_register_bound(generics: &mut Generics) {
+    for param in generics.params.iter_mut() {
+        if let GenericParam::Type(type_param) = param {
+            let bound: syn::TypeParamBound = syn::parse_quote!(::frieze::__private::Register);
             type_param.bounds.push(bound);
         }
     }
@@ -638,7 +666,7 @@ fn composed_name_body(generics: &Generics, base_name: &str) -> TokenStream {
     }
     format_str.push_str(base_name);
     let args = type_param_idents.iter().map(|t| {
-        quote! { <#t as ::frieze::__private::frieze_usecase::Schema>::name() }
+        quote! { <#t as ::frieze::__private::Schema>::name() }
     });
     quote! {
         ::frieze::__private::compose_schema_name(

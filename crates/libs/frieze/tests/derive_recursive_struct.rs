@@ -42,7 +42,7 @@ fn box_tree_is_registrable_through_blanket_impl() {
     // `frieze-usecase::wrapper_impls` is what unlocks this. The
     // snapshot below confirms no synthetic `Tree_Box` entry appears —
     // a `Box<Tree>` and a `Tree` registration produce the same output.
-    let schemas = frieze::schemas()
+    let schemas = frieze::SchemasBuilder::new()
         .add::<Box<Tree>>()
         .build()
         .expect("registering Box<Tree> succeeds and is equivalent to adding Tree");

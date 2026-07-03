@@ -33,7 +33,7 @@ enum Event {
 
 #[test]
 fn rename_all_snake_case_rewrites_tag_values() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Event>()
         .add::<UserLoginData>()
         .add::<UserLogoutData>()

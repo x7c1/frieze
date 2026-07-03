@@ -5,13 +5,13 @@
 //!
 //! Scalar schemas exist to let primitive Rust types (`i32`, `i64`, `u32`,
 //! `u64`, `f32`, `f64`, `bool`, `String`) implement the
-//! `frieze_usecase::Schema` trait so they can appear as generic arguments
+//! `frieze::Schema` trait so they can appear as generic arguments
 //! (`Box<i64>`, `Page<String>`) without forcing a wrapper struct. They are
 //! intentionally **not** registered under `#/components/schemas`: the
-//! `IsRegistrable` marker trait in `frieze-usecase` is the primary guard
-//! that rejects `Schemas::add::<i64>()` at compile time, and the
-//! `Scalar` arm in the boundary conversion (`frieze-usecase::to_value`)
-//! provides the defensive secondary skip.
+//! `IsRegistrable` marker trait in the `frieze` crate is the primary
+//! guard that rejects `Schemas::add::<i64>()` at compile time, and the
+//! `Scalar` arm in `frieze-usecase`'s boundary conversion provides the
+//! defensive secondary skip.
 
 use crate::description::normalize_description;
 use crate::error::Error;

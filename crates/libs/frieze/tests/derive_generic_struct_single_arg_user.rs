@@ -30,7 +30,7 @@ fn page_user_name_uses_suffix_form() {
 
 #[test]
 fn page_user_registers_alongside_user() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Page<User>>()
         .add::<User>()
         .build()

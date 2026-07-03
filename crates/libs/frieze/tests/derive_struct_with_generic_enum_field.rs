@@ -33,7 +33,7 @@ struct Log {
 
 #[test]
 fn log_field_refs_composed_event_name() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Log>()
         .add::<Event<i64, String>>()
         .add::<Container<i64>>()

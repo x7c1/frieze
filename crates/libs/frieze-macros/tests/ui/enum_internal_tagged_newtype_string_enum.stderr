@@ -4,14 +4,14 @@ error[E0277]: frieze: internal-tagged enum variants require their inner type to 
 21 |     Mode(Status),
    |          ^^^^^^ this type does not implement `IsStructSchema`
    |
-help: the trait `frieze::__private::frieze_usecase::schema::IsStructSchema` is not implemented for `Status`
+help: the trait `IsStructSchema` is not implemented for `Status`
   --> tests/ui/enum_internal_tagged_newtype_string_enum.rs:12:1
    |
 12 | enum Status {
    | ^^^^^^^^^^^
    = note: wrap `Status` in a struct with `#[derive(Schema)]` and use the wrapping struct as the newtype variant inner: `struct StatusData { value: Status }`, then `enum YourEnum { ... (StatusData), ... }`
-help: the following other types implement trait `frieze::__private::frieze_usecase::schema::IsStructSchema`
-  --> $WORKSPACE/crates/domain/frieze-usecase/src/wrapper_impls.rs
+help: the following other types implement trait `IsStructSchema`
+  --> $WORKSPACE/crates/libs/frieze/src/wrapper_impls.rs
    |
    | impl<T: IsStructSchema + ?Sized> IsStructSchema for Box<T> {}
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Box<T>`

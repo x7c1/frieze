@@ -33,7 +33,7 @@ use crate::schema_type::SchemaType;
 ///
 /// The `Deserialize` impl here is an intentionally naive auto-derive
 /// used only as a transport: it lets `ObjectSchema` values move through
-/// the top-level [`crate::OasDocument`] / [`crate::Components`] structs
+/// the top-level [`crate::Document`] / [`crate::Components`] structs
 /// without hand-writing their conversions. The matching `Serialize` impl
 /// is handwritten further down to produce the canonical OAS key order
 /// and the OAS 3.0 / 3.1 conditional nullability encoding.

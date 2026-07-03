@@ -8,26 +8,30 @@ description = "Generate OpenAPI Schema Objects from Rust types via proc-macros."
 
 [features]
 default = ["oas-3-0", "inventory"]
+# OAS version selection. This crate's own API is version-agnostic; the
+# features exist so a single `frieze` dependency entry can pick the
+# version for the crates that do encode it (`frieze-openapi`, and
+# `frieze-usecase` on top of it) when they appear in the same build —
+# including this crate's own test suite, which depends on both.
 oas-3-0 = ["frieze-openapi/oas-3-0", "frieze-usecase/oas-3-0"]
 oas-3-1 = ["frieze-openapi/oas-3-1", "frieze-usecase/oas-3-1"]
 # `inventory`-based collection (on by default). Enables
-# `Schemas::builder().from_inventory()` and turns the derive macro's
+# `SchemasBuilder::from_inventory()` and turns the derive macro's
 # `inventory_submit!` token into a real `inventory::submit!` site.
 # Disable with `default-features = false` for no_std / WASM / embedded
 # targets; without this feature the same derive expansion is a no-op
 # submission and `from_inventory()` is not available.
-inventory = ["dep:inventory", "frieze-usecase/inventory"]
+inventory = ["dep:inventory"]
 
 [dependencies]
 frieze-model.workspace = true
-frieze-usecase.workspace = true
-frieze-openapi.workspace = true
 frieze-macros.workspace = true
 inventory = { workspace = true, optional = true }
 
 [dev-dependencies]
+frieze-openapi.workspace = true
+frieze-usecase.workspace = true
 insta.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde_yaml.workspace = true
-trybuild.workspace = true

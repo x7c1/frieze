@@ -11,7 +11,7 @@ struct Flag {
 
 #[test]
 fn bool_field_renders_as_type_boolean() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Flag>()
         .build()
         .expect("schemas build should succeed for valid input");

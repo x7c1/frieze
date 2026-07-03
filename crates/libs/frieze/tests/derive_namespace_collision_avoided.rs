@@ -42,7 +42,7 @@ fn distinct_namespaces_resolve_same_bare_name() {
     // try to register under the bare key `User`. The successful
     // build (no `expect` panic) is the primary assertion; the
     // snapshot below is a secondary visualisation.
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .from_inventory()
         .build()
         .expect("namespace disambiguation prevents OAS key collision");

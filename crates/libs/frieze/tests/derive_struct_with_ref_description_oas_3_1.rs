@@ -23,7 +23,7 @@ struct Profile {
 
 #[test]
 fn ref_field_with_description_emits_sibling_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .add::<User>()
         .build()

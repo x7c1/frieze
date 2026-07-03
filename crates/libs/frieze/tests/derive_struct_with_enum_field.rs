@@ -27,7 +27,7 @@ struct User {
 
 #[test]
 fn struct_field_of_enum_type_renders_as_ref() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .add::<Status>()
         .build()

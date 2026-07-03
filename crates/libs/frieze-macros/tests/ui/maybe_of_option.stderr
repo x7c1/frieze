@@ -1,5 +1,5 @@
 error: frieze: Maybe<Option<T>> is ambiguous; nullability is doubly defined. Use Maybe<T> alone.
- --> tests/ui/maybe_of_option.rs:5:8
+ --> tests/ui/maybe_of_option.rs:6:8
   |
-5 |     x: Maybe<Option<String>>,
+6 |     x: Maybe<Option<String>>,
   |        ^^^^^^^^^^^^^^^^^^^^^

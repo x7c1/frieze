@@ -8,7 +8,7 @@
 //! attribute site) as the namespace's parent path, so the full
 //! declaration `format!("{}::{}", parent_path, local_name)` can be
 //! reconstructed at runtime by
-//! `frieze_usecase::compose_schema_name`.
+//! `frieze::__private::compose_schema_name`.
 //!
 //! Keeping the mod body untouched is what makes file-based mod
 //! declarations (`pub mod v1;`) work uniformly with inline mod blocks:

@@ -17,7 +17,7 @@ struct User {
 
 #[test]
 fn field_rename_rewrites_properties_and_required() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");

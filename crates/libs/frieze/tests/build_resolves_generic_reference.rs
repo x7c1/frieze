@@ -27,7 +27,7 @@ struct Profile {
 
 #[test]
 fn build_resolves_reference_to_generic_instance() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .add::<Container<User>>()
         .add::<User>()

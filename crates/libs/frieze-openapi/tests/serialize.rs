@@ -3,7 +3,7 @@
 //!
 //! These tests pin the canonical OAS YAML output produced by going
 //! directly through `serde_yaml::to_string(&schema)`. They do not run
-//! through `frieze-usecase::to_value` — that path is exercised by the
+//! through `frieze-usecase`'s boundary conversion — that path is exercised by the
 //! existing snapshots in the `frieze` crate, which must continue to
 //! pass byte-for-byte unchanged.
 //!

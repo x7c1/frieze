@@ -5,7 +5,8 @@
 
 #![cfg(feature = "oas-3-1")]
 
-use frieze::{Maybe, Schema};
+use frieze::Schema;
+use frieze_model::Maybe;
 use serde::{Deserialize, Serialize};
 
 mod common;
@@ -33,7 +34,7 @@ struct Listing {
 
 #[test]
 fn maybe_generic_renders_as_optional_nullable_ref_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Listing>()
         .add::<Page<User>>()
         .add::<User>()

@@ -1,5 +1,5 @@
 error: frieze: nested Maybe is not supported.
- --> tests/ui/nested_maybe.rs:5:8
+ --> tests/ui/nested_maybe.rs:6:8
   |
-5 |     x: Maybe<Maybe<String>>,
+6 |     x: Maybe<Maybe<String>>,
   |        ^^^^^^^^^^^^^^^^^^^^

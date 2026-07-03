@@ -19,7 +19,7 @@ struct User {
 
 #[test]
 fn struct_with_field_and_top_descriptions() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
         .build()
         .expect("schemas build should succeed for valid input");

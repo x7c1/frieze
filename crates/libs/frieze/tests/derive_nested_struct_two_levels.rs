@@ -29,7 +29,7 @@ struct Workspace {
 
 #[test]
 fn two_level_nested_renders_all_three() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Workspace>()
         .add::<Profile>()
         .add::<User>()

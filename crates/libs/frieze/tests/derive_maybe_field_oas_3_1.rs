@@ -3,7 +3,8 @@
 
 #![cfg(feature = "oas-3-1")]
 
-use frieze::{Maybe, Schema};
+use frieze::Schema;
+use frieze_model::Maybe;
 use serde::{Deserialize, Serialize};
 
 mod common;
@@ -17,7 +18,7 @@ struct Profile {
 
 #[test]
 fn maybe_field_renders_optional_and_type_null_under_oas_3_1() {
-    let s: frieze::Schemas = frieze::schemas()
+    let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<Profile>()
         .build()
         .expect("schemas build should succeed for valid input");
