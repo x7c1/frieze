@@ -47,5 +47,8 @@ pub use info::Info;
 mod document;
 pub use document::Document;
 
+mod version;
+pub use version::{Version, VersionParseError};
+
 mod to_yaml;
 pub use to_yaml::to_yaml;

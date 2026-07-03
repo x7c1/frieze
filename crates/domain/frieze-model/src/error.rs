@@ -124,4 +124,33 @@ pub enum Error {
          OAS document."
     )]
     PartialAlreadyHasSchemas { count: usize },
+    /// The OpenAPI document's `openapi` field is absent or empty.
+    ///
+    /// The OAS version is required input for document composition —
+    /// there is deliberately no default. Code that loads a partial OAS
+    /// document maps a version-less document (the deserialize failure
+    /// for a missing or empty `openapi:` field) into this variant.
+    ///
+    /// Recovery: add an `openapi: 3.0.3` (or `3.1.0`, etc.) line to the
+    /// partial OAS document.
+    #[error("OpenAPI document is missing required 'openapi' field")]
+    MissingOpenApiVersion,
+    /// The requested OAS version is outside the supported range, or —
+    /// temporarily — does not match the version this build can emit.
+    ///
+    /// `got` is the rejected version string, verbatim (e.g. `"2.0"`,
+    /// `"3.2.0"`).
+    ///
+    /// Besides the plain out-of-range case, the composition entry
+    /// points (`compose` / `from_schemas` in `frieze-usecase`)
+    /// currently also return this error when the requested version is
+    /// supported in general but does not match the OAS version the
+    /// build was compiled for: the `Serialize` implementations are
+    /// still selected at compile time by the `oas-3-0` / `oas-3-1`
+    /// features, so a mismatch would produce a document whose `openapi`
+    /// header disagrees with the shape of its body. That guard is
+    /// temporary and will be removed once serialization dispatches on
+    /// the document's version at runtime.
+    #[error("Unsupported OAS version: '{got}'. Supported: 3.0.x, 3.1.x")]
+    UnsupportedOpenApiVersion { got: String },
 }

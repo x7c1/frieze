@@ -18,6 +18,65 @@ The two features are **mutually exclusive** and enforced via
 explicitly) both fail at compile time on purpose — there is no
 "version-agnostic" mode.
 
+## The runtime `Version` handle
+
+Alongside the compile-time feature gate, `frieze-openapi` exposes a
+`Version` enum that carries the major.minor discriminant as data:
+
+```rust
+use frieze_openapi::Version;
+
+let v = Version::V3_0;
+assert_eq!(v.openapi_string(), "3.0.3");
+```
+
+Every `Document` parsed from YAML or JSON has an
+`oas_version: Version` field, lifted from its `openapi:` string at
+deserialize time. The wire-format string itself (patch included, e.g.
+`"3.0.5"`) is preserved verbatim in `Document.openapi`; `oas_version`
+never appears in serialized output, so the wire format is unchanged.
+
+The parser (`Version::parse_from_openapi`) is patch-tolerant: any
+`3.0.x` string lifts to `Version::V3_0` and any `3.1.x` to
+`Version::V3_1` — OAS patch releases are editorial-only and never
+change schema shape — and the bare `3.0` / `3.1` forms are also
+accepted. Deserializing a document whose `openapi:` field is missing,
+empty, or outside the supported range fails with an error carrying the
+`VersionParseError` message. There is no default version: the value
+always comes from explicit input, either the parsed `openapi:` field
+or an explicit argument.
+
+## Composition entry points
+
+Both entry points in `frieze-usecase` carry the version as data:
+
+```rust
+pub fn from_schemas(info: Info, schemas: Schemas, version: Version) -> Result<Document, Error>;
+pub fn compose(partial: Document, schemas: Schemas) -> Result<Document, Error>;
+```
+
+`from_schemas` takes the target version explicitly and stamps the
+canonical `openapi` string for it (`3.0.3` / `3.1.0`). `compose` uses
+`partial.oas_version` (lifted at parse time) and preserves the
+partial's raw `openapi` string in the output.
+
+### Transition guard
+
+While the `Serialize` implementations in `frieze-openapi` remain
+selected at compile time by the `oas-3-0` / `oas-3-1` features, both
+entry points reject a `Version` that does not match the version the
+build was compiled for, returning
+`Error::UnsupportedOpenApiVersion { got }` before anything is
+composed. Without the guard, an `openapi: 3.1.0` header could be
+paired with a 3.0-style body (`nullable: true`, ...) — a spec-invalid
+document.
+
+The guard is temporary: once serialization dispatches on
+`Document.oas_version` at runtime, the mismatch check disappears and a
+single build can emit both versions. The `Version` enum, the
+`oas_version` field, and the error variants already have the shape
+that refactor will consume.
+
 ## Per-version encoding differences
 
 The differences between OAS 3.0 and OAS 3.1 that affect the emitted

@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 
 use frieze_model::Schemas;
-use frieze_openapi::{to_yaml, Info};
+use frieze_openapi::{to_yaml, Info, Version};
 use frieze_usecase::from_schemas;
 
 /// Wraps a `Schemas` collection in a minimal `Document` for snapshot
@@ -25,9 +25,25 @@ use frieze_usecase::from_schemas;
 /// should do so directly via the document field, not through this
 /// shared snapshot path.
 pub fn snapshot_yaml(schemas: Schemas) -> String {
-    let mut document = from_schemas(snapshot_info(), schemas);
+    let mut document = from_schemas(snapshot_info(), schemas, compiled_version())
+        .expect("from_schemas with the compiled-in OAS version must succeed");
     document.openapi = "X.Y.Z".to_string();
     to_yaml(&document)
+}
+
+/// The OAS version the current build was compiled to emit.
+///
+/// `from_schemas` (temporarily) rejects any other version while the
+/// `Serialize` impls remain feature-gated, so the snapshot helper asks
+/// for exactly this one instead of hard-coding a variant per test.
+#[cfg(feature = "oas-3-0")]
+fn compiled_version() -> Version {
+    Version::V3_0
+}
+
+#[cfg(feature = "oas-3-1")]
+fn compiled_version() -> Version {
+    Version::V3_1
 }
 
 /// Fixed `Info` value used by every snapshot test so that the leading
