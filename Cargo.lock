@@ -95,7 +95,9 @@ dependencies = [
  "frieze-usecase",
  "serde_json",
  "serde_yaml",
+ "tempfile",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
