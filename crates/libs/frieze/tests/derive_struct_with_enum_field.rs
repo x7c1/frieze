@@ -5,7 +5,7 @@
 //! nested struct references — enums ride on it unchanged.
 //!
 //! The output for a plain (non-nullable, non-array) reference is
-//! identical under both `oas-3-0` and `oas-3-1`.
+//! identical under both OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

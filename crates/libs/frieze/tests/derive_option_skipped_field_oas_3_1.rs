@@ -4,8 +4,6 @@
 //! means the field is dropped from `required` **and** the `type` stays as
 //! a scalar (no `"null"` fold).
 
-#![cfg(feature = "oas-3-1")]
-
 use frieze::Schema;
 use serde::Serialize;
 
@@ -26,7 +24,7 @@ fn option_with_skip_serializing_if_renders_optional_non_nullable_under_oas_3_1()
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

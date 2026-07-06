@@ -90,8 +90,8 @@ pub enum PropertyType {
     /// schema.
     Array(Box<PropertyType>),
     /// Marks the wrapped type as accepting `null` in addition to its base
-    /// values. Rendered as `nullable: true` under `oas-3-0` or as a
-    /// 2-element `type` sequence under `oas-3-1`, applied at the position
+    /// values. Rendered as `nullable: true` under OAS 3.0 or as a
+    /// 2-element `type` sequence under OAS 3.1, applied at the position
     /// where this variant appears in the tree (so `Array(Nullable(...))`
     /// makes the array **items** nullable, not the array itself).
     Nullable(Box<PropertyType>),

@@ -4,7 +4,7 @@
 //! object}]`, and the enclosing schema carries
 //! `discriminator: {propertyName: <tag>}` with no `mapping` block.
 //!
-//! The output is identical under both `oas-3-0` and `oas-3-1`.
+//! The output is identical under both OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

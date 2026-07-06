@@ -4,8 +4,6 @@
 //! expressed with `allOf` + `nullable: true` because the spec disallows
 //! sibling keys on a `$ref` schema.
 
-#![cfg(feature = "oas-3-0")]
-
 use frieze::Schema;
 
 mod common;
@@ -30,7 +28,7 @@ fn option_nested_renders_as_nullable_ref_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

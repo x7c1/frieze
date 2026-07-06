@@ -2,7 +2,7 @@
 //! `{type: array, items: {$ref: E}}`, reusing the same array-of-ref
 //! shape that nested struct and string-enum references use.
 //!
-//! The output is identical under both `oas-3-0` and `oas-3-1`.
+//! The output is identical under both OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

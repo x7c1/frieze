@@ -7,7 +7,7 @@
 //! generic-argument rejection in the macro) is what makes the `Box<User>`
 //! parse path work.
 //!
-//! Identical output under `oas-3-0` and `oas-3-1`.
+//! Identical output under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

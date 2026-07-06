@@ -12,9 +12,8 @@
 //!
 //! Gated to the no-inventory build path with
 //! `#[cfg(not(feature = "inventory"))]` so the test compiles only
-//! under that configuration. The matrix runs include
-//! `--features oas-3-0` and `--features oas-3-1` (without
-//! `inventory`); under both this test is active.
+//! under that configuration. The `--no-default-features` runs in the
+//! build/test matrix keep it active.
 
 #![cfg(not(feature = "inventory"))]
 

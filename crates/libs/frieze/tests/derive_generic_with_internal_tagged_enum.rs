@@ -3,7 +3,7 @@
 //! bound check accepts the generic instantiation because
 //! `Container<T>: IsStructSchema` holds whenever `T: Schema` holds.
 //!
-//! The wire shape is identical under `oas-3-0` and `oas-3-1`.
+//! The wire shape is identical under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

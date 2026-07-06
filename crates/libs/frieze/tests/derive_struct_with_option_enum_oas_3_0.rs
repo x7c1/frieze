@@ -5,8 +5,6 @@
 //! `nullable: true` — the same wrap used for nullable nested-struct
 //! references.
 
-#![cfg(feature = "oas-3-0")]
-
 use frieze::Schema;
 
 mod common;
@@ -32,7 +30,7 @@ fn option_enum_field_renders_as_nullable_ref_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

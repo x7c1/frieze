@@ -6,8 +6,6 @@
 //! This file also serves as a contract test that the macro inspects field-
 //! level serde attributes and switches its emission based on them.
 
-#![cfg(feature = "oas-3-0")]
-
 use frieze::Schema;
 use serde::Serialize;
 
@@ -28,7 +26,7 @@ fn option_with_skip_serializing_if_renders_optional_non_nullable_under_oas_3_0()
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

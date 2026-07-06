@@ -7,8 +7,6 @@
 //! shape. Guards against regressions in the shared `Maybe` × `$ref`
 //! composition path when applied to `OneOf` references.
 
-#![cfg(feature = "oas-3-0")]
-
 use frieze::Schema;
 use frieze_model::Maybe;
 use serde::{Deserialize, Serialize};
@@ -53,7 +51,7 @@ fn maybe_oneof_field_wraps_with_allof_nullable_and_drops_required() {
         .build()
         .expect("schemas build should succeed for valid input");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

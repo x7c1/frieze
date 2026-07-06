@@ -11,7 +11,7 @@
 //! The end result is that adding only the non-generic root pulls in
 //! every monomorphic instance reachable through the field graph.
 //!
-//! Identical output under `oas-3-0` and `oas-3-1`.
+//! Identical output under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

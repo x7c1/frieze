@@ -45,8 +45,7 @@ let document = frieze_usecase::from_schemas(
     Info { title: "My API".into(), version: "1.0.0".into(), ..Default::default() },
     schemas,
     frieze_openapi::Version::V3_0,
-)
-.expect("requested OAS version should match the compiled feature");
+);
 println!("{}", frieze_openapi::to_yaml(&document));
 ```
 
@@ -110,13 +109,13 @@ single attribute.
 
 ## OpenAPI version
 
-Pick exactly one of `oas-3-0` (default) or `oas-3-1` as a Cargo feature.
-The two encode nullability differently (`nullable: true` vs
-`type: [..., "null"]`) and are mutually exclusive. The version also
-travels as data: `from_schemas` takes an explicit
-`frieze_openapi::Version`, and a parsed `Document` carries the version
-lifted from its `openapi:` field. For now the data-level version must
-match the compiled feature. See
+OAS 3.0 and 3.1 are both supported by every build — no Cargo feature
+to pick. The version travels as per-document data: `from_schemas`
+takes an explicit `frieze_openapi::Version`, a parsed `Document`
+carries the version lifted from its `openapi:` field, and
+serialization dispatches on it, so one program can emit a 3.0 document
+and a 3.1 document side by side. The two versions encode nullability
+differently (`nullable: true` vs `type: [..., "null"]`); see
 [`docs/oas-versions.md`](docs/oas-versions.md) for the full encoding
 table, the version-specific shapes for nullable references, and the
 runtime `Version` handle.
@@ -177,7 +176,7 @@ Targets that cannot host `inventory`'s linker-based registration can
 opt out by disabling the default features:
 
 ```toml
-frieze = { version = "...", default-features = false, features = ["oas-3-0"] }
+frieze = { version = "...", default-features = false }
 ```
 
 With the feature off, `SchemasBuilder::new().from_inventory()` is no
@@ -190,7 +189,7 @@ becomes a no-op. Register schemas explicitly via `add::<T>()` instead.
 |------------------------------------------------------------|--------------------------------------------------|
 | [`docs/field-shapes.md`](docs/field-shapes.md)             | Field types and presence/nullability             |
 | [`docs/output-ordering.md`](docs/output-ordering.md)       | Output ordering guarantees                       |
-| [`docs/oas-versions.md`](docs/oas-versions.md)             | OAS feature flags and version differences        |
+| [`docs/oas-versions.md`](docs/oas-versions.md)             | OAS version handling and version differences     |
 
 ## License
 

@@ -540,7 +540,7 @@ tag value and then validate the payload against `LoginData` alone —
 bypassing the `enum: [<wire_name>]` constraint that frieze synthesises
 in the `allOf` arm. Omitting `mapping` makes readers shape-match
 across the arms instead, so the tag-value constraint stays strict on
-the wire. The shape is identical under both `oas-3-0` and `oas-3-1`.
+the wire. The shape is identical under both OAS 3.0 and 3.1.
 
 ### `rename` and `rename_all` on the tag value
 

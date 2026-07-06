@@ -4,7 +4,7 @@
 //! a generic-typed path delivers the suffix-form name correctly through
 //! `<#ty as Schema>::name()`.
 //!
-//! The shape is identical under `oas-3-0` and `oas-3-1`.
+//! The shape is identical under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

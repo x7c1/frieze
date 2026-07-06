@@ -3,7 +3,7 @@
 //! the Rust identifier) for that variant's tag value, matching the
 //! precedence rule used everywhere else in frieze.
 //!
-//! The output is identical under both `oas-3-0` and `oas-3-1`.
+//! The output is identical under both OAS 3.0 and 3.1.
 
 use frieze::Schema;
 use serde::{Deserialize, Serialize};

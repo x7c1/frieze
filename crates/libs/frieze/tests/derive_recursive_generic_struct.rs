@@ -41,7 +41,6 @@ fn node_i64_name_uses_suffix_form() {
     assert_eq!(<Node<i64> as Schema>::name(), "Int64_Node");
 }
 
-#[cfg(feature = "oas-3-0")]
 #[test]
 fn node_user_self_references_under_oas_3_0() {
     let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
@@ -50,7 +49,7 @@ fn node_user_self_references_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for a recursive generic type");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test
@@ -83,7 +82,6 @@ fn node_user_self_references_under_oas_3_0() {
     ");
 }
 
-#[cfg(feature = "oas-3-1")]
 #[test]
 fn node_user_self_references_under_oas_3_1() {
     let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
@@ -92,7 +90,7 @@ fn node_user_self_references_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for a recursive generic type");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test
@@ -125,7 +123,6 @@ fn node_user_self_references_under_oas_3_1() {
     ");
 }
 
-#[cfg(feature = "oas-3-0")]
 #[test]
 fn node_i64_self_references_with_inline_primitive_under_oas_3_0() {
     // The `value: T` field with `T = i64` inlines as the primitive
@@ -138,7 +135,7 @@ fn node_i64_self_references_with_inline_primitive_under_oas_3_0() {
         .build()
         .expect("schemas build should succeed for a recursive generic over a primitive");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_0(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test
@@ -161,7 +158,6 @@ fn node_i64_self_references_with_inline_primitive_under_oas_3_0() {
     ");
 }
 
-#[cfg(feature = "oas-3-1")]
 #[test]
 fn node_i64_self_references_with_inline_primitive_under_oas_3_1() {
     let s: frieze_model::Schemas = frieze::SchemasBuilder::new()
@@ -169,7 +165,7 @@ fn node_i64_self_references_with_inline_primitive_under_oas_3_1() {
         .build()
         .expect("schemas build should succeed for a recursive generic over a primitive");
 
-    insta::assert_snapshot!(common::snapshot_yaml(s), @"
+    insta::assert_snapshot!(common::snapshot_yaml_3_1(s), @"
     openapi: X.Y.Z
     info:
       title: snapshot test

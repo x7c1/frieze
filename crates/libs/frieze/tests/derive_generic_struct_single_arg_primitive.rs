@@ -12,7 +12,7 @@
 //! the scalar shape at the leaf position. The OAS document therefore
 //! contains no `components/schemas/Int64` entry and no dangling `$ref`.
 //!
-//! Identical output under `oas-3-0` and `oas-3-1`.
+//! Identical output under OAS 3.0 and 3.1.
 
 use frieze::Schema;
 

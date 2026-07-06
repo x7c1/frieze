@@ -18,17 +18,12 @@ struct User {
     name: String,
 }
 
-/// The `openapi:` header matching the OAS version this build was
-/// compiled to emit. `compose` (temporarily) rejects a partial whose
-/// version differs from the compiled-in one, so the partial below is
-/// stitched together with the matching header per feature — this
-/// test's contract is composition shape, not version dispatch.
-#[cfg(feature = "oas-3-0")]
-const OPENAPI_HEADER: &str = "openapi: 3.0.3\n";
-#[cfg(feature = "oas-3-1")]
-const OPENAPI_HEADER: &str = "openapi: 3.1.0\n";
-
-const PARTIAL_BODY: &str = "\
+/// The partial used by every test in this file. The `openapi:` header
+/// is a fixed `3.0.3` — this test's contract is composition shape
+/// (which sections survive the merge), not version dispatch, and the
+/// schema below is version-neutral anyway.
+const PARTIAL_YAML: &str = "\
+openapi: 3.0.3
 info:
   title: Example API
   version: 1.0.0
@@ -44,14 +39,10 @@ x-codegen-info:
   generator: frieze
 ";
 
-fn partial_yaml() -> String {
-    format!("{OPENAPI_HEADER}{PARTIAL_BODY}")
-}
-
 #[test]
 fn compose_merges_schemas_into_partial_and_preserves_other_sections() {
     let partial: Document =
-        serde_yaml::from_str(&partial_yaml()).expect("partial YAML must parse as Document");
+        serde_yaml::from_str(PARTIAL_YAML).expect("partial YAML must parse as Document");
 
     let schemas: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .add::<User>()
@@ -60,10 +51,9 @@ fn compose_merges_schemas_into_partial_and_preserves_other_sections() {
 
     let composed = compose(partial, schemas).expect("partial has no schemas; merge must succeed");
 
-    // Strip the version-dependent `openapi:` line so the snapshot is
-    // identical under both `oas-3-0` and `oas-3-1`. The assertion in
-    // this test is about composition shape (which sections survive),
-    // not the version string.
+    // Strip the `openapi:` line so the snapshot pins only what this
+    // test asserts: composition shape (which sections survive), not
+    // the version string.
     let yaml = to_yaml(&composed);
     let yaml = yaml.lines().skip(1).collect::<Vec<_>>().join("\n");
 
@@ -104,7 +94,7 @@ fn compose_preserves_empty_components_when_no_schemas_registered() {
     // boundary writes only into `components.schemas` and leaves the
     // surrounding shape alone.
     let partial: Document =
-        serde_yaml::from_str(&partial_yaml()).expect("partial YAML must parse as Document");
+        serde_yaml::from_str(PARTIAL_YAML).expect("partial YAML must parse as Document");
 
     let schemas: frieze_model::Schemas = frieze::SchemasBuilder::new()
         .build()

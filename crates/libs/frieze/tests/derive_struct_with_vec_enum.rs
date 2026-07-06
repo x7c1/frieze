@@ -1,5 +1,5 @@
 //! A `Vec<Status>` field renders as `type: array, items: {$ref}`. The
-//! shape is identical under both `oas-3-0` and `oas-3-1` (no
+//! shape is identical under both OAS 3.0 and 3.1 (no
 //! nullability is involved).
 
 use frieze::Schema;

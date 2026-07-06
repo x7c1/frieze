@@ -21,38 +21,24 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: cargo fmt
         run: cargo fmt --all -- --check
-      # `oas-3-0` and `oas-3-1` are mutually exclusive (see
-      # `frieze-openapi`'s `compile_error!` guards); each feature set is
-      # checked in its own step.
-      #
-      # The `inventory` feature is additive and opt-in; we exercise it
-      # in tandem with each OAS version so the opt-in
-      # `Schemas::from_inventory()` path stays green alongside the
-      # default-off path.
-      - name: cargo clippy (oas-3-0)
-        run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-0 -- -D warnings
-      - name: cargo clippy (oas-3-1)
-        run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-1 -- -D warnings
-      - name: cargo clippy (oas-3-0 + inventory)
-        run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-0,inventory -- -D warnings
-      - name: cargo clippy (oas-3-1 + inventory)
-        run: cargo clippy --workspace --all-targets --no-default-features --features oas-3-1,inventory -- -D warnings
-      - name: cargo build (oas-3-0)
-        run: cargo build --workspace --no-default-features --features oas-3-0
-      - name: cargo build (oas-3-1)
-        run: cargo build --workspace --no-default-features --features oas-3-1
-      - name: cargo build (oas-3-0 + inventory)
-        run: cargo build --workspace --no-default-features --features oas-3-0,inventory
-      - name: cargo build (oas-3-1 + inventory)
-        run: cargo build --workspace --no-default-features --features oas-3-1,inventory
-      - name: cargo test (oas-3-0)
-        run: cargo test --workspace --no-default-features --features oas-3-0
-      - name: cargo test (oas-3-1)
-        run: cargo test --workspace --no-default-features --features oas-3-1
-      - name: cargo test (oas-3-0 + inventory)
-        run: cargo test --workspace --no-default-features --features oas-3-0,inventory
-      - name: cargo test (oas-3-1 + inventory)
-        run: cargo test --workspace --no-default-features --features oas-3-1,inventory
+      # The OAS version (3.0 / 3.1) is per-document runtime data, so a
+      # single test run exercises both output shapes. The only feature
+      # axis left is `inventory` (on by default): the
+      # `--no-default-features` steps keep the opt-out path — no_std /
+      # WASM-leaning consumers without linker-based registration —
+      # green alongside the default one.
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo clippy (no default features)
+        run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+      - name: cargo build
+        run: cargo build --workspace
+      - name: cargo build (no default features)
+        run: cargo build --workspace --no-default-features
+      - name: cargo test
+        run: cargo test --workspace
+      - name: cargo test (no default features)
+        run: cargo test --workspace --no-default-features
 
   validate-title:
     name: validate-title
