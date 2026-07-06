@@ -83,7 +83,7 @@ dependencies = [
 name = "frieze-cli"
 version = "0.1.0"
 dependencies = [
- "frieze-usecase",
+ "frieze-wire",
 ]
 
 [[package]]

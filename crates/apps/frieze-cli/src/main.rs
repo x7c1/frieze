@@ -1,11 +1,19 @@
-//! `frieze-cli` — placeholder entry point.
+//! `frieze-cli` — thin driver skeleton for the generate flow.
 //!
-//! The CLI surface (compose / validate / etc.) is intentionally empty for
-//! now; the binary exists so the workspace structure is in place for
-//! later work.
+//! The binary's only job is to parse arguments into the parsed domain
+//! types, obtain the assembled interactor from `frieze-wire`, run it,
+//! and render errors. None of that behavior exists yet — argument
+//! parsing and the run land together with the concrete gateway
+//! implementations. For now the skeleton proves the wiring compiles
+//! end to end and exits with a clear not-implemented message.
 
-fn main() {
-    // Intentionally empty for now. A `--help` flag and subcommands will be
-    // added once there is something to expose.
-    let _ = frieze_usecase::from_schemas;
+use std::process::ExitCode;
+
+fn main() -> ExitCode {
+    // Assembling the interactor is side-effect free; running it is
+    // what will execute the generate flow once the gateways are
+    // implemented.
+    let _interactor = frieze_wire::generate_oas();
+    eprintln!("frieze: the generate flow is not implemented yet");
+    ExitCode::FAILURE
 }

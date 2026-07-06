@@ -13,20 +13,27 @@ This is a Cargo workspace.
 ```
 crates/
   apps/
-    frieze-cli           # bin: compose / validate (future)
+    frieze-cli           # bin: thin driver for the generate flow (skeleton)
+  gateway/
+    frieze-fs            # Filesystem gateway: package metadata, partials, outputs (stubs)
+    frieze-cargo         # Cargo gateway: schema collection via a scratch crate (stub)
   domain/
     frieze-model         # Domain types whose invariants are enforced by the type system
-    frieze-usecase       # Boundary conversion and document composition (compose / from_schemas)
+    frieze-usecase       # Boundary conversion, document composition, gateway traits, GenerateOas interactor
   libs/
     frieze-openapi       # Plain representation of the OpenAPI Specification (+ to_yaml)
     frieze-macros        # proc-macro crate
+    frieze-wire          # Composition root: injects the concrete gateways into the interactors
     frieze               # User-facing API: Schema / Register traits + SchemasBuilder registry
 ```
 
 ## Dependency direction and invariants
 
 ```
-frieze-cli     -> frieze-usecase
+frieze-cli     -> frieze-wire
+frieze-wire    -> frieze-fs, frieze-cargo, frieze-usecase
+frieze-fs      -> frieze-usecase, frieze-model, frieze-openapi
+frieze-cargo   -> frieze-usecase, frieze-model, frieze-openapi
 frieze-usecase -> frieze-model, frieze-openapi
 frieze         -> frieze-model, frieze-macros
 ```
@@ -41,6 +48,9 @@ tests.)
 3. Only `frieze-usecase` performs the boundary conversion between `frieze-openapi` and `frieze-model`.
 4. `frieze-model` types use private fields + constructor functions; they cannot be built via struct literals.
 5. `frieze-macros` only touches the `Schema` / `Register` traits and the `__private` helpers defined in `frieze`; it never constructs `frieze-openapi` types, and reaches `frieze-model` constructors only through `::frieze::__private`.
+6. Gateway crates (`frieze-fs`, `frieze-cargo`) implement the gateway traits defined in `frieze-usecase`; they do not know about each other.
+7. `frieze-usecase` does not depend on any gateway crate — it holds only the trait definitions and the interactors written against them.
+8. Concrete gateway types are known only to `frieze-wire` and to the gateway crates themselves; `frieze-cli` obtains the assembled interactor through `frieze-wire` and never names a gateway type.
 
 ## Terminology
 
