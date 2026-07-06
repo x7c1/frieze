@@ -10,3 +10,9 @@ description = "Use cases for frieze: OAS boundary conversion and document compos
 frieze-model.workspace = true
 frieze-openapi.workspace = true
 indexmap.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

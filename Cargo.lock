@@ -115,6 +115,10 @@ dependencies = [
  "frieze-model",
  "frieze-openapi",
  "indexmap",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]

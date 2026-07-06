@@ -1,0 +1,69 @@
+//! The gateway traits: the seams between the use-case layer and
+//! external systems (filesystem, cargo).
+//!
+//! Each trait covers one kind of external interaction the generate
+//! flow needs. The use-case layer holds only these abstractions;
+//! concrete implementations live in dedicated gateway crates and are
+//! injected by the composition root. Signatures deal exclusively in
+//! parsed domain types ([`PackageRoot`], [`PartialFilePath`],
+//! [`OutputFilePath`], ...) and in-memory documents
+//! ([`Document`] / [`Components`]) — never in raw paths, strings, or
+//! bytes. Encoding to and from bytes (YAML/JSON, process stdout) is an
+//! implementation detail inside each gateway.
+//!
+//! Implementations map their internal failures into the semantic
+//! boundary variants of [`crate::Error`] ([`crate::Error::MetadataRead`],
+//! [`crate::Error::PartialRead`], [`crate::Error::SchemasCollect`],
+//! [`crate::Error::OutputWrite`]) at this boundary.
+
+use frieze_model::{OutputFilePath, OutputFormat, PackageMetadata, PackageRoot, PartialFilePath};
+use frieze_openapi::{Components, Document};
+
+use crate::Result;
+
+/// Reads a package's generation configuration.
+pub trait MetadataSource {
+    /// Reads the `Cargo.toml` under `root`, extracts the
+    /// `[package.metadata.frieze]` section, and converts every raw
+    /// path / name / format value into its parsed domain type.
+    ///
+    /// Fails with [`crate::Error::MissingFriezeSection`] /
+    /// [`crate::Error::NoOutputsDefined`] when the section or its
+    /// outputs are absent, and with [`crate::Error::MetadataRead`] for
+    /// read/parse failures.
+    fn read(&self, root: &PackageRoot) -> Result<PackageMetadata>;
+}
+
+/// Loads a partial OAS document.
+pub trait PartialSource {
+    /// Parses the partial OAS document at `path` into a [`Document`].
+    ///
+    /// The document's OAS version is lifted from its `openapi:` field
+    /// during parsing. Fails with [`crate::Error::PartialRead`].
+    fn load(&self, path: &PartialFilePath) -> Result<Document>;
+}
+
+/// Collects the schemas registered by the target crate.
+pub trait SchemasCollector {
+    /// Builds and runs a scratch binary that links the target crate,
+    /// and receives the canonical, version-neutral [`Components`]
+    /// dump it emits.
+    ///
+    /// Fails with [`crate::Error::SchemasCollect`].
+    fn collect(&self, metadata: &PackageMetadata) -> Result<Components>;
+}
+
+/// Persists a generated OAS document.
+pub trait OutputSink {
+    /// Serializes `document` in `format` and writes it to `target`.
+    ///
+    /// Serialization happens inside the implementation — the use-case
+    /// layer never sees bytes. Fails with
+    /// [`crate::Error::OutputWrite`].
+    fn persist(
+        &self,
+        target: &OutputFilePath,
+        document: &Document,
+        format: OutputFormat,
+    ) -> Result<()>;
+}
