@@ -10,13 +10,12 @@
 //! crate. The filesystem gateway crate handles the target package's
 //! own files instead, and the two know nothing about each other. Only
 //! the composition root wires concrete gateways together.
-//!
-//! The trait implementation is a structural stub for now (`todo!()`);
-//! the real collection logic lands together with the CLI that drives
-//! it.
 
 mod error;
 pub use error::Error;
 
 mod collector;
 pub use collector::CargoSchemasCollector;
+
+mod inspect;
+mod scratch;
