@@ -94,6 +94,87 @@ attributes frieze cannot encode into a single OAS schema (and
 therefore rejects at compile time) are documented under
 [Wire names](docs/field-shapes.md#wire-names-rename-and-rename_all).
 
+## CLI quick start: `cargo frieze generate`
+
+The `frieze-cli` crate ships the same pipeline as a cargo subcommand,
+so a crate can get its complete OAS document without writing any
+generation code — no hand-written dump binary, no `build.rs`:
+
+```console
+$ cargo install frieze-cli   # installs the `cargo-frieze` binary
+```
+
+(Until the crates are published on crates.io, install from a checkout
+with `cargo install --path crates/apps/frieze-cli`.)
+
+You write three things. First, the Rust types, with
+`#[derive(Schema)]` as usual. Second, a *partial* OAS document — the
+hand-written half (`info`, `paths`, tags, vendor extensions) with
+**no** `components.schemas` (the Rust types are the single source of
+truth for that slot):
+
+```yaml
+# openapi/partial.yaml
+openapi: 3.0.3
+info:
+  title: My API
+  version: 0.1.0
+paths:
+  /users/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+```
+
+Third, the outputs declaration in `Cargo.toml`. Even a single output
+uses the array form:
+
+```toml
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "openapi/openapi.yaml"
+```
+
+Then, from the package directory:
+
+```console
+$ cargo frieze generate
+   Compiling my-api v0.1.0 (...)
+   Compiling frieze-scratch-my-api v0.0.0 (...)
+    Finished `dev` profile [unoptimized + debuginfo] target(s)
+generated → openapi/openapi.yaml
+```
+
+Details worth knowing:
+
+- **Multiple outputs.** Declare several `[[outputs]]` entries (unique
+  `name`s, unique `output` paths) to generate e.g. a public and an
+  internal document from one crate; the schemas are collected once and
+  composed into each partial.
+- **Paths** in the declaration resolve relative to the package's
+  `Cargo.toml`. The output **format** follows the output path's
+  extension: `.yaml` / `.yml` for YAML, `.json` for JSON.
+- **Byte-equivalence.** The CLI applies no transformation of its own:
+  the written document is byte-for-byte what the library path
+  (`frieze_usecase::compose` + `frieze_openapi::to_yaml`) produces for
+  the same partial and types.
+- **How it works.** The CLI generates a small *scratch* crate under
+  `target/frieze/<package>/` that links your crate, runs it via cargo
+  (so incremental builds apply and `cargo clean` removes everything),
+  and receives the collected schemas from its stdout. Build output
+  streams to your terminal exactly as cargo emits it; generation only
+  ever runs when you invoke `cargo frieze generate`.
+- **The `inventory` feature is required** on your crate's `frieze`
+  dependency (it is on by default). A crate that opts out via
+  `default-features = false` gets a clear error — the CLI never
+  re-enables the feature behind your back; use the library path
+  (`SchemasBuilder::add`) for inventory-less setups.
+
 ## Optionality, in one paragraph
 
 OpenAPI separates two concepts that Rust users often conflate:
