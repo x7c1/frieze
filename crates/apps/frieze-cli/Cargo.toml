@@ -6,9 +6,13 @@ license.workspace = true
 repository.workspace = true
 description = "Command-line front-end for frieze."
 
+# The cargo subcommand convention: a binary named `cargo-frieze` on
+# the PATH makes `cargo frieze ...` work.
 [[bin]]
-name = "frieze"
+name = "cargo-frieze"
 path = "src/main.rs"
 
 [dependencies]
+frieze-model.workspace = true
+frieze-usecase.workspace = true
 frieze-wire.workspace = true

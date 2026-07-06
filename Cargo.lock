@@ -76,6 +76,7 @@ dependencies = [
  "frieze-openapi",
  "frieze-usecase",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
@@ -83,6 +84,8 @@ dependencies = [
 name = "frieze-cli"
 version = "0.1.0"
 dependencies = [
+ "frieze-model",
+ "frieze-usecase",
  "frieze-wire",
 ]
 
