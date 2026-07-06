@@ -10,3 +10,6 @@ description = "Domain types with invariants for frieze."
 indexmap.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

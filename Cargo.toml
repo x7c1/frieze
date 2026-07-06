@@ -27,6 +27,7 @@ proc-macro2 = "1.0"
 thiserror = "2.0"
 insta = { version = "1.48", features = ["yaml"] }
 trybuild = "1"
+tempfile = "3"
 
 frieze-model = { path = "crates/domain/frieze-model", version = "0.1.0" }
 frieze-usecase = { path = "crates/domain/frieze-usecase", version = "0.1.0" }
