@@ -1,27 +1,15 @@
 # OAS versions
 
-`frieze` targets exactly **one** OpenAPI Specification version per
-build. The version is selected by a Cargo feature; the `frieze` crate
-forwards `oas-3-0` / `oas-3-1` to the crates that encode the version
-(`frieze-openapi`, and `frieze-usecase` on top of it).
-
-## Feature flags
-
-| Feature   | OAS version | Default | Nullability encoding         |
-|-----------|-------------|---------|------------------------------|
-| `oas-3-0` | 3.0.x       | yes     | `nullable: true`             |
-| `oas-3-1` | 3.1.x       | no      | `type: [<base>, "null"]`     |
-
-The two features are **mutually exclusive** and enforced via
-`compile_error!` in both `frieze-openapi` and `frieze-usecase`.
-`--all-features` and `--no-default-features` (without picking one
-explicitly) both fail at compile time on purpose — there is no
-"version-agnostic" mode.
+`frieze` supports OpenAPI Specification 3.0.x and 3.1.x. The version
+is **per-document runtime data**: every `frieze_openapi::Document`
+carries the version it targets, and serialization dispatches on it.
+There are no version-selection Cargo features — a single build can
+produce 3.0 and 3.1 documents side by side.
 
 ## The runtime `Version` handle
 
-Alongside the compile-time feature gate, `frieze-openapi` exposes a
-`Version` enum that carries the major.minor discriminant as data:
+`frieze-openapi` exposes a `Version` enum that carries the major.minor
+discriminant as data:
 
 ```rust
 use frieze_openapi::Version;
@@ -34,7 +22,8 @@ Every `Document` parsed from YAML or JSON has an
 `oas_version: Version` field, lifted from its `openapi:` string at
 deserialize time. The wire-format string itself (patch included, e.g.
 `"3.0.5"`) is preserved verbatim in `Document.openapi`; `oas_version`
-never appears in serialized output, so the wire format is unchanged.
+never appears in serialized output, so the wire format carries only
+the standard `openapi:` field.
 
 The parser (`Version::parse_from_openapi`) is patch-tolerant: any
 `3.0.x` string lifts to `Version::V3_0` and any `3.1.x` to
@@ -46,36 +35,37 @@ empty, or outside the supported range fails with an error carrying the
 always comes from explicit input, either the parsed `openapi:` field
 or an explicit argument.
 
+## Serialization dispatches on the document's version
+
+`Document`'s `Serialize` impl routes the whole document tree through a
+version-aware emitter keyed by `oas_version`. Calling
+`frieze_openapi::to_yaml(&doc)` (or `serde_yaml` / `serde_json`
+directly) therefore emits the OAS shape the document declares — the
+per-version encoding differences below are applied at this point, not
+when the schemas are built.
+
+The schema types themselves (`Components`, `SchemaObject`, ...) store
+version-neutral data: `nullable` is a plain flag and `description`
+sits directly on a `$ref` schema. Serializing a `Components` value
+*directly* (outside a `Document`) uses that canonical, version-neutral
+form — a machine-readable dump that round-trips through `Deserialize`
+and can later be composed into documents of any supported version.
+
 ## Composition entry points
 
 Both entry points in `frieze-usecase` carry the version as data:
 
 ```rust
-pub fn from_schemas(info: Info, schemas: Schemas, version: Version) -> Result<Document, Error>;
+pub fn from_schemas(info: Info, schemas: Schemas, version: Version) -> Document;
 pub fn compose(partial: Document, schemas: Schemas) -> Result<Document, Error>;
 ```
 
 `from_schemas` takes the target version explicitly and stamps the
 canonical `openapi` string for it (`3.0.3` / `3.1.0`). `compose` uses
 `partial.oas_version` (lifted at parse time) and preserves the
-partial's raw `openapi` string in the output.
-
-### Transition guard
-
-While the `Serialize` implementations in `frieze-openapi` remain
-selected at compile time by the `oas-3-0` / `oas-3-1` features, both
-entry points reject a `Version` that does not match the version the
-build was compiled for, returning
-`Error::UnsupportedOpenApiVersion { got }` before anything is
-composed. Without the guard, an `openapi: 3.1.0` header could be
-paired with a 3.0-style body (`nullable: true`, ...) — a spec-invalid
-document.
-
-The guard is temporary: once serialization dispatches on
-`Document.oas_version` at runtime, the mismatch check disappears and a
-single build can emit both versions. The `Version` enum, the
-`oas_version` field, and the error variants already have the shape
-that refactor will consume.
+partial's raw `openapi` string in the output. The version-neutral
+`Schemas -> Components` conversion is also available on its own as
+`frieze_usecase::components_from_schemas(&schemas)`.
 
 ## Per-version encoding differences
 
@@ -117,7 +107,7 @@ never inside the `allOf` / `oneOf` array.
 ### String enums are version-agnostic
 
 A unit-variant enum derives `type: string, enum: [...]`. The shape
-is identical under both `oas-3-0` and `oas-3-1` — neither involves
+is identical under both OAS 3.0 and 3.1 — neither involves
 nullability nor `$ref` siblings, so no per-version wrap is needed.
 A nullable enum reference (`Option<EnumType>` field) reuses the same
 nullable-reference wrap as a nullable nested-struct reference; see
@@ -128,7 +118,7 @@ the table above.
 An internally-tagged enum (`#[serde(tag = "...")]` with every variant
 a newtype of a `Schema`-implementing struct) derives a `oneOf` schema
 with a top-level `discriminator: {propertyName: <tag>}` block. The
-shape is identical under both `oas-3-0` and `oas-3-1`. A nullable
+shape is identical under both OAS 3.0 and 3.1. A nullable
 `oneOf` reference (`Option<EnumType>` field) reuses the same
 nullable-reference wrap as a nullable nested-struct reference; see
 the table above.
@@ -149,16 +139,20 @@ The `discriminator.mapping` block is deliberately omitted (see
 
 ## Build / Test
 
-The standard matrix runs the same command set against each version:
+Both OAS versions are exercised by the same test run — the
+version-paired snapshot tests build documents with explicit
+`Version::V3_0` / `Version::V3_1` arguments. The matrix only varies
+the `inventory` feature (on by default, opt-out for no_std / WASM
+targets):
 
 ```
-cargo build  --workspace --no-default-features --features oas-3-0
-cargo test   --workspace --no-default-features --features oas-3-0
-cargo build  --workspace --no-default-features --features oas-3-1
-cargo test   --workspace --no-default-features --features oas-3-1
 cargo fmt --all -- --check
-cargo clippy --workspace --all-targets --no-default-features --features oas-3-0 -- -D warnings
-cargo clippy --workspace --all-targets --no-default-features --features oas-3-1 -- -D warnings
+cargo build  --workspace
+cargo build  --workspace --no-default-features
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+cargo test   --workspace
+cargo test   --workspace --no-default-features
 ```
 
-Both feature gates must remain green; CI runs the matrix on every PR.
+Both configurations must remain green; CI runs the matrix on every PR.

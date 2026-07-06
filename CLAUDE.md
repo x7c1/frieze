@@ -34,7 +34,7 @@ frieze         -> frieze-model, frieze-macros
 (`frieze-macros` has no runtime dependency on the other crates: the
 tokens it emits resolve through `::frieze::__private`. `frieze` also
 dev-depends on `frieze-openapi` / `frieze-usecase` for its integration
-tests, forwarding the `oas-3-0` / `oas-3-1` features to them.)
+tests.)
 
 1. `frieze-model` depends on nothing else within frieze (and minimally on external crates).
 2. `frieze-openapi` does not know about `frieze-model` or `frieze-usecase`.
@@ -58,23 +58,19 @@ upon — refer to them by their crate-specific roles instead.
 
 ## Build / Test matrix
 
-Both OAS feature gates must remain green, both with and without the
-`inventory` feature (which is on by default, but can be opted out of):
+The OAS version (3.0 / 3.1) is per-document runtime data, so one test
+run covers both output shapes. The only feature axis is `inventory`
+(on by default; the `--no-default-features` runs keep the opt-out
+path for no_std / WASM-leaning consumers green):
 
 ```
 cargo fmt --all -- --check
-cargo build  --workspace --no-default-features --features oas-3-0
-cargo build  --workspace --no-default-features --features oas-3-1
-cargo build  --workspace --no-default-features --features oas-3-0,inventory
-cargo build  --workspace --no-default-features --features oas-3-1,inventory
-cargo clippy --workspace --all-targets --no-default-features --features oas-3-0 -- -D warnings
-cargo clippy --workspace --all-targets --no-default-features --features oas-3-1 -- -D warnings
-cargo clippy --workspace --all-targets --no-default-features --features oas-3-0,inventory -- -D warnings
-cargo clippy --workspace --all-targets --no-default-features --features oas-3-1,inventory -- -D warnings
-cargo test   --workspace --no-default-features --features oas-3-0
-cargo test   --workspace --no-default-features --features oas-3-1
-cargo test   --workspace --no-default-features --features oas-3-0,inventory
-cargo test   --workspace --no-default-features --features oas-3-1,inventory
+cargo build  --workspace
+cargo build  --workspace --no-default-features
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+cargo test   --workspace
+cargo test   --workspace --no-default-features
 ```
 
 ## Branch and PR conventions
