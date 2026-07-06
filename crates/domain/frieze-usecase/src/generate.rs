@@ -1,7 +1,7 @@
 //! The `GenerateOas` interactor: the end-to-end generate flow,
 //! expressed against the gateway traits.
 
-use frieze_model::{OutputConfig, OutputName, PackageMetadata, PackageRoot};
+use frieze_model::{OutputConfig, OutputFilePath, OutputName, PackageMetadata, PackageRoot};
 
 use crate::compose::compose_components;
 use crate::gateway::{MetadataSource, OutputSink, PartialSource, SchemasCollector};
@@ -16,16 +16,27 @@ pub struct GenerateOasParams {
     pub filter: Option<OutputName>,
 }
 
+/// One output a [`GenerateOas::run`] invocation wrote: its declared
+/// name and the path the document landed at.
+#[derive(Debug)]
+pub struct WrittenOutput {
+    /// The declared name of the output.
+    pub name: OutputName,
+    /// The path the generated document was written to.
+    pub path: OutputFilePath,
+}
+
 /// The result of a successful [`GenerateOas::run`].
+#[derive(Debug)]
 pub struct Report {
-    /// The names of the outputs that were generated, in the order they
-    /// were written.
-    pub written: Vec<OutputName>,
+    /// The outputs that were generated, in the order they were
+    /// written.
+    pub written: Vec<WrittenOutput>,
 }
 
 impl Report {
-    /// Wraps the list of generated output names.
-    pub fn success(written: Vec<OutputName>) -> Self {
+    /// Wraps the list of generated outputs.
+    pub fn success(written: Vec<WrittenOutput>) -> Self {
         Self { written }
     }
 }
@@ -74,14 +85,17 @@ where
     pub fn run(&self, params: &GenerateOasParams) -> Result<Report> {
         let metadata = self.metadata.read(&params.root)?;
         let selected = select_outputs(&metadata, params.filter.as_ref())?;
-        let components = self.schemas.collect(&metadata)?;
+        let components = self.schemas.collect(&params.root, &metadata)?;
         let mut written = Vec::new();
         for config in selected {
             let partial = self.partials.load(config.partial())?;
             let complete = compose_components(partial, components.clone())?;
             self.outputs
                 .persist(config.output(), &complete, config.format())?;
-            written.push(config.name().clone());
+            written.push(WrittenOutput {
+                name: config.name().clone(),
+                path: config.output().clone(),
+            });
         }
         Ok(Report::success(written))
     }
@@ -166,7 +180,7 @@ mod tests {
     }
 
     impl SchemasCollector for FakeSchemasCollector {
-        fn collect(&self, _metadata: &PackageMetadata) -> Result<Components> {
+        fn collect(&self, _root: &PackageRoot, _metadata: &PackageMetadata) -> Result<Components> {
             *self.calls.borrow_mut() += 1;
             Ok(self.components.clone())
         }
@@ -249,8 +263,15 @@ mod tests {
 
         let report = interactor.run(&params).unwrap();
 
-        let names: Vec<&str> = report.written.iter().map(OutputName::as_str).collect();
+        let names: Vec<&str> = report
+            .written
+            .iter()
+            .map(|written| written.name.as_str())
+            .collect();
         assert_eq!(names, ["public", "internal"]);
+        // Each written entry reports the path the output landed at.
+        assert!(report.written[0].path.as_path().ends_with("public.yaml"));
+        assert!(report.written[1].path.as_path().ends_with("internal.json"));
         // Schemas are collected once and reused across outputs.
         assert_eq!(*interactor.schemas.calls.borrow(), 1);
         let persisted = interactor.outputs.persisted.borrow();
@@ -274,7 +295,11 @@ mod tests {
 
         let report = interactor.run(&params).unwrap();
 
-        let names: Vec<&str> = report.written.iter().map(OutputName::as_str).collect();
+        let names: Vec<&str> = report
+            .written
+            .iter()
+            .map(|written| written.name.as_str())
+            .collect();
         assert_eq!(names, ["internal"]);
         let persisted = interactor.outputs.persisted.borrow();
         assert_eq!(persisted.len(), 1);

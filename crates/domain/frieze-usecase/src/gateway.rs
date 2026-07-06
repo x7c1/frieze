@@ -49,8 +49,12 @@ pub trait SchemasCollector {
     /// and receives the canonical, version-neutral [`Components`]
     /// dump it emits.
     ///
+    /// `root` locates the target package on disk — the scratch crate
+    /// references it as a path dependency, which `metadata` alone (a
+    /// parsed configuration value) cannot provide.
+    ///
     /// Fails with [`crate::Error::SchemasCollect`].
-    fn collect(&self, metadata: &PackageMetadata) -> Result<Components>;
+    fn collect(&self, root: &PackageRoot, metadata: &PackageMetadata) -> Result<Components>;
 }
 
 /// Persists a generated OAS document.

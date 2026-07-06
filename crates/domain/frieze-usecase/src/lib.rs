@@ -34,7 +34,7 @@ pub mod gateway;
 pub use gateway::{MetadataSource, OutputSink, PartialSource, SchemasCollector};
 
 mod generate;
-pub use generate::{GenerateOas, GenerateOasParams, Report};
+pub use generate::{GenerateOas, GenerateOasParams, Report, WrittenOutput};
 
 mod error;
 pub use error::{
