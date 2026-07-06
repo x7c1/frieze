@@ -1,0 +1,16 @@
+# End-to-end fixture: the target crate opts out of the frieze
+# `inventory` feature, so schema collection must fail with a curated
+# error instead of silently forcing the feature back on.
+[package]
+name = "inventory-off"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "../../../../../libs/frieze", default-features = false }
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"

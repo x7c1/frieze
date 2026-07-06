@@ -1,6 +1,13 @@
 # Rust
 /target/
 
+# End-to-end fixture run artifacts (the fixtures are standalone
+# packages: cargo may drop a lockfile, and the generate runs write
+# their outputs under generated/)
+crates/apps/frieze-cli/tests/fixtures/*/Cargo.lock
+crates/apps/frieze-cli/tests/fixtures/*/generated/
+crates/apps/frieze-cli/tests/fixtures/*/target/
+
 # Scratch / agent progress logs
 .tmp/
 

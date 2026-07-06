@@ -1,0 +1,19 @@
+# End-to-end fixture: two declared outputs sharing one schema collection.
+[package]
+name = "multi-output"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "../../../../../libs/frieze" }
+
+[[package.metadata.frieze.outputs]]
+name    = "public"
+partial = "openapi/public-partial.yaml"
+output  = "generated/public.yaml"
+
+[[package.metadata.frieze.outputs]]
+name    = "internal"
+partial = "openapi/internal-partial.yaml"
+output  = "generated/internal.yaml"

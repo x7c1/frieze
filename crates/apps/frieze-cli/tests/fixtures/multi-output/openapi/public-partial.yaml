@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info:
+  title: Pet Store (public)
+  version: 1.0.0
+paths:
+  /pets/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Pet"

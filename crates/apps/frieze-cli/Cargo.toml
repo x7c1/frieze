@@ -16,3 +16,13 @@ path = "src/main.rs"
 frieze-model.workspace = true
 frieze-usecase.workspace = true
 frieze-wire.workspace = true
+
+# The end-to-end tests compare the CLI's outputs against the library
+# path (`compose` + `to_yaml`) for the same inputs, so they link the
+# fixture crates directly.
+[dev-dependencies]
+frieze.workspace = true
+frieze-openapi.workspace = true
+serde_yaml.workspace = true
+single-output = { path = "tests/fixtures/single-output" }
+multi-output = { path = "tests/fixtures/multi-output" }
