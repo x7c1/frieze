@@ -21,8 +21,7 @@
 //! such as `Page<Bar>`) automatically.
 //!
 //! Consumers that want to skip the linker section entirely can opt out
-//! with `default-features = false` (selecting an OAS version feature
-//! such as `oas-3-0` explicitly). With the feature off, the derive's
+//! with `default-features = false`. With the feature off, the derive's
 //! submission site expands to a no-op so feature-gated code paths in
 //! user crates stay valid in both configurations.
 
