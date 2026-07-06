@@ -159,7 +159,10 @@ pub enum SchemasCollectCause {
     /// failed. The build log itself goes to the user's terminal via
     /// stderr; `stderr` carries any additionally captured output and
     /// is empty when everything was already streamed through.
-    #[error("cargo invocation failed{}", render_invocation_failure(exit_code, stderr))]
+    #[error(
+        "cargo invocation failed{}",
+        render_invocation_failure(exit_code, stderr)
+    )]
     CargoInvocation {
         exit_code: Option<i32>,
         stderr: String,
