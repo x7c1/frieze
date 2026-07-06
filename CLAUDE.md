@@ -13,10 +13,10 @@ This is a Cargo workspace.
 ```
 crates/
   apps/
-    frieze-cli           # bin: thin driver for the generate flow (skeleton)
+    frieze-cli           # bin `cargo-frieze`: the `cargo frieze generate` subcommand
   gateway/
-    frieze-fs            # Filesystem gateway: package metadata, partials, outputs (stubs)
-    frieze-cargo         # Cargo gateway: schema collection via a scratch crate (stub)
+    frieze-fs            # Filesystem gateway: package metadata, partials, outputs
+    frieze-cargo         # Cargo gateway: schema collection via a scratch crate
   domain/
     frieze-model         # Domain types whose invariants are enforced by the type system
     frieze-usecase       # Boundary conversion, document composition, gateway traits, GenerateOas interactor
@@ -30,7 +30,7 @@ crates/
 ## Dependency direction and invariants
 
 ```
-frieze-cli     -> frieze-wire
+frieze-cli     -> frieze-wire, frieze-usecase, frieze-model
 frieze-wire    -> frieze-fs, frieze-cargo, frieze-usecase
 frieze-fs      -> frieze-usecase, frieze-model, frieze-openapi
 frieze-cargo   -> frieze-usecase, frieze-model, frieze-openapi
@@ -82,6 +82,25 @@ cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 cargo test   --workspace
 cargo test   --workspace --no-default-features
 ```
+
+### End-to-end tests
+
+`cargo test --workspace` includes the end-to-end tests in
+`crates/apps/frieze-cli/tests/generate.rs`. They run the real
+`cargo-frieze` binary against the fixture packages under
+`crates/apps/frieze-cli/tests/fixtures/` (standalone packages,
+excluded from the workspace but linked as path dev-dependencies for
+the byte-equivalence assertions) and therefore invoke real nested
+cargo builds:
+
+- The tests are serialized through a lock; each fixture builds into
+  its own persistent `target/e2e/<fixture>/` directory, so the first
+  run is cold (tens of seconds) and reruns hit the incremental cache.
+- The subprocess environment sets `FRIEZE_LOCAL_CRATES_DIR` to the
+  checkout root so the generated scratch crate resolves the
+  unpublished `frieze` / `frieze-usecase` crates by path. Production
+  scratch crates pin the crates.io releases instead.
+- Run them alone with `cargo test -p frieze-cli --test generate`.
 
 ## Branch and PR conventions
 

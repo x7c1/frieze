@@ -15,10 +15,6 @@
 //! cargo to collect schemas is the separate cargo gateway crate's job,
 //! and the two know nothing about each other. Only the composition
 //! root wires concrete gateways together.
-//!
-//! The trait implementations are structural stubs for now
-//! (`todo!()`); the real filesystem logic lands together with the CLI
-//! that drives it.
 
 mod error;
 pub use error::Error;

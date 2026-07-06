@@ -109,6 +109,18 @@ pub enum MetadataReadCause {
     /// silently ignored.
     #[error("unknown key `{key}` in `{table}`")]
     UnknownKey { key: String, table: String },
+    /// A required key is absent from one of the frieze metadata
+    /// tables.
+    #[error("missing required key `{key}` in `{table}`")]
+    MissingKey { key: String, table: String },
+    /// A key in one of the frieze metadata tables holds a value of the
+    /// wrong TOML type (e.g. an integer where a string is required).
+    #[error("key `{key}` in `{table}` must be {expected}")]
+    UnexpectedType {
+        key: String,
+        table: String,
+        expected: &'static str,
+    },
 }
 
 /// Machine-readable detail of an [`Error::PartialRead`] failure.
@@ -138,11 +150,19 @@ pub enum SchemasCollectCause {
     /// failed.
     #[error("cannot generate the scratch crate: {0}")]
     ScratchGenerate(io::Error),
+    /// Inspecting the target package with `cargo metadata` produced
+    /// output the collector cannot interpret (or the package shape is
+    /// unusable, e.g. no lib target to link).
+    #[error("cannot interpret the package layout: {message}")]
+    PackageInspect { message: String },
     /// The cargo invocation that builds and runs the scratch crate
     /// failed. The build log itself goes to the user's terminal via
-    /// stderr; `stderr` here carries what was captured for the error
-    /// report.
-    #[error("cargo invocation failed (exit code {exit_code:?}): {stderr}")]
+    /// stderr; `stderr` carries any additionally captured output and
+    /// is empty when everything was already streamed through.
+    #[error(
+        "cargo invocation failed{}",
+        render_invocation_failure(exit_code, stderr)
+    )]
     CargoInvocation {
         exit_code: Option<i32>,
         stderr: String,
@@ -158,6 +178,22 @@ pub enum SchemasCollectCause {
          so its schemas cannot be collected"
     )]
     InventoryDisabled,
+}
+
+/// Renders the detail suffix of a failed cargo invocation: the exit
+/// code when one exists (a spawn failure has none) and any captured
+/// stderr. When stderr was streamed straight to the terminal nothing
+/// is repeated here.
+fn render_invocation_failure(exit_code: &Option<i32>, stderr: &str) -> String {
+    let mut detail = match exit_code {
+        Some(code) => format!(" (exit code {code})"),
+        None => String::new(),
+    };
+    if !stderr.trim().is_empty() {
+        detail.push_str(": ");
+        detail.push_str(stderr.trim_end());
+    }
+    detail
 }
 
 /// Machine-readable detail of an [`Error::OutputWrite`] failure.

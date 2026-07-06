@@ -11,6 +11,15 @@ members = [
     "crates/libs/frieze-wire",
     "crates/libs/frieze",
 ]
+# The end-to-end fixtures are standalone packages the CLI is run
+# against; excluding them keeps each one its own workspace root while
+# still allowing the frieze-cli tests to link them as path
+# dev-dependencies.
+exclude = [
+    "crates/apps/frieze-cli/tests/fixtures/single-output",
+    "crates/apps/frieze-cli/tests/fixtures/multi-output",
+    "crates/apps/frieze-cli/tests/fixtures/inventory-off",
+]
 
 [workspace.package]
 version = "0.1.0"
@@ -28,6 +37,7 @@ syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 thiserror = "2.0"
+toml = "1"
 insta = { version = "1.48", features = ["yaml"] }
 trybuild = "1"
 tempfile = "3"

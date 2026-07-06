@@ -1,0 +1,14 @@
+# End-to-end fixture: a single-package crate with one declared output.
+[package]
+name = "single-output"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "../../../../../libs/frieze" }
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"

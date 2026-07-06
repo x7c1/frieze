@@ -76,6 +76,7 @@ dependencies = [
  "frieze-openapi",
  "frieze-usecase",
  "serde_json",
+ "tempfile",
  "thiserror",
 ]
 
@@ -83,7 +84,14 @@ dependencies = [
 name = "frieze-cli"
 version = "0.1.0"
 dependencies = [
+ "frieze",
+ "frieze-model",
+ "frieze-openapi",
+ "frieze-usecase",
  "frieze-wire",
+ "multi-output",
+ "serde_yaml",
+ "single-output",
 ]
 
 [[package]]
@@ -95,7 +103,9 @@ dependencies = [
  "frieze-usecase",
  "serde_json",
  "serde_yaml",
+ "tempfile",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -235,6 +245,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88904434abc2901f197fe8cc55f0445e7ded921dba5911dad2e2b39b48e663c4"
 
 [[package]]
+name = "multi-output"
+version = "0.1.0"
+dependencies = [
+ "frieze",
+]
+
+[[package]]
 name = "once_cell"
 version = "1.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -359,6 +376,13 @@ name = "similar"
 version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbbb5d9659141646ae647b42fe094daf6c6192d1620870b449d9557f748b2daa"
+
+[[package]]
+name = "single-output"
+version = "0.1.0"
+dependencies = [
+ "frieze",
+]
 
 [[package]]
 name = "syn"

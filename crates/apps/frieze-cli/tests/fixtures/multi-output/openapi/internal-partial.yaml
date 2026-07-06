@@ -1,0 +1,14 @@
+openapi: 3.0.3
+info:
+  title: Pet Store (internal)
+  version: 1.0.0
+  description: Internal surface, including owner records.
+paths:
+  /owners/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Owner"

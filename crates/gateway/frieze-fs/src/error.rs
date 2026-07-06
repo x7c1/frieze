@@ -13,8 +13,6 @@ use thiserror::Error;
 /// cause, so callers of the use-case layer never see this type in a
 /// signature.
 ///
-/// A variant for TOML parse failures will join these once the
-/// manifest-parsing implementation (and its parser choice) lands.
 #[derive(Debug, Error)]
 pub enum Error {
     /// An I/O failure (read, write, create-dir, ...).
@@ -26,4 +24,7 @@ pub enum Error {
     /// A JSON parse or serialize failure.
     #[error(transparent)]
     Json(#[from] serde_json::Error),
+    /// A TOML parse failure (manifest reading).
+    #[error(transparent)]
+    Toml(#[from] toml::de::Error),
 }
