@@ -4,8 +4,11 @@ members = [
     "crates/apps/frieze-cli",
     "crates/domain/frieze-model",
     "crates/domain/frieze-usecase",
+    "crates/gateway/frieze-cargo",
+    "crates/gateway/frieze-fs",
     "crates/libs/frieze-openapi",
     "crates/libs/frieze-macros",
+    "crates/libs/frieze-wire",
     "crates/libs/frieze",
 ]
 
@@ -27,9 +30,13 @@ proc-macro2 = "1.0"
 thiserror = "2.0"
 insta = { version = "1.48", features = ["yaml"] }
 trybuild = "1"
+tempfile = "3"
 
 frieze-model = { path = "crates/domain/frieze-model", version = "0.1.0" }
 frieze-usecase = { path = "crates/domain/frieze-usecase", version = "0.1.0" }
+frieze-fs = { path = "crates/gateway/frieze-fs", version = "0.1.0" }
+frieze-cargo = { path = "crates/gateway/frieze-cargo", version = "0.1.0" }
+frieze-wire = { path = "crates/libs/frieze-wire", version = "0.1.0" }
 frieze-openapi = { path = "crates/libs/frieze-openapi", version = "0.1.0" }
 frieze-macros = { path = "crates/libs/frieze-macros", version = "0.1.0" }
 frieze = { path = "crates/libs/frieze", version = "0.1.0", default-features = false }

@@ -11,4 +11,4 @@ name = "frieze"
 path = "src/main.rs"
 
 [dependencies]
-frieze-usecase.workspace = true
+frieze-wire.workspace = true

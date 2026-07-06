@@ -13,6 +13,11 @@
 //!   [`Version`], with empty `paths` / `servers` / etc. for callers
 //!   that have no partial to merge with.
 //!
+//! [`compose_components`] is the lower-level half of [`compose`] for
+//! callers that already hold a canonical [`Components`] value and want
+//! to merge it into one or more partials without re-running the
+//! boundary conversion.
+//!
 //! Both paths funnel through the same boundary conversion
 //! ([`crate::components_from_schemas`]) so the resulting
 //! `components.schemas` map is identical for the same input.
@@ -50,14 +55,40 @@ use crate::boundary::components_from_schemas;
 /// keyed by [`frieze_model::SchemaName`]).
 ///
 /// [`BTreeMap`]: std::collections::BTreeMap
-pub fn compose(mut partial: Document, schemas: Schemas) -> Result<Document, Error> {
-    let components = partial.components.get_or_insert_with(Components::default);
-    if !components.schemas.is_empty() {
+pub fn compose(partial: Document, schemas: Schemas) -> Result<Document, Error> {
+    compose_components(partial, components_from_schemas(&schemas))
+}
+
+/// Merges an already-converted [`Components`] value into
+/// `partial.components.schemas` and returns the resulting complete OAS
+/// document.
+///
+/// This is the second half of [`compose`]: [`compose`] converts a
+/// [`Schemas`] collection through the boundary
+/// ([`crate::components_from_schemas`]) and then delegates here. The
+/// split exists for callers that already hold the canonical
+/// [`Components`] form — e.g. a flow that collects components once and
+/// composes them into several partial documents — so the conversion is
+/// not repeated per document.
+///
+/// The same precondition as [`compose`] applies: `partial` must not
+/// already contain entries under `components.schemas`
+/// ([`Error::PartialAlreadyHasSchemas`] otherwise), and everything
+/// else in `partial` is preserved verbatim. Only the `schemas` map of
+/// `components` is consumed; a `Components` produced by
+/// [`crate::components_from_schemas`] (or parsed back from its
+/// canonical dump) carries nothing else.
+pub fn compose_components(
+    mut partial: Document,
+    components: Components,
+) -> Result<Document, Error> {
+    let slot = partial.components.get_or_insert_with(Components::default);
+    if !slot.schemas.is_empty() {
         return Err(Error::PartialAlreadyHasSchemas {
-            count: components.schemas.len(),
+            count: slot.schemas.len(),
         });
     }
-    components.schemas = components_from_schemas(&schemas).schemas;
+    slot.schemas = components.schemas;
     Ok(partial)
 }
 
