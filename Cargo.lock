@@ -69,10 +69,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "frieze-cargo"
+version = "0.1.0"
+dependencies = [
+ "frieze-model",
+ "frieze-openapi",
+ "frieze-usecase",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "frieze-cli"
 version = "0.1.0"
 dependencies = [
  "frieze-usecase",
+]
+
+[[package]]
+name = "frieze-fs"
+version = "0.1.0"
+dependencies = [
+ "frieze-model",
+ "frieze-openapi",
+ "frieze-usecase",
+ "serde_json",
+ "serde_yaml",
+ "thiserror",
 ]
 
 [[package]]
@@ -119,6 +142,15 @@ dependencies = [
  "serde_yaml",
  "tempfile",
  "thiserror",
+]
+
+[[package]]
+name = "frieze-wire"
+version = "0.1.0"
+dependencies = [
+ "frieze-cargo",
+ "frieze-fs",
+ "frieze-usecase",
 ]
 
 [[package]]

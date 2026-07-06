@@ -1,0 +1,15 @@
+[package]
+name = "frieze-fs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Filesystem gateway for frieze: package metadata, partial documents, and output files."
+
+[dependencies]
+frieze-model.workspace = true
+frieze-openapi.workspace = true
+frieze-usecase.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
