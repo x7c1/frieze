@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info:
+  title: Workspace API
+  version: 0.1.0
+paths:
+  /tickets/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Ticket"

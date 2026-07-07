@@ -32,3 +32,8 @@ mixed-formats = { path = "tests/fixtures/mixed-formats" }
 # library-path comparison can register the gated type in-process; the
 # CLI run under test gets it from the fixture's metadata instead.
 feature-gated = { path = "tests/fixtures/feature-gated", features = ["extra"] }
+# Workspace fixtures: only the frieze-configured member is linked (the
+# byte-equivalence comparison needs its types); sibling members arrive
+# transitively.
+ws-api = { path = "tests/fixtures/workspace/ws-api" }
+vw-api-v1 = { path = "tests/fixtures/virtual-workspace/api-v1" }

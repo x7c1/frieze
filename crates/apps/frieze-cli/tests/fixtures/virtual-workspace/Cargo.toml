@@ -1,0 +1,8 @@
+# End-to-end fixture: a virtual workspace (the root manifest has no
+# [package] table) with a declared default target.
+[workspace]
+resolver = "2"
+members = ["api-v1", "api-v2"]
+
+[workspace.metadata.frieze]
+package = "vw-api-v1"

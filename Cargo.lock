@@ -102,6 +102,8 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "single-output",
+ "vw-api-v1",
+ "ws-api",
 ]
 
 [[package]]
@@ -527,6 +529,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "673aac59facbab8a9007c7f6108d11f63b603f7cabff99fabf650fea5c32b861"
 
 [[package]]
+name = "vw-api-v1"
+version = "0.1.0"
+dependencies = [
+ "frieze",
+]
+
+[[package]]
 name = "winapi-util"
 version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -555,6 +564,21 @@ name = "winnow"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0592e1c9d151f854e6fd382574c3a0855250e1d9b2f99d9281c6e6391af352f1"
+
+[[package]]
+name = "ws-api"
+version = "0.1.0"
+dependencies = [
+ "frieze",
+ "ws-shared",
+]
+
+[[package]]
+name = "ws-shared"
+version = "0.1.0"
+dependencies = [
+ "frieze",
+]
 
 [[package]]
 name = "zmij"

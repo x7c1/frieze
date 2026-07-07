@@ -33,6 +33,10 @@ exclude = [
     "crates/apps/frieze-cli/tests/fixtures/version-mismatch",
     "crates/apps/frieze-cli/tests/fixtures/unknown-key",
     "crates/apps/frieze-cli/tests/fixtures/bad-extension",
+    "crates/apps/frieze-cli/tests/fixtures/workspace",
+    "crates/apps/frieze-cli/tests/fixtures/virtual-workspace",
+    "crates/apps/frieze-cli/tests/fixtures/virtual-no-default",
+    "crates/apps/frieze-cli/tests/fixtures/workspace-unknown-key",
 ]
 
 [workspace.package]

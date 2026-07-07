@@ -1,0 +1,7 @@
+# A member without any frieze configuration: targeting it must produce
+# the missing-section error, and runs inside it resolve to it.
+[package]
+name = "vw-api-v2"
+version = "0.1.0"
+edition = "2021"
+publish = false
