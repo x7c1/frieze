@@ -31,7 +31,7 @@ mod compose;
 pub use compose::{compose, compose_components, from_schemas};
 
 pub mod gateway;
-pub use gateway::{MetadataSource, OutputSink, PartialSource, SchemasCollector};
+pub use gateway::{MetadataSource, OutputSink, PackageResolver, PartialSource, SchemasCollector};
 
 mod generate;
 pub use generate::{GenerateOas, GenerateOasParams, Report, WrittenOutput};
@@ -41,5 +41,6 @@ pub use edit_distance::suggest_key;
 
 mod error;
 pub use error::{
-    Error, MetadataReadCause, OutputWriteCause, PartialReadCause, Result, SchemasCollectCause,
+    Error, MetadataReadCause, OutputWriteCause, PackageResolveCause, PartialReadCause, Result,
+    SchemasCollectCause,
 };
