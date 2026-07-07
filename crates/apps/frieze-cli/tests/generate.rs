@@ -316,6 +316,126 @@ fn output_flag_generates_only_the_named_output() {
 }
 
 #[test]
+fn check_mode_verifies_and_diagnoses_without_writing() {
+    let _guard = E2E_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // Reuses the single-output fixture (and its build cache): check
+    // mode runs the same pipeline, so no dedicated build fixture is
+    // needed.
+    let fixture = fixture_dir("single-output");
+    let output_file = fixture.join("generated/openapi.yaml");
+    let _ = std::fs::remove_file(&output_file);
+
+    // Green path: a freshly generated output passes the check.
+    let generated = run_generate("single-output");
+    assert!(generated.status.success());
+    let fresh = read(&output_file);
+    let check = run_generate_args("single-output", &["--check"]);
+    let stdout = String::from_utf8_lossy(&check.stdout);
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(
+        check.status.success(),
+        "a fresh output must pass --check.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert!(
+        stdout.contains("up-to-date → ") && stdout.contains("openapi.yaml"),
+        "stdout should announce the passing output, got:\n{stdout}"
+    );
+
+    // Stale path: a modified output is detected, named, and left
+    // untouched — check mode never writes.
+    std::fs::write(&output_file, format!("{fresh}# drifted\n")).unwrap();
+    let check = run_generate_args("single-output", &["--check"]);
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(!check.status.success(), "a stale output must fail --check");
+    for needle in [
+        "output `default` is stale:",
+        "does not match the generated document",
+        "1 output is not up to date: \
+         run `cargo frieze generate` without `--check` to regenerate",
+    ] {
+        assert!(
+            stderr.contains(needle),
+            "stderr should contain {needle:?}, got:\n{stderr}"
+        );
+    }
+    assert!(
+        stderr.contains("openapi.yaml"),
+        "stderr should name the stale file, got:\n{stderr}"
+    );
+    assert_eq!(
+        read(&output_file),
+        format!("{fresh}# drifted\n"),
+        "--check must not rewrite the stale file"
+    );
+
+    // Missing path: a deleted output is reported as missing.
+    std::fs::remove_file(&output_file).unwrap();
+    let check = run_generate_args("single-output", &["--check"]);
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(
+        !check.status.success(),
+        "a missing output must fail --check"
+    );
+    assert!(
+        stderr.contains("output `default` is missing:") && stderr.contains("does not exist"),
+        "stderr should report the missing file, got:\n{stderr}"
+    );
+    assert!(
+        !output_file.exists(),
+        "--check must not create the missing file"
+    );
+
+    // Leave the fixture clean for the other tests.
+    let regenerated = run_generate("single-output");
+    assert!(regenerated.status.success());
+}
+
+#[test]
+fn check_mode_composes_with_the_output_filter() {
+    let _guard = E2E_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // Reuses the multi-output fixture (and its build cache).
+    let fixture = fixture_dir("multi-output");
+    let internal_file = fixture.join("generated/internal.yaml");
+
+    let generated = run_generate("multi-output");
+    assert!(generated.status.success());
+    let fresh = read(&internal_file);
+    std::fs::write(&internal_file, format!("{fresh}# drifted\n")).unwrap();
+
+    // The filter scopes the check: the tampered sibling is not
+    // compared, so checking `public` alone passes.
+    let check = run_generate_args("multi-output", &["--check", "--output", "public"]);
+    let stdout = String::from_utf8_lossy(&check.stdout);
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(
+        check.status.success(),
+        "checking the untouched output alone must pass.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+
+    // An unfiltered check reports the full picture: the passing
+    // output on stdout, the stale one diagnosed on stderr.
+    let check = run_generate_args("multi-output", &["--check"]);
+    let stdout = String::from_utf8_lossy(&check.stdout);
+    let stderr = String::from_utf8_lossy(&check.stderr);
+    assert!(!check.status.success(), "the stale sibling must fail");
+    assert!(
+        stdout.contains("up-to-date → ") && stdout.contains("public.yaml"),
+        "stdout should announce the passing output, got:\n{stdout}"
+    );
+    assert!(
+        stderr.contains("output `internal` is stale:") && stderr.contains("internal.yaml"),
+        "stderr should diagnose the stale output, got:\n{stderr}"
+    );
+
+    // Leave the fixture clean for the other tests.
+    std::fs::write(&internal_file, fresh).unwrap();
+}
+
+#[test]
 fn an_oas_version_mismatch_is_a_curated_error_without_a_build() {
     // No lock: the run fails at the consistency check, before any
     // cargo invocation.
