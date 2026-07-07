@@ -14,3 +14,7 @@ oas-version = "3.1"
 name    = "default"
 partial = "openapi/partial.yaml"
 output  = "generated/openapi.yaml"
+
+# This fixture is its own workspace root: without this table, cargo
+# attaches the package to the enclosing repository workspace.
+[workspace]

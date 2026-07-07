@@ -120,6 +120,10 @@ pub enum Error {
 /// Machine-readable detail of an [`Error::PackageResolve`] failure.
 #[derive(Debug, Error)]
 pub enum PackageResolveCause {
+    /// The current directory the resolution starts from cannot be
+    /// determined.
+    #[error("cannot determine the current directory: {0}")]
+    CurrentDir(io::Error),
     /// The `cargo metadata` invocation that discovers the enclosing
     /// workspace could not run or exited nonzero — e.g. the current
     /// directory is not inside a cargo project. Cargo's own stderr is

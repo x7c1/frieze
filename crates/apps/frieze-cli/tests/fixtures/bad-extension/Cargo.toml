@@ -11,3 +11,7 @@ publish = false
 name    = "default"
 partial = "openapi/partial.yaml"
 output  = "generated/openapi.txt"
+
+# This fixture is its own workspace root: without this table, cargo
+# attaches the package to the enclosing repository workspace.
+[workspace]
