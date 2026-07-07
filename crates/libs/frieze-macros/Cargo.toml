@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Proc-macro derives for frieze."
 
 [lib]
@@ -18,8 +21,11 @@ proc-macro2.workspace = true
 # The trybuild UI tests exercise the expansion end-to-end, so they need
 # the runtime crates the emitted code resolves against. A dev-dependency
 # back onto `frieze` is fine: dev-dependencies do not participate in the
-# publishable dependency graph, so no cycle is introduced.
-frieze.workspace = true
-frieze-model.workspace = true
+# publishable dependency graph, so no cycle is introduced. The internal
+# dev-dependencies deliberately carry no `version`: version-less path
+# dev-dependencies are stripped by `cargo publish`, so the published
+# package does not depend on them being released.
+frieze = { path = "../frieze", default-features = false }
+frieze-model = { path = "../../domain/frieze-model" }
 serde.workspace = true
 trybuild.workspace = true
