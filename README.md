@@ -243,6 +243,33 @@ workspace-level build directory (`target/frieze/<package>/`), seeded
 with the workspace `Cargo.lock`, so the member's dependencies resolve
 exactly as in your normal builds.
 
+### CI: verify the committed documents with `--check`
+
+When the generated documents are committed to the repository, CI
+should fail whenever someone changes a schema type but forgets to
+regenerate. `cargo frieze generate --check` runs the exact same
+pipeline — including the build that collects the schemas — but writes
+nothing: each output file is compared byte-for-byte against what a
+normal run would write. Every output passing prints one
+`up-to-date → <path>` line and exits 0; any stale or missing file is
+named on stderr and the run exits 1. `--check` composes with `-p` and
+`--output` the same way the write mode does.
+
+A minimal GitHub Actions step:
+
+```yaml
+jobs:
+  openapi-up-to-date:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install frieze-cli
+      - run: cargo frieze generate --check
+```
+
+When the step fails, the fix is what the message says: run
+`cargo frieze generate` locally and commit the refreshed documents.
+
 ## Optionality, in one paragraph
 
 OpenAPI separates two concepts that Rust users often conflate:
