@@ -1,0 +1,21 @@
+# End-to-end fixture: a schema behind a non-default cargo feature that
+# only the `features` declaration in the frieze metadata enables.
+[package]
+name = "feature-gated"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[features]
+extra = []
+
+[dependencies]
+frieze = { path = "../../../../../libs/frieze" }
+
+[package.metadata.frieze]
+features = ["extra"]
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"

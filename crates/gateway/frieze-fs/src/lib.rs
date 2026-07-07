@@ -16,6 +16,8 @@
 //! and the two know nothing about each other. Only the composition
 //! root wires concrete gateways together.
 
+mod edit_distance;
+
 mod error;
 pub use error::Error;
 

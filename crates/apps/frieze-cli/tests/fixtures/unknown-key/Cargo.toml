@@ -1,0 +1,12 @@
+# End-to-end fixture: a typo (`parital`) in an outputs entry. The
+# metadata reader must reject it and suggest the intended key.
+[package]
+name = "unknown-key"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+parital = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"

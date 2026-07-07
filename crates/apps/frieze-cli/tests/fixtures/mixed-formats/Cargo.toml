@@ -1,0 +1,21 @@
+# End-to-end fixture: one schema collection serving two outputs that
+# differ on both axes — a JSON document from an OAS 3.0 partial and a
+# YAML document from an OAS 3.1 partial.
+[package]
+name = "mixed-formats"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "../../../../../libs/frieze" }
+
+[[package.metadata.frieze.outputs]]
+name    = "v30-json"
+partial = "openapi/v30-partial.yaml"
+output  = "generated/openapi.json"
+
+[[package.metadata.frieze.outputs]]
+name    = "v31-yaml"
+partial = "openapi/v31-partial.yaml"
+output  = "generated/v31.yaml"

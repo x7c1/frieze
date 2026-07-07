@@ -1,0 +1,16 @@
+# End-to-end fixture: the metadata pins `oas-version = "3.1"` but the
+# partial declares an OAS 3.0 document. The run must fail with a
+# curated error before any build starts.
+[package]
+name = "version-mismatch"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[package.metadata.frieze]
+oas-version = "3.1"
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"

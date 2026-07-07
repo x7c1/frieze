@@ -1,8 +1,8 @@
 //! The filesystem-backed [`MetadataSource`] implementation.
 
 use frieze_model::{
-    OutputConfig, OutputFilePath, OutputName, PackageMetadata, PackageName, PackageRoot,
-    PartialFilePath,
+    CargoFeatureName, OasVersionCheck, OutputConfig, OutputFilePath, OutputName, PackageMetadata,
+    PackageName, PackageRoot, PartialFilePath,
 };
 use frieze_usecase::{Error, MetadataReadCause, MetadataSource, Result};
 use toml::Value;
@@ -12,7 +12,7 @@ use toml::Value;
 /// Anything else is rejected with a curated error instead of being
 /// silently ignored — a typo like `outpts` must not turn into "no
 /// outputs were generated".
-const KNOWN_SECTION_KEYS: &[&str] = &["outputs"];
+const KNOWN_SECTION_KEYS: &[&str] = &["features", "oas-version", "outputs"];
 
 /// The keys one `[[package.metadata.frieze.outputs]]` entry may carry.
 const KNOWN_OUTPUT_KEYS: &[&str] = &["name", "partial", "output"];
@@ -53,6 +53,11 @@ impl MetadataSource for FsMetadataSource {
         let package_name = PackageName::new(required_str(package, "name", "[package]", root)?)?;
         let frieze = frieze_section(root, package)?;
         reject_unknown_keys(frieze, KNOWN_SECTION_KEYS, SECTION_TABLE, root)?;
+        // The parent table's own values are validated before the
+        // structural "at least one output" requirement, so a broken
+        // declaration is reported as what it is.
+        let features = features(root, frieze)?;
+        let oas_version_check = oas_version_check(root, frieze)?;
         let outputs = outputs_entries(root, frieze)?
             .iter()
             .map(|entry| output_config(root, entry))
@@ -60,10 +65,71 @@ impl MetadataSource for FsMetadataSource {
         Ok(PackageMetadata::new(
             package_name,
             outputs,
-            Vec::new(),
-            None,
+            features,
+            oas_version_check,
         )?)
     }
+}
+
+/// Parses the optional `features` array: the cargo features to enable
+/// on the target crate while its schemas are collected, shared by
+/// every output. Absent means none.
+fn features(
+    root: &PackageRoot,
+    frieze: &toml::map::Map<String, Value>,
+) -> Result<Vec<CargoFeatureName>> {
+    let Some(value) = frieze.get("features") else {
+        return Ok(Vec::new());
+    };
+    let entries = value.as_array().ok_or_else(|| {
+        metadata_read(
+            root,
+            MetadataReadCause::UnexpectedType {
+                key: "features".to_string(),
+                table: SECTION_TABLE.to_string(),
+                expected: "an array of strings",
+            },
+        )
+    })?;
+    entries
+        .iter()
+        .map(|entry| {
+            let name = entry.as_str().ok_or_else(|| {
+                metadata_read(
+                    root,
+                    MetadataReadCause::UnexpectedType {
+                        key: "features".to_string(),
+                        table: SECTION_TABLE.to_string(),
+                        expected: "an array of strings",
+                    },
+                )
+            })?;
+            Ok(CargoFeatureName::new(name)?)
+        })
+        .collect()
+}
+
+/// Parses the optional `oas-version` string: a major.minor line
+/// (`"3.0"` / `"3.1"`) every partial document must match. Absent means
+/// the partials rule, unchecked.
+fn oas_version_check(
+    root: &PackageRoot,
+    frieze: &toml::map::Map<String, Value>,
+) -> Result<Option<OasVersionCheck>> {
+    let Some(value) = frieze.get("oas-version") else {
+        return Ok(None);
+    };
+    let raw = value.as_str().ok_or_else(|| {
+        metadata_read(
+            root,
+            MetadataReadCause::UnexpectedType {
+                key: "oas-version".to_string(),
+                table: SECTION_TABLE.to_string(),
+                expected: "a string",
+            },
+        )
+    })?;
+    Ok(Some(OasVersionCheck::new(raw)?))
 }
 
 /// Reads and parses the `Cargo.toml` under `root`. Raw failures stay
@@ -198,7 +264,9 @@ fn required_str<'a>(
 }
 
 /// Rejects any key of `table` outside `known`, so typos surface as
-/// errors instead of silently changing behaviour.
+/// errors instead of silently changing behaviour. A key within a small
+/// edit distance of a known one is reported with that key as a
+/// suggestion.
 fn reject_unknown_keys(
     table: &toml::map::Map<String, Value>,
     known: &[&str],
@@ -211,6 +279,7 @@ fn reject_unknown_keys(
             MetadataReadCause::UnknownKey {
                 key: key.clone(),
                 table: table_name.to_string(),
+                suggestion: crate::edit_distance::suggest(key, known).map(str::to_string),
             },
         )),
         None => Ok(()),
@@ -270,6 +339,9 @@ output  = "openapi/internal.json"
         let fixture = fixture(HAPPY_MANIFEST);
         let metadata = FsMetadataSource::new().read(&fixture.root).unwrap();
         assert_eq!(metadata.package_name().as_str(), "my-api");
+        // Neither optional parent-table key is declared.
+        assert!(metadata.features().is_empty());
+        assert_eq!(metadata.oas_version_check(), None);
         assert_eq!(metadata.outputs().len(), 2);
         let first = &metadata.outputs()[0];
         assert_eq!(first.name().as_str(), "default");
@@ -284,6 +356,123 @@ output  = "openapi/internal.json"
         assert_eq!(first.format(), OutputFormat::Yaml);
         // The second output's format follows its own extension.
         assert_eq!(metadata.outputs()[1].format(), OutputFormat::Json);
+    }
+
+    #[test]
+    fn reads_the_optional_parent_table_keys() {
+        let manifest = r#"
+[package]
+name = "my-api"
+
+[package.metadata.frieze]
+features    = ["extra", "json-schema"]
+oas-version = "3.1"
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "openapi/openapi.yaml"
+"#;
+        let fixture = fixture(manifest);
+        let metadata = FsMetadataSource::new().read(&fixture.root).unwrap();
+        let features: Vec<&str> = metadata
+            .features()
+            .iter()
+            .map(CargoFeatureName::as_str)
+            .collect();
+        assert_eq!(features, ["extra", "json-schema"]);
+        assert_eq!(metadata.oas_version_check(), Some(OasVersionCheck::V3_1));
+    }
+
+    #[test]
+    fn non_array_features_value_is_rejected() {
+        let manifest = "[package]\nname = \"my-api\"\n\
+                        [package.metadata.frieze]\nfeatures = \"extra\"\n";
+        let fixture = fixture(manifest);
+        let result = FsMetadataSource::new().read(&fixture.root);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::MetadataRead {
+                    cause: MetadataReadCause::UnexpectedType { key, expected, .. },
+                    ..
+                }) if key == "features" && *expected == "an array of strings"
+            ),
+            "expected the string features value to be rejected, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn non_string_feature_entry_is_rejected() {
+        let manifest = "[package]\nname = \"my-api\"\n\
+                        [package.metadata.frieze]\nfeatures = [1]\n";
+        let fixture = fixture(manifest);
+        let result = FsMetadataSource::new().read(&fixture.root);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::MetadataRead {
+                    cause: MetadataReadCause::UnexpectedType { key, .. },
+                    ..
+                }) if key == "features"
+            ),
+            "expected the integer feature entry to be rejected, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn invalid_feature_name_is_rejected() {
+        let manifest = "[package]\nname = \"my-api\"\n\
+                        [package.metadata.frieze]\nfeatures = [\"dep:foo\"]\n";
+        let fixture = fixture(manifest);
+        let result = FsMetadataSource::new().read(&fixture.root);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::Config(
+                    frieze_model::ConfigError::CargoFeatureNameInvalid { got }
+                )) if got == "dep:foo"
+            ),
+            "expected the dependency-scoped feature to be rejected, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn invalid_oas_version_value_lists_the_valid_literals() {
+        let manifest = "[package]\nname = \"my-api\"\n\
+                        [package.metadata.frieze]\noas-version = \"3.0.3\"\n";
+        let fixture = fixture(manifest);
+        let result = FsMetadataSource::new().read(&fixture.root);
+        match result {
+            Err(Error::Config(
+                error @ frieze_model::ConfigError::OasVersionCheckInvalid { .. },
+            )) => {
+                let message = error.to_string();
+                assert!(
+                    message.contains("\"3.0\"") && message.contains("\"3.1\""),
+                    "expected the valid literals to be listed, got: {message}"
+                );
+            }
+            other => panic!("expected the patch-qualified value to be rejected, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn non_string_oas_version_value_is_rejected() {
+        let manifest = "[package]\nname = \"my-api\"\n\
+                        [package.metadata.frieze]\n\"oas-version\" = 3.0\n";
+        let fixture = fixture(manifest);
+        let result = FsMetadataSource::new().read(&fixture.root);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::MetadataRead {
+                    cause: MetadataReadCause::UnexpectedType { key, expected, .. },
+                    ..
+                }) if key == "oas-version" && *expected == "a string"
+            ),
+            "expected the float value to be rejected, got {result:?}"
+        );
     }
 
     #[test]
@@ -318,11 +507,31 @@ output  = "openapi/internal.json"
             matches!(
                 &result,
                 Err(Error::MetadataRead {
-                    cause: MetadataReadCause::UnknownKey { key, table },
+                    cause: MetadataReadCause::UnknownKey { key, table, suggestion },
                     ..
-                }) if key == "outpts" && table == SECTION_TABLE
+                }) if key == "outpts"
+                    && table == SECTION_TABLE
+                    && suggestion.as_deref() == Some("outputs")
             ),
-            "expected the unknown key to be rejected, got {result:?}"
+            "expected the unknown key to be rejected with a suggestion, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn unknown_section_key_without_a_near_miss_gets_no_suggestion() {
+        let manifest = "[package]\nname = \"my-api\"\n\
+                        [package.metadata.frieze]\ntargets = []\n";
+        let fixture = fixture(manifest);
+        let result = FsMetadataSource::new().read(&fixture.root);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::MetadataRead {
+                    cause: MetadataReadCause::UnknownKey { key, suggestion, .. },
+                    ..
+                }) if key == "targets" && suggestion.is_none()
+            ),
+            "expected no suggestion for a distant key, got {result:?}"
         );
     }
 
@@ -339,16 +548,29 @@ output  = "openapi/openapi.yaml"
 "#;
         let fixture = fixture(manifest);
         let result = FsMetadataSource::new().read(&fixture.root);
-        assert!(
-            matches!(
-                &result,
-                Err(Error::MetadataRead {
-                    cause: MetadataReadCause::UnknownKey { key, table },
+        match &result {
+            Err(
+                error @ Error::MetadataRead {
+                    cause:
+                        MetadataReadCause::UnknownKey {
+                            key,
+                            table,
+                            suggestion,
+                        },
                     ..
-                }) if key == "parital" && table == OUTPUTS_TABLE
-            ),
-            "expected the typo key to be rejected, got {result:?}"
-        );
+                },
+            ) => {
+                assert_eq!(key, "parital");
+                assert_eq!(table, OUTPUTS_TABLE);
+                assert_eq!(suggestion.as_deref(), Some("partial"));
+                // The rendered message carries the suggestion.
+                assert!(
+                    error.to_string().contains("did you mean `partial`?"),
+                    "got: {error}"
+                );
+            }
+            other => panic!("expected the typo key to be rejected, got {other:?}"),
+        }
     }
 
     #[test]

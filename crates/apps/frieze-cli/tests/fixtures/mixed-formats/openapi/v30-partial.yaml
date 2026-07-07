@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info:
+  title: Mixed Formats API (3.0)
+  version: 0.1.0
+paths:
+  /orders/{id}:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"

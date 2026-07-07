@@ -1,0 +1,13 @@
+# End-to-end fixture: an output path with an extension outside the
+# supported set. The metadata reader must reject it and list the
+# extensions it accepts.
+[package]
+name = "bad-extension"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.txt"

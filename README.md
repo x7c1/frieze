@@ -155,10 +155,25 @@ Details worth knowing:
 - **Multiple outputs.** Declare several `[[outputs]]` entries (unique
   `name`s, unique `output` paths) to generate e.g. a public and an
   internal document from one crate; the schemas are collected once and
-  composed into each partial.
+  composed into each partial. `cargo frieze generate --output <name>`
+  restricts a run to the one output declared under `<name>`.
 - **Paths** in the declaration resolve relative to the package's
   `Cargo.toml`. The output **format** follows the output path's
   extension: `.yaml` / `.yml` for YAML, `.json` for JSON.
+- **Cargo features.** The `[package.metadata.frieze]` parent table may
+  declare `features = ["..."]` — cargo features to enable on your
+  crate while its schemas are collected, shared by every output. Types
+  behind `#[cfg(feature = "...")]` only reach the document when the
+  feature is listed here (or is on by default).
+- **OAS version.** The generated document always follows its partial's
+  `openapi:` field — 3.0 and 3.1 partials can live side by side. The
+  parent table may additionally pin `oas-version = "3.0"` (or
+  `"3.1"`) as a consistency check: a partial outside that major.minor
+  line fails the run with a clear error before anything is built or
+  written.
+- **Unknown keys are errors.** Any key the frieze tables do not define
+  is rejected — with a "did you mean ...?" suggestion when it looks
+  like a typo — rather than silently ignored.
 - **Byte-equivalence.** The CLI applies no transformation of its own:
   the written document is byte-for-byte what the library path
   (`frieze_usecase::compose` + `frieze_openapi::to_yaml`) produces for
