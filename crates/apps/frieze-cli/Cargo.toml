@@ -24,5 +24,11 @@ frieze-wire.workspace = true
 frieze.workspace = true
 frieze-openapi.workspace = true
 serde_yaml.workspace = true
+serde_json.workspace = true
 single-output = { path = "tests/fixtures/single-output" }
 multi-output = { path = "tests/fixtures/multi-output" }
+mixed-formats = { path = "tests/fixtures/mixed-formats" }
+# The test binary enables the fixture's gated feature itself so the
+# library-path comparison can register the gated type in-process; the
+# CLI run under test gets it from the fixture's metadata instead.
+feature-gated = { path = "tests/fixtures/feature-gated", features = ["extra"] }

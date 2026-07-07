@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info:
+  title: Feature Gated API
+  version: 0.1.0
+paths:
+  /gated:
+    get:
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gated"

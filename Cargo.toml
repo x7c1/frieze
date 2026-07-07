@@ -19,6 +19,11 @@ exclude = [
     "crates/apps/frieze-cli/tests/fixtures/single-output",
     "crates/apps/frieze-cli/tests/fixtures/multi-output",
     "crates/apps/frieze-cli/tests/fixtures/inventory-off",
+    "crates/apps/frieze-cli/tests/fixtures/mixed-formats",
+    "crates/apps/frieze-cli/tests/fixtures/feature-gated",
+    "crates/apps/frieze-cli/tests/fixtures/version-mismatch",
+    "crates/apps/frieze-cli/tests/fixtures/unknown-key",
+    "crates/apps/frieze-cli/tests/fixtures/bad-extension",
 ]
 
 [workspace.package]
