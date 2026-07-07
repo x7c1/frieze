@@ -69,7 +69,8 @@ pub enum Error {
     #[error(
         "output `{output}`: the partial document `{partial}` declares \
          `openapi: {partial_version}`, but the package metadata pins \
-         `oas-version = \"{expected}\"`"
+         `oas-version = \"{expected}\"`: update the partial's `openapi:` \
+         field or the pinned `oas-version` so they agree"
     )]
     OasVersionMismatch {
         /// The output whose partial failed the check.
@@ -83,13 +84,17 @@ pub enum Error {
     },
     /// The package's `Cargo.toml` has no `[package.metadata.frieze]`
     /// section.
-    #[error("no `[package.metadata.frieze]` section in `{root}`")]
+    #[error(
+        "no `[package.metadata.frieze]` section in the Cargo.toml of \
+         `{root}`: declare at least one \
+         `[[package.metadata.frieze.outputs]]` entry"
+    )]
     MissingFriezeSection { root: PackageRoot },
     /// The package declares a `[package.metadata.frieze]` section but
     /// no outputs; at least one output is required.
     #[error(
-        "no outputs defined in `{root}`: declare at least one \
-         `[[package.metadata.frieze.outputs]]` entry"
+        "no outputs defined in the Cargo.toml of `{root}`: declare at \
+         least one `[[package.metadata.frieze.outputs]]` entry"
     )]
     NoOutputsDefined { root: PackageRoot },
     /// Resolving which package the run targets failed.
@@ -225,7 +230,7 @@ pub enum MetadataReadCause {
     #[error("cannot parse Cargo.toml: {message}")]
     CargoManifestParse { message: String },
     /// The `Cargo.toml` has no `[package]` table.
-    #[error("Cargo.toml has no [package] table")]
+    #[error("Cargo.toml has no `[package]` table")]
     MissingPackageTable,
     /// A table under `[package.metadata.frieze]` contains a key the
     /// schema does not define. Unknown keys are rejected rather than
@@ -305,7 +310,9 @@ pub enum SchemasCollectCause {
     /// frieze disabled, so no schemas can be collected from it.
     #[error(
         "the target crate disables the frieze `inventory` feature, \
-         so its schemas cannot be collected"
+         so its schemas cannot be collected: re-enable it by removing \
+         `default-features = false` from the frieze dependency, or by \
+         adding \"inventory\" to its `features` list"
     )]
     InventoryDisabled,
 }
