@@ -98,20 +98,30 @@ therefore rejects at compile time) are documented under
 
 The `frieze-cli` crate ships the same pipeline as a cargo subcommand,
 so a crate can get its complete OAS document without writing any
-generation code — no hand-written dump binary, no `build.rs`:
+generation code — no hand-written dump binary, no `build.rs`. From
+zero to a generated document:
+
+**1. Install the CLI.** The binary is named `cargo-frieze`, which
+makes it available as a `cargo frieze` subcommand:
 
 ```console
-$ cargo install frieze-cli   # installs the `cargo-frieze` binary
+$ cargo install frieze-cli
 ```
 
-(Until the crates are published on crates.io, install from a checkout
-with `cargo install --path crates/apps/frieze-cli`.)
+> Until the crates are published on crates.io, install from a checkout
+> instead (`cargo install --path crates/apps/frieze-cli`) and declare
+> `frieze` as a path dependency into that same checkout — the
+> crates.io route below assumes published releases.
 
-You write three things. First, the Rust types, with
-`#[derive(Schema)]` as usual. Second, a *partial* OAS document — the
-hand-written half (`info`, `paths`, tags, vendor extensions) with
-**no** `components.schemas` (the Rust types are the single source of
-truth for that slot):
+**2. Derive the schemas.** Add `frieze` to `[dependencies]` and put
+`#[derive(Schema)]` on the types to expose, exactly as in the
+[quick start](#quick-start) above. The installed CLI and the declared
+`frieze` dependency must agree on the version — see the version
+matching note below.
+
+**3. Write the partial document** — the hand-written half (`info`,
+`paths`, tags, vendor extensions) with **no** `components.schemas`
+(the Rust types are the single source of truth for that slot):
 
 ```yaml
 # openapi/partial.yaml
@@ -130,8 +140,8 @@ paths:
                 $ref: "#/components/schemas/User"
 ```
 
-Third, the outputs declaration in `Cargo.toml`. Even a single output
-uses the array form:
+**4. Declare the outputs** in `Cargo.toml`. Even a single output uses
+the array form:
 
 ```toml
 [[package.metadata.frieze.outputs]]
@@ -140,8 +150,9 @@ partial = "openapi/partial.yaml"
 output  = "openapi/openapi.yaml"
 ```
 
-Then, from the package directory (or any directory inside it — see
-[Workspaces](#workspaces) for how the target package is picked):
+**5. Generate.** From the package directory (or any directory inside
+it — see [Workspaces](#workspaces) for how the target package is
+picked):
 
 ```console
 $ cargo frieze generate
@@ -150,6 +161,10 @@ $ cargo frieze generate
     Finished `dev` profile [unoptimized + debuginfo] target(s)
 generated → openapi/openapi.yaml
 ```
+
+In CI, run the same command with `--check` to fail the build whenever
+a committed document is out of date — see
+[the CI section](#ci-verify-the-committed-documents-with---check).
 
 Details worth knowing:
 
@@ -190,6 +205,18 @@ Details worth knowing:
   `default-features = false` gets a clear error — the CLI never
   re-enables the feature behind your back; use the library path
   (`SchemasBuilder::add`) for inventory-less setups.
+- **The frieze versions must match.** The schemas are collected with
+  the exact frieze version the installed CLI ships with (the scratch
+  crate pins `frieze = "=X.Y.Z"`), because two different frieze
+  versions in one build would resolve as two separate instances and
+  the collection would come back empty. A declared `frieze`
+  requirement that cannot match the installed `cargo-frieze`'s
+  version therefore fails up front, with an error naming both
+  versions — after upgrading one side, upgrade the other to match. A
+  crate that declares `frieze` as a **path dependency** into a
+  checkout of this repository is exempt: the scratch crate mirrors
+  that path, which is the route for developing against unreleased
+  frieze (with a CLI built from the same checkout).
 
 ### Workspaces
 
@@ -266,6 +293,9 @@ jobs:
       - run: cargo install frieze-cli
       - run: cargo frieze generate --check
 ```
+
+(Until the crates are published on crates.io, the install step must
+point at a checkout instead, as in the quick start above.)
 
 When the step fails, the fix is what the message says: run
 `cargo frieze generate` locally and commit the refreshed documents.
@@ -366,6 +396,7 @@ becomes a no-op. Register schemas explicitly via `add::<T>()` instead.
 | [`docs/field-shapes.md`](docs/field-shapes.md)             | Field types and presence/nullability             |
 | [`docs/output-ordering.md`](docs/output-ordering.md)       | Output ordering guarantees                       |
 | [`docs/oas-versions.md`](docs/oas-versions.md)             | OAS version handling and version differences     |
+| [`RELEASING.md`](RELEASING.md)                             | Release procedure and version policy             |
 
 ## License
 
