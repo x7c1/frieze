@@ -37,7 +37,11 @@ pub enum ConfigError {
     PackageRootCanonicalize { got: PathBuf, cause: io::Error },
     /// The path handed to [`crate::PartialFilePath::try_from_path`]
     /// does not point to an existing file.
-    #[error("partial OAS document `{}` does not point to an existing file", got.display())]
+    #[error(
+        "partial OAS document `{}` does not exist: create it, or fix the \
+         `partial` path declared in `[[package.metadata.frieze.outputs]]`",
+        got.display()
+    )]
     PartialFileNotFound { got: PathBuf },
     /// The parent directory of an output path could not be created.
     #[error("cannot create the parent directory of output path `{}`: {cause}", got.display())]
@@ -86,7 +90,7 @@ pub enum ConfigError {
     CargoFeatureNameInvalid { got: String },
     /// A declared OAS version-check value is outside the supported set
     /// (`"3.0"` / `"3.1"`).
-    #[error("invalid OAS version check value `{got}` (expected \"3.0\" or \"3.1\")")]
+    #[error("invalid `oas-version` value `{got}` (expected \"3.0\" or \"3.1\")")]
     OasVersionCheckInvalid { got: String },
     /// Two outputs in the same package declare the same name.
     #[error("output name `{name}` is declared more than once")]

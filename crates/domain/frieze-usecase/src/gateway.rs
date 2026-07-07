@@ -15,7 +15,8 @@
 //! boundary variants of [`crate::Error`]
 //! ([`crate::Error::PackageResolve`], [`crate::Error::MetadataRead`],
 //! [`crate::Error::PartialRead`], [`crate::Error::SchemasCollect`],
-//! [`crate::Error::OutputWrite`]) at this boundary.
+//! [`crate::Error::OutputWrite`], [`crate::Error::OutputCheck`]) at
+//! this boundary.
 
 use frieze_model::{
     OutputFilePath, OutputFormat, PackageMetadata, PackageName, PackageRoot, PartialFilePath,
@@ -77,6 +78,22 @@ pub trait SchemasCollector {
     fn collect(&self, root: &PackageRoot, metadata: &PackageMetadata) -> Result<Components>;
 }
 
+/// The verdict of comparing an existing output file against the
+/// document a run composed for it.
+///
+/// A verdict is data, not an error: reaching one means the comparison
+/// itself worked. Only a comparison that cannot be carried out (an
+/// unreadable file, a serialization failure) is an [`crate::Error`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckOutcome {
+    /// The file holds exactly the bytes a write would produce.
+    UpToDate,
+    /// The file exists but differs from what a write would produce.
+    Stale,
+    /// No file exists at the output path.
+    Missing,
+}
+
 /// Persists a generated OAS document.
 pub trait OutputSink {
     /// Serializes `document` in `format` and writes it to `target`.
@@ -90,4 +107,18 @@ pub trait OutputSink {
         document: &Document,
         format: OutputFormat,
     ) -> Result<()>;
+
+    /// Serializes `document` in `format` and compares the result
+    /// against the file at `target`, without writing anything.
+    ///
+    /// The comparison is byte-exact against what [`Self::persist`]
+    /// would write, and — like serialization — happens inside the
+    /// implementation. Fails with [`crate::Error::OutputCheck`] when
+    /// the comparison itself cannot be carried out.
+    fn verify(
+        &self,
+        target: &OutputFilePath,
+        document: &Document,
+        format: OutputFormat,
+    ) -> Result<CheckOutcome>;
 }
