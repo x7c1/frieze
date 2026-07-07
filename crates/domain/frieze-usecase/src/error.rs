@@ -9,7 +9,8 @@
 //!   configuration) are dedicated variants.
 //! - Failures at a gateway boundary are grouped by *semantic category*
 //!   ([`Error::MetadataRead`] / [`Error::PartialRead`] /
-//!   [`Error::SchemasCollect`] / [`Error::OutputWrite`]) — named after
+//!   [`Error::SchemasCollect`] / [`Error::OutputWrite`] /
+//!   [`Error::OutputCheck`]) — named after
 //!   what was being attempted, never after a concrete gateway type —
 //!   with a machine-readable `Cause` sub-enum carrying the detail.
 //!   Gateway implementations map their internal errors into these
@@ -114,6 +115,15 @@ pub enum Error {
     OutputWrite {
         path: OutputFilePath,
         cause: OutputWriteCause,
+    },
+    /// Comparing an existing output file against the generated
+    /// document (check mode) could not be carried out. A file that is
+    /// merely stale or missing is *not* this error — that is a
+    /// [`crate::gateway::CheckOutcome`] verdict in the report.
+    #[error("failed to check the output `{path}`: {cause}")]
+    OutputCheck {
+        path: OutputFilePath,
+        cause: OutputCheckCause,
     },
 }
 
@@ -338,10 +348,23 @@ pub enum OutputWriteCause {
     /// The process lacks permission to write the file.
     #[error("permission denied")]
     PermissionDenied,
-    /// Serializing the document to YAML failed.
-    #[error("YAML serialize error: {0}")]
-    SerializeYaml(serde_yaml::Error),
-    /// Serializing the document to JSON failed.
+    /// Serializing the document to JSON failed. (YAML rendering is
+    /// infallible, so it has no counterpart here.)
+    #[error("JSON serialize error: {0}")]
+    SerializeJson(serde_json::Error),
+}
+
+/// Machine-readable detail of an [`Error::OutputCheck`] failure.
+#[derive(Debug, Error)]
+pub enum OutputCheckCause {
+    /// The process lacks permission to read the existing output file.
+    #[error("permission denied")]
+    PermissionDenied,
+    /// Any other I/O failure while reading the existing output file.
+    #[error("{0}")]
+    Read(io::Error),
+    /// Serializing the document to JSON for the comparison failed.
+    /// (YAML rendering is infallible, so it has no counterpart here.)
     #[error("JSON serialize error: {0}")]
     SerializeJson(serde_json::Error),
 }

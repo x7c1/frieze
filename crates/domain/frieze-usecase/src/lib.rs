@@ -31,16 +31,20 @@ mod compose;
 pub use compose::{compose, compose_components, from_schemas};
 
 pub mod gateway;
-pub use gateway::{MetadataSource, OutputSink, PackageResolver, PartialSource, SchemasCollector};
+pub use gateway::{
+    CheckOutcome, MetadataSource, OutputSink, PackageResolver, PartialSource, SchemasCollector,
+};
 
 mod generate;
-pub use generate::{GenerateOas, GenerateOasParams, Report, WrittenOutput};
+pub use generate::{
+    CheckedOutput, GenerateMode, GenerateOas, GenerateOasParams, OutputRecord, Report,
+};
 
 mod edit_distance;
 pub use edit_distance::suggest_key;
 
 mod error;
 pub use error::{
-    Error, MetadataReadCause, OutputWriteCause, PackageResolveCause, PartialReadCause, Result,
-    SchemasCollectCause,
+    Error, MetadataReadCause, OutputCheckCause, OutputWriteCause, PackageResolveCause,
+    PartialReadCause, Result, SchemasCollectCause,
 };

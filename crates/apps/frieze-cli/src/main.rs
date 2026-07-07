@@ -2,20 +2,22 @@
 //!
 //! The binary's only job is to parse the arguments, obtain the
 //! assembled interactor from `frieze-wire`, run it, and render the
-//! result: one `generated → <path>` line per output on stdout, errors
-//! on stderr with exit code 1. Cargo's own build log for the scratch
-//! build streams through on stderr untouched. Which package a run
-//! targets is the interactor's business — it resolves the enclosing
-//! workspace from the current directory and honours the `-p` request.
+//! result: one `generated → <path>` line per output on stdout (or
+//! `up-to-date → <path>` under `--check`), errors and check
+//! diagnostics on stderr with exit code 1. Cargo's own build log for
+//! the scratch build streams through on stderr untouched. Which
+//! package a run targets is the interactor's business — it resolves
+//! the enclosing workspace from the current directory and honours the
+//! `-p` request.
 //!
 //! Argument handling is plain `std::env::args` matching — the surface
-//! today is a single `generate` subcommand with two optional flags,
+//! today is a single `generate` subcommand with three optional flags,
 //! which does not yet justify an argument-parser dependency.
 
 use std::process::ExitCode;
 
 use frieze_model::{OutputName, PackageName};
-use frieze_usecase::GenerateOasParams;
+use frieze_usecase::{CheckOutcome, CheckedOutput, GenerateMode, GenerateOasParams, Report};
 
 /// What the user asked for, parsed from `argv`.
 enum Invocation {
@@ -26,6 +28,9 @@ enum Invocation {
         /// The value of `--output`, verbatim; validated into an
         /// [`OutputName`] only when the command actually runs.
         output: Option<String>,
+        /// Whether `--check` was passed: compare the existing output
+        /// files instead of writing them.
+        check: bool,
     },
     /// Anything unrecognized; carries the error to print above the
     /// usage message, when there is one.
@@ -34,13 +39,17 @@ enum Invocation {
 
 fn main() -> ExitCode {
     match parse_invocation(std::env::args().skip(1)) {
-        Invocation::Generate { package, output } => generate(package, output),
+        Invocation::Generate {
+            package,
+            output,
+            check,
+        } => generate(package, output, check),
         Invocation::Usage { error } => {
             if let Some(error) = &error {
                 eprintln!("error: {error}");
                 eprintln!();
             }
-            eprintln!("Usage: cargo frieze generate [-p <package>] [--output <name>]");
+            eprintln!("Usage: cargo frieze generate [-p <package>] [--output <name>] [--check]");
             eprintln!();
             eprintln!("Generates the OAS documents declared under");
             eprintln!("[[package.metadata.frieze.outputs]] of the target package.");
@@ -49,6 +58,8 @@ fn main() -> ExitCode {
             eprintln!("  -p, --package <name>  Target the given workspace member instead of");
             eprintln!("                        the package resolved from the current directory");
             eprintln!("  --output <name>       Generate only the output declared under <name>");
+            eprintln!("  --check               Write nothing; fail if any output file differs");
+            eprintln!("                        from what a run without `--check` would write");
             ExitCode::FAILURE
         }
     }
@@ -75,12 +86,23 @@ fn parse_invocation(args: impl Iterator<Item = String>) -> Invocation {
 }
 
 /// Parses the arguments after `generate`: at most one
-/// `-p` / `--package` and at most one `--output`, each accepting both
-/// the space-separated and the `=` spelling, nothing else.
+/// `-p` / `--package` and at most one `--output` (each accepting both
+/// the space-separated and the `=` spelling), an optional `--check`,
+/// nothing else.
 fn parse_generate_args(mut args: impl Iterator<Item = String>) -> Invocation {
     let mut package = None;
     let mut output = None;
+    let mut check = false;
     while let Some(arg) = args.next() {
+        if arg == "--check" {
+            if check {
+                return Invocation::Usage {
+                    error: Some("`--check` may be given at most once".to_string()),
+                };
+            }
+            check = true;
+            continue;
+        }
         let parsed = parse_flag(&arg, &mut args);
         let (flag, value) = match parsed {
             Ok(pair) => pair,
@@ -97,7 +119,11 @@ fn parse_generate_args(mut args: impl Iterator<Item = String>) -> Invocation {
         }
         *slot = Some(value);
     }
-    Invocation::Generate { package, output }
+    Invocation::Generate {
+        package,
+        output,
+        check,
+    }
 }
 
 /// The flags `generate` accepts.
@@ -145,9 +171,9 @@ fn parse_flag(
 }
 
 /// Runs the generate flow for the resolved target package, optionally
-/// pinned to the package named by `-p` and restricted to the output
-/// named by `--output`.
-fn generate(package: Option<String>, output: Option<String>) -> ExitCode {
+/// pinned to the package named by `-p`, restricted to the output
+/// named by `--output`, and switched to comparison by `--check`.
+fn generate(package: Option<String>, output: Option<String>, check: bool) -> ExitCode {
     let package = match package.map(PackageName::new).transpose() {
         Ok(package) => package,
         Err(error) => {
@@ -162,19 +188,80 @@ fn generate(package: Option<String>, output: Option<String>) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let params = GenerateOasParams { package, filter };
+    let params = GenerateOasParams {
+        package,
+        filter,
+        mode: if check {
+            GenerateMode::Check
+        } else {
+            GenerateMode::Write
+        },
+    };
     match frieze_wire::generate_oas().run(&params) {
-        Ok(report) => {
-            for written in &report.written {
-                println!("generated → {}", written.path);
+        Ok(Report::Written { outputs }) => {
+            for record in &outputs {
+                println!("generated → {}", record.path);
             }
             ExitCode::SUCCESS
         }
+        Ok(Report::Checked { outcomes }) => render_check_report(&outcomes),
         Err(error) => {
             eprintln!("error: {error}");
             ExitCode::FAILURE
         }
     }
+}
+
+/// Renders a check run: passing outputs on stdout, one diagnostic per
+/// failing output on stderr, plus a closing hint on how to fix them.
+/// Exit code 1 as soon as a single output is not up to date.
+fn render_check_report(outcomes: &[CheckedOutput]) -> ExitCode {
+    for output in outcomes {
+        match output.outcome {
+            CheckOutcome::UpToDate => println!("up-to-date → {}", output.path),
+            CheckOutcome::Stale | CheckOutcome::Missing => {
+                eprintln!("error: {}", check_diagnosis(output));
+            }
+        }
+    }
+    let failed = outcomes
+        .iter()
+        .filter(|output| !output.is_up_to_date())
+        .count();
+    if failed == 0 {
+        return ExitCode::SUCCESS;
+    }
+    eprintln!("error: {}", check_summary(failed));
+    ExitCode::FAILURE
+}
+
+/// The per-output diagnostic line of a failed check.
+fn check_diagnosis(output: &CheckedOutput) -> String {
+    match output.outcome {
+        CheckOutcome::UpToDate => unreachable!("up-to-date outputs are not diagnosed"),
+        CheckOutcome::Stale => format!(
+            "output `{}` is stale: `{}` does not match the generated document",
+            output.name, output.path
+        ),
+        CheckOutcome::Missing => format!(
+            "output `{}` is missing: `{}` does not exist",
+            output.name, output.path
+        ),
+    }
+}
+
+/// The closing line of a failed check: what happened, and the exact
+/// command that fixes it.
+fn check_summary(failed: usize) -> String {
+    let outputs = if failed == 1 {
+        "output is"
+    } else {
+        "outputs are"
+    };
+    format!(
+        "{failed} {outputs} not up to date: \
+         run `cargo frieze generate` without `--check` to regenerate"
+    )
 }
 
 #[cfg(test)]
@@ -196,6 +283,7 @@ mod tests {
             Invocation::Generate {
                 package: None,
                 output: None,
+                check: false,
             }
         ));
         // direct `cargo-frieze generate` → argv[1..] = ["generate"]
@@ -204,6 +292,7 @@ mod tests {
             Invocation::Generate {
                 package: None,
                 output: None,
+                check: false,
             }
         ));
     }
@@ -247,8 +336,60 @@ mod tests {
             Invocation::Generate {
                 package: Some(package),
                 output: Some(output),
+                check: false,
             } if package == "api" && output == "public"
         ));
+    }
+
+    #[test]
+    fn the_check_flag_composes_with_the_other_flags() {
+        assert!(matches!(
+            parse_invocation(args(&["generate", "--check"])),
+            Invocation::Generate {
+                package: None,
+                output: None,
+                check: true,
+            }
+        ));
+        // Position does not matter.
+        assert!(matches!(
+            parse_invocation(args(&["generate", "--check", "-p", "api", "--output", "public"])),
+            Invocation::Generate {
+                package: Some(package),
+                output: Some(output),
+                check: true,
+            } if package == "api" && output == "public"
+        ));
+    }
+
+    #[test]
+    fn check_flag_misuse_is_reported() {
+        // A repeated flag.
+        assert!(matches!(
+            parse_invocation(args(&["generate", "--check", "--check"])),
+            Invocation::Usage { error: Some(message) }
+                if message == "`--check` may be given at most once"
+        ));
+        // `--check` takes no value.
+        assert!(matches!(
+            parse_invocation(args(&["generate", "--check=yes"])),
+            Invocation::Usage { error: Some(message) }
+                if message == "unexpected argument `--check=yes` after `generate`"
+        ));
+    }
+
+    #[test]
+    fn check_summary_names_the_fix_and_counts_correctly() {
+        assert_eq!(
+            check_summary(1),
+            "1 output is not up to date: \
+             run `cargo frieze generate` without `--check` to regenerate"
+        );
+        assert_eq!(
+            check_summary(2),
+            "2 outputs are not up to date: \
+             run `cargo frieze generate` without `--check` to regenerate"
+        );
     }
 
     #[test]
@@ -300,8 +441,8 @@ mod tests {
             Invocation::Usage { error: Some(message) } if message.contains("genrate")
         ));
         assert!(matches!(
-            parse_invocation(args(&["frieze", "generate", "--check"])),
-            Invocation::Usage { error: Some(message) } if message.contains("--check")
+            parse_invocation(args(&["frieze", "generate", "--verbose"])),
+            Invocation::Usage { error: Some(message) } if message.contains("--verbose")
         ));
     }
 }
