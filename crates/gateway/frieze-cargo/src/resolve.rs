@@ -50,44 +50,29 @@ const KNOWN_WORKSPACE_KEYS: &[&str] = &["package"];
 /// Resolves the target package through `cargo metadata`, starting from
 /// the process's current directory.
 #[derive(Debug, Default)]
-pub struct CargoPackageResolver {
-    /// When set, resolution starts here instead of the process's
-    /// current directory. Production wiring leaves this unset; tests
-    /// pin it to a fixture directory.
-    start_dir: Option<PathBuf>,
-}
+pub struct CargoPackageResolver;
 
 impl CargoPackageResolver {
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// A resolver that behaves as if the process were invoked from
-    /// `dir`.
-    pub fn from_dir(dir: impl Into<PathBuf>) -> Self {
-        Self {
-            start_dir: Some(dir.into()),
-        }
+        Self
     }
 }
 
 impl PackageResolver for CargoPackageResolver {
     fn resolve(&self, package: Option<&PackageName>) -> Result<PackageRoot> {
-        resolve_package(self.start_dir.as_deref(), package)
-            .map_err(|cause| UsecaseError::PackageResolve { cause })
+        resolve_package(package).map_err(|cause| UsecaseError::PackageResolve { cause })
     }
 }
 
 /// The whole resolution flow in terms of the semantic cause; the trait
-/// boundary above wraps it into the boundary variant.
+/// boundary above wraps it into the boundary variant. The subprocess
+/// call and the pure parsing/selection steps are split below so the
+/// latter stay unit-testable; the composed flow is exercised by the
+/// end-to-end tests.
 fn resolve_package(
-    start_dir: Option<&Path>,
     package: Option<&PackageName>,
 ) -> std::result::Result<PackageRoot, PackageResolveCause> {
-    let cwd = match start_dir {
-        Some(dir) => dir.to_path_buf(),
-        None => std::env::current_dir().map_err(PackageResolveCause::CurrentDir)?,
-    };
+    let cwd = std::env::current_dir().map_err(PackageResolveCause::CurrentDir)?;
     let json = workspace_metadata_json(&cwd)?;
     let view = parse_workspace(&json)?;
     let member = select_member(&view, package, &normalized(&cwd))?;
