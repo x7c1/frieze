@@ -25,7 +25,9 @@
 
 use std::io;
 
-use frieze_model::{ConfigError, OutputFilePath, OutputName, PackageRoot, PartialFilePath};
+use frieze_model::{
+    ConfigError, OasVersionCheck, OutputFilePath, OutputName, PackageRoot, PartialFilePath,
+};
 use thiserror::Error;
 
 /// The `Result` alias used across the use-case layer, including the
@@ -54,6 +56,28 @@ pub enum Error {
     UnknownOutputName {
         requested: OutputName,
         available: Vec<OutputName>,
+    },
+    /// A partial document declares an OAS version outside the
+    /// major.minor line the package metadata pins via its optional
+    /// `oas-version` consistency check.
+    ///
+    /// The check never selects a version — the generated document
+    /// always follows the partial's `openapi:` field — it only rejects
+    /// a partial that contradicts the declared expectation.
+    #[error(
+        "output `{output}`: the partial document `{partial}` declares \
+         `openapi: {partial_version}`, but the package metadata pins \
+         `oas-version = \"{expected}\"`"
+    )]
+    OasVersionMismatch {
+        /// The output whose partial failed the check.
+        output: OutputName,
+        /// The partial document that was checked.
+        partial: PartialFilePath,
+        /// The verbatim `openapi:` field of the partial document.
+        partial_version: String,
+        /// The major.minor line the metadata pins.
+        expected: OasVersionCheck,
     },
     /// The package's `Cargo.toml` has no `[package.metadata.frieze]`
     /// section.

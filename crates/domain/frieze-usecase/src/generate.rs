@@ -1,7 +1,10 @@
 //! The `GenerateOas` interactor: the end-to-end generate flow,
 //! expressed against the gateway traits.
 
-use frieze_model::{OutputConfig, OutputFilePath, OutputName, PackageMetadata, PackageRoot};
+use frieze_model::{
+    OasVersionCheck, OutputConfig, OutputFilePath, OutputName, PackageMetadata, PackageRoot,
+};
+use frieze_openapi::{Document, Version};
 
 use crate::compose::compose_components;
 use crate::gateway::{MetadataSource, OutputSink, PartialSource, SchemasCollector};
@@ -82,13 +85,26 @@ where
     /// at the first failure; a filter naming an undeclared output
     /// fails with [`Error::UnknownOutputName`] before anything is
     /// read or written.
+    ///
+    /// Every selected partial is loaded — and checked against the
+    /// metadata's optional `oas-version` declaration — *before* the
+    /// schema collection: an unreadable or inconsistent partial fails
+    /// the run without paying for a build, and before any output file
+    /// is touched.
     pub fn run(&self, params: &GenerateOasParams) -> Result<Report> {
         let metadata = self.metadata.read(&params.root)?;
         let selected = select_outputs(&metadata, params.filter.as_ref())?;
+        let partials = selected
+            .iter()
+            .map(|config| {
+                let partial = self.partials.load(config.partial())?;
+                check_oas_version(&metadata, config, &partial)?;
+                Ok(partial)
+            })
+            .collect::<Result<Vec<_>>>()?;
         let components = self.schemas.collect(&params.root, &metadata)?;
         let mut written = Vec::new();
-        for config in selected {
-            let partial = self.partials.load(config.partial())?;
+        for (config, partial) in selected.iter().zip(partials) {
             let complete = compose_components(partial, components.clone())?;
             self.outputs
                 .persist(config.output(), &complete, config.format())?;
@@ -99,6 +115,36 @@ where
         }
         Ok(Report::success(written))
     }
+}
+
+/// Enforces the metadata's optional `oas-version` consistency check
+/// against the version a partial document declares.
+///
+/// The generated document always follows the partial's `openapi:`
+/// field; when the metadata pins a major.minor line, a partial outside
+/// that line is rejected with [`Error::OasVersionMismatch`]. Without
+/// the declaration the partials rule, unchecked.
+fn check_oas_version(
+    metadata: &PackageMetadata,
+    config: &OutputConfig,
+    partial: &Document,
+) -> Result<()> {
+    let Some(expected) = metadata.oas_version_check() else {
+        return Ok(());
+    };
+    let matches = match expected {
+        OasVersionCheck::V3_0 => partial.oas_version == Version::V3_0,
+        OasVersionCheck::V3_1 => partial.oas_version == Version::V3_1,
+    };
+    if matches {
+        return Ok(());
+    }
+    Err(Error::OasVersionMismatch {
+        output: config.name().clone(),
+        partial: config.partial().clone(),
+        partial_version: partial.openapi.clone(),
+        expected,
+    })
 }
 
 /// Resolves the outputs a run should generate: all of them, or the
@@ -140,6 +186,10 @@ mod tests {
     }
 
     fn fixture() -> Fixture {
+        fixture_with(None)
+    }
+
+    fn fixture_with(oas_version_check: Option<OasVersionCheck>) -> Fixture {
         let dir = tempfile::tempdir().unwrap();
         let mut outputs = Vec::new();
         for (name, output_file) in [("public", "public.yaml"), ("internal", "internal.json")] {
@@ -155,7 +205,7 @@ mod tests {
             PackageName::new("my-api").unwrap(),
             outputs,
             Vec::new(),
-            None,
+            oas_version_check,
         )
         .unwrap();
         Fixture {
@@ -304,6 +354,55 @@ mod tests {
         let persisted = interactor.outputs.persisted.borrow();
         assert_eq!(persisted.len(), 1);
         assert!(persisted[0].0.ends_with("internal.json"));
+    }
+
+    #[test]
+    fn oas_version_check_passes_when_every_partial_matches() {
+        // The fake partial source serves OAS 3.0 documents, so a
+        // metadata declaration pinning "3.0" is consistent.
+        let fixture = fixture_with(Some(OasVersionCheck::V3_0));
+        let interactor = interactor(&fixture);
+        let params = GenerateOasParams {
+            root: package_root(&fixture),
+            filter: None,
+        };
+
+        let report = interactor.run(&params).unwrap();
+
+        assert_eq!(report.written.len(), 2);
+    }
+
+    #[test]
+    fn oas_version_mismatch_fails_before_collecting_schemas() {
+        // Pinning "3.1" contradicts the 3.0 partials the fake source
+        // serves: the run must fail on the first output, without
+        // collecting schemas or writing anything.
+        let fixture = fixture_with(Some(OasVersionCheck::V3_1));
+        let interactor = interactor(&fixture);
+        let params = GenerateOasParams {
+            root: package_root(&fixture),
+            filter: None,
+        };
+
+        let result = interactor.run(&params);
+
+        assert!(
+            matches!(
+                &result,
+                Err(Error::OasVersionMismatch {
+                    output,
+                    partial_version,
+                    expected,
+                    ..
+                }) if output.as_str() == "public"
+                    && partial_version == "3.0.3"
+                    && *expected == OasVersionCheck::V3_1
+            ),
+            "expected the version mismatch to be rejected, got {:?}",
+            result.map(|report| report.written)
+        );
+        assert_eq!(*interactor.schemas.calls.borrow(), 0);
+        assert!(interactor.outputs.persisted.borrow().is_empty());
     }
 
     #[test]
