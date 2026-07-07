@@ -26,7 +26,8 @@
 use std::io;
 
 use frieze_model::{
-    ConfigError, OasVersionCheck, OutputFilePath, OutputName, PackageRoot, PartialFilePath,
+    ConfigError, OasVersionCheck, OutputFilePath, OutputName, PackageName, PackageRoot,
+    PartialFilePath,
 };
 use thiserror::Error;
 
@@ -90,6 +91,9 @@ pub enum Error {
          `[[package.metadata.frieze.outputs]]` entry"
     )]
     NoOutputsDefined { root: PackageRoot },
+    /// Resolving which package the run targets failed.
+    #[error("cannot resolve the target package: {cause}")]
+    PackageResolve { cause: PackageResolveCause },
     /// Reading the package's generation configuration failed.
     #[error("failed to read the frieze metadata of `{root}`: {cause}")]
     MetadataRead {
@@ -111,6 +115,91 @@ pub enum Error {
         path: OutputFilePath,
         cause: OutputWriteCause,
     },
+}
+
+/// Machine-readable detail of an [`Error::PackageResolve`] failure.
+#[derive(Debug, Error)]
+pub enum PackageResolveCause {
+    /// The current directory the resolution starts from cannot be
+    /// determined.
+    #[error("cannot determine the current directory: {0}")]
+    CurrentDir(io::Error),
+    /// The `cargo metadata` invocation that discovers the enclosing
+    /// workspace could not run or exited nonzero — e.g. the current
+    /// directory is not inside a cargo project. Cargo's own stderr is
+    /// relayed verbatim.
+    #[error(
+        "cargo metadata failed{}",
+        render_invocation_failure(exit_code, stderr)
+    )]
+    CargoMetadata {
+        exit_code: Option<i32>,
+        stderr: String,
+    },
+    /// The `cargo metadata` output could not be interpreted.
+    #[error("cannot interpret the cargo metadata output: {message}")]
+    MetadataParse { message: String },
+    /// The explicitly requested package (`-p <name>`) is not a member
+    /// of the enclosing workspace. `available` lists the members.
+    #[error(
+        "package `{requested}` is not a member of this workspace \
+         (members: {})",
+        render_members(available)
+    )]
+    RequestedPackageNotFound {
+        requested: PackageName,
+        available: Vec<PackageName>,
+    },
+    /// The `[workspace.metadata.frieze] package` declaration names a
+    /// package that is not a member of the workspace.
+    #[error(
+        "`[workspace.metadata.frieze]` declares `package = \
+         \"{requested}\"`, which is not a member of this workspace \
+         (members: {})",
+        render_members(available)
+    )]
+    DefaultPackageNotFound {
+        requested: PackageName,
+        available: Vec<PackageName>,
+    },
+    /// Nothing selects a target package: the workspace has several
+    /// members, the invocation names none, and the workspace declares
+    /// no default.
+    #[error(
+        "no target package selected: pass `-p <name>` or declare \
+         `package = \"...\"` under `[workspace.metadata.frieze]` in \
+         the workspace root Cargo.toml (members: {})",
+        render_members(available)
+    )]
+    NoTargetPackage { available: Vec<PackageName> },
+    /// The `[workspace.metadata.frieze]` table contains a key the
+    /// schema does not define. Unknown keys are rejected rather than
+    /// silently ignored; when the key is a near-miss of a known one,
+    /// the message suggests it.
+    #[error(
+        "unknown key `{key}` in `[workspace.metadata.frieze]`{}",
+        render_suggestion(suggestion)
+    )]
+    UnknownKey {
+        key: String,
+        /// The closest known key of the table, when one is within a
+        /// small edit distance of `key`.
+        suggestion: Option<String>,
+    },
+    /// A key in the `[workspace.metadata.frieze]` table holds a value
+    /// of the wrong TOML type.
+    #[error("key `{key}` in `[workspace.metadata.frieze]` must be {expected}")]
+    UnexpectedType { key: String, expected: &'static str },
+}
+
+/// Renders a member list for the resolve failures, in the stable
+/// (sorted) order the causes carry.
+fn render_members(members: &[PackageName]) -> String {
+    members
+        .iter()
+        .map(PackageName::as_str)
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Machine-readable detail of an [`Error::MetadataRead`] failure.

@@ -14,3 +14,7 @@ frieze = { path = "../../../../../libs/frieze", default-features = false }
 name    = "default"
 partial = "openapi/partial.yaml"
 output  = "generated/openapi.yaml"
+
+# This fixture is its own workspace root: without this table, cargo
+# attaches the package to the enclosing repository workspace.
+[workspace]

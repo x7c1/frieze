@@ -1,0 +1,15 @@
+# The frieze-configured member of the workspace fixture.
+[package]
+name = "ws-api"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "../../../../../../libs/frieze" }
+ws-shared = { path = "../ws-shared" }
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"

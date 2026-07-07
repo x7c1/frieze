@@ -2,18 +2,23 @@
 //! expressed against the gateway traits.
 
 use frieze_model::{
-    OasVersionCheck, OutputConfig, OutputFilePath, OutputName, PackageMetadata, PackageRoot,
+    OasVersionCheck, OutputConfig, OutputFilePath, OutputName, PackageMetadata, PackageName,
 };
 use frieze_openapi::{Document, Version};
 
 use crate::compose::compose_components;
-use crate::gateway::{MetadataSource, OutputSink, PartialSource, SchemasCollector};
+use crate::gateway::{
+    MetadataSource, OutputSink, PackageResolver, PartialSource, SchemasCollector,
+};
 use crate::{Error, Result};
 
 /// The input of one [`GenerateOas::run`] invocation.
 pub struct GenerateOasParams {
-    /// The package whose configuration and schemas drive the run.
-    pub root: PackageRoot,
+    /// The explicitly requested target package, when the caller named
+    /// one; when `None`, the resolver derives the target from the
+    /// invocation's environment (workspace default, current
+    /// directory).
+    pub package: Option<PackageName>,
     /// When set, only the output declared under this name is
     /// generated; when `None`, every declared output is.
     pub filter: Option<OutputName>,
@@ -44,33 +49,36 @@ impl Report {
     }
 }
 
-/// Orchestrates the generate flow: read the package configuration,
-/// collect the schemas the target crate registers, and for each
-/// selected output compose the schemas into its partial document and
-/// persist the result.
+/// Orchestrates the generate flow: resolve the target package, read
+/// its configuration, collect the schemas the target crate registers,
+/// and for each selected output compose the schemas into its partial
+/// document and persist the result.
 ///
 /// The interactor holds one implementation per gateway trait and is
 /// generic over the concrete types; the composition root decides which
 /// implementations are injected. Schemas are collected once per run
 /// and reused across every output — only the partial document and the
 /// serialization format vary per output.
-pub struct GenerateOas<M, S, P, O> {
+pub struct GenerateOas<R, M, S, P, O> {
+    resolver: R,
     metadata: M,
     schemas: S,
     partials: P,
     outputs: O,
 }
 
-impl<M, S, P, O> GenerateOas<M, S, P, O>
+impl<R, M, S, P, O> GenerateOas<R, M, S, P, O>
 where
+    R: PackageResolver,
     M: MetadataSource,
     S: SchemasCollector,
     P: PartialSource,
     O: OutputSink,
 {
-    /// Assembles the interactor from its four gateways.
-    pub fn new(metadata: M, schemas: S, partials: P, outputs: O) -> Self {
+    /// Assembles the interactor from its five gateways.
+    pub fn new(resolver: R, metadata: M, schemas: S, partials: P, outputs: O) -> Self {
         Self {
+            resolver,
             metadata,
             schemas,
             partials,
@@ -78,8 +86,12 @@ where
         }
     }
 
-    /// Runs the generate flow for `params.root`, returning the names
-    /// of the outputs that were written.
+    /// Runs the generate flow for the resolved target package,
+    /// returning the names of the outputs that were written.
+    ///
+    /// The target package is resolved first — every path in its
+    /// configuration is then read relative to *that* package's root
+    /// directory, never the workspace root.
     ///
     /// Outputs are processed in declaration order and the flow stops
     /// at the first failure; a filter naming an undeclared output
@@ -92,7 +104,8 @@ where
     /// the run without paying for a build, and before any output file
     /// is touched.
     pub fn run(&self, params: &GenerateOasParams) -> Result<Report> {
-        let metadata = self.metadata.read(&params.root)?;
+        let root = self.resolver.resolve(params.package.as_ref())?;
+        let metadata = self.metadata.read(&root)?;
         let selected = select_outputs(&metadata, params.filter.as_ref())?;
         let partials = selected
             .iter()
@@ -102,7 +115,7 @@ where
                 Ok(partial)
             })
             .collect::<Result<Vec<_>>>()?;
-        let components = self.schemas.collect(&params.root, &metadata)?;
+        let components = self.schemas.collect(&root, &metadata)?;
         let mut written = Vec::new();
         for (config, partial) in selected.iter().zip(partials) {
             let complete = compose_components(partial, components.clone())?;
@@ -173,7 +186,7 @@ mod tests {
     use std::path::PathBuf;
 
     use frieze_model::{
-        OutputConfig, OutputFilePath, OutputFormat, PackageMetadata, PackageName, PartialFilePath,
+        OutputConfig, OutputFilePath, OutputFormat, PackageMetadata, PackageRoot, PartialFilePath,
     };
     use frieze_openapi::{Components, Document, Info, Version};
 
@@ -211,6 +224,20 @@ mod tests {
         Fixture {
             _dir: dir,
             metadata,
+        }
+    }
+
+    /// Resolves every request to the fixture's root, recording the
+    /// explicitly requested package name it received.
+    struct FakeResolver {
+        root: PackageRoot,
+        requested: RefCell<Vec<Option<PackageName>>>,
+    }
+
+    impl PackageResolver for FakeResolver {
+        fn resolve(&self, package: Option<&PackageName>) -> Result<PackageRoot> {
+            self.requested.borrow_mut().push(package.cloned());
+            Ok(self.root.clone())
         }
     }
 
@@ -282,9 +309,18 @@ mod tests {
 
     fn interactor(
         fixture: &Fixture,
-    ) -> GenerateOas<FakeMetadataSource, FakeSchemasCollector, FakePartialSource, RecordingSink>
-    {
+    ) -> GenerateOas<
+        FakeResolver,
+        FakeMetadataSource,
+        FakeSchemasCollector,
+        FakePartialSource,
+        RecordingSink,
+    > {
         GenerateOas::new(
+            FakeResolver {
+                root: package_root(fixture),
+                requested: RefCell::new(Vec::new()),
+            },
             FakeMetadataSource {
                 metadata: fixture.metadata.clone(),
             },
@@ -307,7 +343,7 @@ mod tests {
         let fixture = fixture();
         let interactor = interactor(&fixture);
         let params = GenerateOasParams {
-            root: package_root(&fixture),
+            package: None,
             filter: None,
         };
 
@@ -335,11 +371,32 @@ mod tests {
     }
 
     #[test]
+    fn the_requested_package_reaches_the_resolver() {
+        let fixture = fixture();
+        let interactor = interactor(&fixture);
+        let params = GenerateOasParams {
+            package: Some(PackageName::new("my-api").unwrap()),
+            filter: None,
+        };
+
+        interactor.run(&params).unwrap();
+
+        // Resolution happens exactly once, with the explicit request
+        // forwarded verbatim.
+        let requested = interactor.resolver.requested.borrow();
+        assert_eq!(requested.len(), 1);
+        assert_eq!(
+            requested[0].as_ref().map(PackageName::as_str),
+            Some("my-api")
+        );
+    }
+
+    #[test]
     fn filter_selects_a_single_output() {
         let fixture = fixture();
         let interactor = interactor(&fixture);
         let params = GenerateOasParams {
-            root: package_root(&fixture),
+            package: None,
             filter: Some(OutputName::new("internal").unwrap()),
         };
 
@@ -363,7 +420,7 @@ mod tests {
         let fixture = fixture_with(Some(OasVersionCheck::V3_0));
         let interactor = interactor(&fixture);
         let params = GenerateOasParams {
-            root: package_root(&fixture),
+            package: None,
             filter: None,
         };
 
@@ -380,7 +437,7 @@ mod tests {
         let fixture = fixture_with(Some(OasVersionCheck::V3_1));
         let interactor = interactor(&fixture);
         let params = GenerateOasParams {
-            root: package_root(&fixture),
+            package: None,
             filter: None,
         };
 
@@ -410,7 +467,7 @@ mod tests {
         let fixture = fixture();
         let interactor = interactor(&fixture);
         let params = GenerateOasParams {
-            root: package_root(&fixture),
+            package: None,
             filter: Some(OutputName::new("absent").unwrap()),
         };
 

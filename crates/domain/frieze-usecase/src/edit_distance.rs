@@ -4,6 +4,11 @@
 //! known key is suggested if it is plausibly a typo. The candidate set
 //! is a handful of short literals, so a plain Levenshtein computation
 //! is more than fast enough — no dependency is warranted for this.
+//!
+//! The helper lives in the use-case layer because it backs the curated
+//! error causes defined here (the `suggestion` field of an
+//! unknown-key error); every gateway that validates a configuration
+//! table reuses it through this crate.
 
 /// Returns the known key closest to `unknown`, when close enough to be
 /// a plausible typo.
@@ -12,7 +17,7 @@
 /// the unknown key's length, rounded up — long keys may drift further
 /// than short ones before a suggestion stops being helpful. Ties go to
 /// the earliest candidate in `known`.
-pub(crate) fn suggest<'a>(unknown: &str, known: &[&'a str]) -> Option<&'a str> {
+pub fn suggest_key<'a>(unknown: &str, known: &[&'a str]) -> Option<&'a str> {
     let threshold = unknown.chars().count().div_ceil(3);
     known
         .iter()
@@ -61,15 +66,15 @@ mod tests {
     #[test]
     fn suggests_the_closest_known_key_for_a_plausible_typo() {
         let known = ["name", "partial", "output"];
-        assert_eq!(suggest("parital", &known), Some("partial"));
-        assert_eq!(suggest("ouput", &known), Some("output"));
-        assert_eq!(suggest("nme", &known), Some("name"));
+        assert_eq!(suggest_key("parital", &known), Some("partial"));
+        assert_eq!(suggest_key("ouput", &known), Some("output"));
+        assert_eq!(suggest_key("nme", &known), Some("name"));
     }
 
     #[test]
     fn stays_silent_when_nothing_is_close() {
         let known = ["name", "partial", "output"];
-        assert_eq!(suggest("description", &known), None);
-        assert_eq!(suggest("x", &known), None);
+        assert_eq!(suggest_key("description", &known), None);
+        assert_eq!(suggest_key("x", &known), None);
     }
 }

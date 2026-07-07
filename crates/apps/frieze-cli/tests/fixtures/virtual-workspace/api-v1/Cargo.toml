@@ -1,0 +1,14 @@
+# The frieze-configured member of the virtual-workspace fixture.
+[package]
+name = "vw-api-v1"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "../../../../../../libs/frieze" }
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"

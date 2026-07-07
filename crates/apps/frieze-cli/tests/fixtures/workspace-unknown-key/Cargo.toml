@@ -1,0 +1,8 @@
+# End-to-end fixture: a typo (`pacakge`) in the workspace-level frieze
+# table. Resolution must reject it and suggest the intended key.
+[workspace]
+resolver = "2"
+members = ["app"]
+
+[workspace.metadata.frieze]
+pacakge = "wuk-app"

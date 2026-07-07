@@ -140,7 +140,8 @@ partial = "openapi/partial.yaml"
 output  = "openapi/openapi.yaml"
 ```
 
-Then, from the package directory:
+Then, from the package directory (or any directory inside it — see
+[Workspaces](#workspaces) for how the target package is picked):
 
 ```console
 $ cargo frieze generate
@@ -189,6 +190,58 @@ Details worth knowing:
   `default-features = false` gets a clear error — the CLI never
   re-enables the feature behind your back; use the library path
   (`SchemasBuilder::add`) for inventory-less setups.
+
+### Workspaces
+
+`cargo frieze generate` works from anywhere inside a workspace,
+including virtual workspaces (a root `Cargo.toml` with no `[package]`
+table). The frieze configuration itself stays per-package —
+`[package.metadata.frieze]` lives in the member's own `Cargo.toml` —
+and the workspace root may add one workspace-level key to name the
+default target:
+
+```toml
+# Cargo.toml (workspace root)
+[workspace]
+members = ["api-v1", "api-v2", "shared"]
+
+[workspace.metadata.frieze]
+package = "api-v1"   # the default target for `cargo frieze generate`
+```
+
+```console
+$ cargo frieze generate                             # workspace root → the declared default (api-v1)
+$ cargo frieze generate -p api-v2                   # explicit member, from any directory
+$ cargo frieze generate -p api-v1 --output public   # flags compose: one member, one output
+```
+
+The target package is resolved in this order:
+
+1. **`-p <name>` / `--package <name>`** — an explicit request always
+   wins.
+2. **The member directory you are inside** — running inside `api-v2/`
+   targets `api-v2`, exactly like `cargo build`.
+3. **The `[workspace.metadata.frieze] package` declaration** — at the
+   workspace root (or anywhere outside a member directory), the
+   declared default applies.
+4. **The root package or sole member** — a workspace whose root is
+   itself a package falls back to that package; a single-member
+   workspace resolves to its sole member. A plain single-package
+   crate therefore needs no configuration at all.
+
+A virtual workspace with several members and no declaration fails with
+an error listing the members and both selection mechanisms. Unknown
+values are rejected the same way everything else is: `-p nope` and a
+declaration naming a non-member list the actual members, and an
+unknown key in the workspace table gets a "did you mean ...?"
+suggestion.
+
+Wherever the run starts, the declared `partial` / `output` paths
+resolve relative to the **resolved member's** directory — never the
+workspace root — and the scratch crate builds under the
+workspace-level build directory (`target/frieze/<package>/`), seeded
+with the workspace `Cargo.lock`, so the member's dependencies resolve
+exactly as in your normal builds.
 
 ## Optionality, in one paragraph
 

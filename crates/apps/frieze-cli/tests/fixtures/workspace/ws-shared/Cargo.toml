@@ -1,0 +1,10 @@
+# A sibling member: it declares no frieze configuration of its own,
+# but its types are collected through the member that references them.
+[package]
+name = "ws-shared"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "../../../../../../libs/frieze" }

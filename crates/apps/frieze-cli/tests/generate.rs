@@ -22,6 +22,14 @@
 //! fixtures whose runs fail before any build starts — those tests are
 //! cheap and skip the build lock.
 //!
+//! Workspace fixtures (`workspace`, `virtual-workspace`, plus two
+//! buildless error fixtures) exercise target-package resolution: the
+//! `[workspace.metadata.frieze] package` declaration, the `-p` flag,
+//! invocation from inside a member directory, and the curated errors
+//! for an unknown package or an undeclared virtual workspace. Each
+//! workspace fixture keeps a single frieze-configured member so the
+//! resolution matrix reuses one scratch build per fixture.
+//!
 //! The tests invoke real cargo builds, so they are serialized through
 //! a lock and each fixture gets its own build directory
 //! (`target/e2e/<fixture>/`) to keep runs independent; the directory
@@ -61,10 +69,17 @@ fn run_generate(fixture: &str) -> std::process::Output {
 
 /// Like [`run_generate`], with extra arguments after `generate`.
 fn run_generate_args(fixture: &str, args: &[&str]) -> std::process::Output {
+    run_generate_from(fixture, "", args)
+}
+
+/// Like [`run_generate_args`], invoked from `subdir` inside the
+/// fixture — workspace fixtures exercise resolution from the root and
+/// from member directories, all sharing the fixture's build directory.
+fn run_generate_from(fixture: &str, subdir: &str, args: &[&str]) -> std::process::Output {
     Command::new(env!("CARGO_BIN_EXE_cargo-frieze"))
         .arg("generate")
         .args(args)
-        .current_dir(fixture_dir(fixture))
+        .current_dir(fixture_dir(fixture).join(subdir))
         .env("FRIEZE_LOCAL_CRATES_DIR", repo_root())
         .env(
             "CARGO_TARGET_DIR",
@@ -354,6 +369,216 @@ fn an_unsupported_output_extension_lists_the_allowed_ones() {
 }
 
 #[test]
+fn workspace_declaration_targets_the_member_from_the_root() {
+    let _guard = E2E_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let fixture = fixture_dir("workspace");
+    let output_file = fixture.join("ws-api/generated/openapi.yaml");
+    let _ = std::fs::remove_file(&output_file);
+
+    // No flags, invoked at the workspace root: the run targets the
+    // member the workspace declares under
+    // `[workspace.metadata.frieze] package`, not the root package.
+    let output = run_generate("workspace");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "generate failed.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+
+    // The declared paths resolved against the *member's* directory,
+    // never the workspace root.
+    assert!(
+        stdout.contains("ws-api/generated/openapi.yaml"),
+        "stdout should announce the member-relative path, got:\n{stdout}"
+    );
+    assert!(
+        !fixture.join("generated").exists(),
+        "nothing may be written relative to the workspace root"
+    );
+
+    // Byte-equivalence across workspace members: `Ticket` lives in
+    // the resolved member and pulls `Person` in from the sibling
+    // member, exactly like the inventory walk does.
+    let expected = library_path_yaml(&fixture.join("ws-api/openapi/partial.yaml"), |builder| {
+        builder.add::<ws_api::Ticket>()
+    });
+    assert_eq!(read(&output_file), expected);
+
+    // The scratch crate landed in the (workspace-level) build
+    // directory, keyed by the resolved member's name.
+    let scratch = repo_root().join("target/e2e/workspace/frieze/ws-api");
+    assert!(
+        scratch.join("Cargo.toml").is_file(),
+        "expected the scratch crate under {}",
+        scratch.display()
+    );
+    assert!(
+        read(&scratch.join("Cargo.toml")).contains("frieze-scratch-ws-api"),
+        "the scratch crate is named after the resolved member"
+    );
+}
+
+#[test]
+fn package_flag_selects_the_member_from_the_workspace_root() {
+    let _guard = E2E_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // Reuses the workspace fixture (and its build cache).
+    let fixture = fixture_dir("workspace");
+    let output_file = fixture.join("ws-api/generated/openapi.yaml");
+    let _ = std::fs::remove_file(&output_file);
+
+    let output = run_generate_args("workspace", &["-p", "ws-api"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "generate failed.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert!(output_file.is_file());
+}
+
+#[test]
+fn inside_a_member_directory_that_member_wins_over_the_declaration() {
+    // No lock: resolving to `ws-shared` fails at the metadata read
+    // (the member has no frieze section), before any build.
+    let output = run_generate_from("workspace", "ws-shared", &[]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "generate must fail for the unconfigured member"
+    );
+    // The resolved target is the member the invocation sits in — not
+    // `ws-api`, which the workspace declaration names.
+    assert!(
+        stderr.contains("no `[package.metadata.frieze]` section") && stderr.contains("ws-shared"),
+        "stderr should report the missing section of ws-shared, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn an_unknown_package_flag_lists_the_workspace_members() {
+    let output = run_generate_args("workspace", &["-p", "nope"]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "generate must fail for an unknown package"
+    );
+    assert!(
+        stderr.contains("package `nope` is not a member of this workspace")
+            && stderr.contains("ws-api, ws-root, ws-shared"),
+        "stderr should list the members, got:\n{stderr}"
+    );
+}
+
+#[test]
+fn virtual_workspace_declaration_targets_the_member_from_the_root() {
+    let _guard = E2E_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let fixture = fixture_dir("virtual-workspace");
+    let output_file = fixture.join("api-v1/generated/openapi.yaml");
+    let _ = std::fs::remove_file(&output_file);
+
+    // The root manifest has no [package] at all; the declaration is
+    // the only thing selecting a target here.
+    let output = run_generate("virtual-workspace");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "generate failed.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+
+    let expected = library_path_yaml(&fixture.join("api-v1/openapi/partial.yaml"), |builder| {
+        builder.add::<vw_api_v1::Widget>()
+    });
+    assert_eq!(read(&output_file), expected);
+}
+
+#[test]
+fn inside_a_virtual_member_no_flag_is_needed() {
+    let _guard = E2E_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    // Reuses the virtual-workspace fixture (and its build cache).
+    let fixture = fixture_dir("virtual-workspace");
+    let output_file = fixture.join("api-v1/generated/openapi.yaml");
+    let _ = std::fs::remove_file(&output_file);
+
+    let output = run_generate_from("virtual-workspace", "api-v1", &[]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "generate failed.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert!(output_file.is_file());
+}
+
+#[test]
+fn the_package_flag_wins_from_inside_another_member() {
+    let _guard = E2E_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let fixture = fixture_dir("virtual-workspace");
+    let output_file = fixture.join("api-v1/generated/openapi.yaml");
+    let _ = std::fs::remove_file(&output_file);
+
+    // Invoked inside `api-v2`, but `-p` overrides the location.
+    let output = run_generate_from("virtual-workspace", "api-v2", &["-p", "vw-api-v1"]);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "generate failed.\nstdout:\n{stdout}\nstderr:\n{stderr}"
+    );
+    assert!(
+        output_file.is_file(),
+        "the output must land under the requested member"
+    );
+}
+
+#[test]
+fn an_undeclared_virtual_workspace_asks_for_a_selection() {
+    let output = run_generate("virtual-no-default");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "generate must fail when nothing selects a target"
+    );
+    for needle in [
+        "no target package selected",
+        "-p <name>",
+        "[workspace.metadata.frieze]",
+        "vnd-a, vnd-b",
+    ] {
+        assert!(
+            stderr.contains(needle),
+            "stderr should contain {needle:?}, got:\n{stderr}"
+        );
+    }
+}
+
+#[test]
+fn an_unknown_workspace_metadata_key_suggests_the_intended_one() {
+    let output = run_generate("workspace-unknown-key");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "generate must fail on the unknown workspace key"
+    );
+    assert!(
+        stderr.contains("unknown key `pacakge` in `[workspace.metadata.frieze]`")
+            && stderr.contains("did you mean `package`?"),
+        "stderr should reject the typo with a suggestion, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn an_inventory_disabled_target_fails_with_a_curated_error() {
     let _guard = E2E_LOCK
         .lock()
@@ -368,8 +593,11 @@ fn an_inventory_disabled_target_fails_with_a_curated_error() {
         !output.status.success(),
         "generate must fail for an inventory-disabled target"
     );
+    // The full curated wording is pinned: a weaker check (say, just
+    // "inventory") could be satisfied by an unrelated failure whose
+    // message happens to carry the fixture's path.
     assert!(
-        stderr.contains("inventory"),
+        stderr.contains("disables the frieze `inventory` feature"),
         "stderr should explain the disabled feature, got:\n{stderr}"
     );
     assert!(

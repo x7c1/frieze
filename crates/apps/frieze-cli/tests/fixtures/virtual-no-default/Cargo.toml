@@ -1,0 +1,6 @@
+# End-to-end fixture: a virtual workspace with several members and no
+# `[workspace.metadata.frieze]` declaration. A run from the root has
+# no way to pick a target and must fail with a curated error.
+[workspace]
+resolver = "2"
+members = ["a", "b"]

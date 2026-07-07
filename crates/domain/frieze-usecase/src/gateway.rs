@@ -12,14 +12,34 @@
 //! implementation detail inside each gateway.
 //!
 //! Implementations map their internal failures into the semantic
-//! boundary variants of [`crate::Error`] ([`crate::Error::MetadataRead`],
+//! boundary variants of [`crate::Error`]
+//! ([`crate::Error::PackageResolve`], [`crate::Error::MetadataRead`],
 //! [`crate::Error::PartialRead`], [`crate::Error::SchemasCollect`],
 //! [`crate::Error::OutputWrite`]) at this boundary.
 
-use frieze_model::{OutputFilePath, OutputFormat, PackageMetadata, PackageRoot, PartialFilePath};
+use frieze_model::{
+    OutputFilePath, OutputFormat, PackageMetadata, PackageName, PackageRoot, PartialFilePath,
+};
 use frieze_openapi::{Components, Document};
 
 use crate::Result;
+
+/// Resolves which package a run targets.
+pub trait PackageResolver {
+    /// Resolves the target package for the invocation, returning the
+    /// root directory of the resolved package.
+    ///
+    /// The invocation's environment (the current directory and the
+    /// workspace enclosing it, including any
+    /// `[workspace.metadata.frieze]` declaration) is the
+    /// implementation's own input — like every gateway, it hides how
+    /// that external state is obtained. `package` is the explicitly
+    /// requested package name, when the caller passed one; it always
+    /// wins over any environment-derived selection.
+    ///
+    /// Fails with [`crate::Error::PackageResolve`].
+    fn resolve(&self, package: Option<&PackageName>) -> Result<PackageRoot>;
+}
 
 /// Reads a package's generation configuration.
 pub trait MetadataSource {

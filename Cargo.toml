@@ -11,10 +11,19 @@ members = [
     "crates/libs/frieze-wire",
     "crates/libs/frieze",
 ]
-# The end-to-end fixtures are standalone packages the CLI is run
-# against; excluding them keeps each one its own workspace root while
-# still allowing the frieze-cli tests to link them as path
-# dev-dependencies.
+# The end-to-end fixture packages the CLI is run against fall in two
+# groups:
+#
+# - Fixtures linked as path dev-dependencies of frieze-cli (for the
+#   byte-equivalence assertions) are pulled into this workspace by
+#   cargo's path-dependency auto-inclusion, which overrides `exclude`;
+#   they stay plain packages, and a nested `[workspace]` table there
+#   would be a hard error.
+# - Fixtures the tests only run the binary against carry their own
+#   `[workspace]` table (or are workspaces themselves), so cargo
+#   treats them as separate workspace roots when invoked inside them.
+#
+# The entries here document the intended separation for both groups.
 exclude = [
     "crates/apps/frieze-cli/tests/fixtures/single-output",
     "crates/apps/frieze-cli/tests/fixtures/multi-output",
@@ -24,6 +33,10 @@ exclude = [
     "crates/apps/frieze-cli/tests/fixtures/version-mismatch",
     "crates/apps/frieze-cli/tests/fixtures/unknown-key",
     "crates/apps/frieze-cli/tests/fixtures/bad-extension",
+    "crates/apps/frieze-cli/tests/fixtures/workspace",
+    "crates/apps/frieze-cli/tests/fixtures/virtual-workspace",
+    "crates/apps/frieze-cli/tests/fixtures/virtual-no-default",
+    "crates/apps/frieze-cli/tests/fixtures/workspace-unknown-key",
 ]
 
 [workspace.package]

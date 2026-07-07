@@ -87,11 +87,14 @@ cargo test   --workspace --no-default-features
 
 `cargo test --workspace` includes the end-to-end tests in
 `crates/apps/frieze-cli/tests/generate.rs`. They run the real
-`cargo-frieze` binary against the fixture packages under
-`crates/apps/frieze-cli/tests/fixtures/` (standalone packages,
-excluded from the workspace but linked as path dev-dependencies for
-the byte-equivalence assertions) and therefore invoke real nested
-cargo builds:
+`cargo-frieze` binary against the fixture packages and workspaces
+under `crates/apps/frieze-cli/tests/fixtures/` and therefore invoke
+real nested cargo builds. Fixture packages linked as path
+dev-dependencies (for the byte-equivalence assertions) are pulled into
+this repository's workspace by cargo's path-dependency auto-inclusion
+(which overrides `exclude`); the standalone error fixtures carry their
+own `[workspace]` table instead — see the note in the root
+`Cargo.toml`. Further notes:
 
 - The tests are serialized through a lock; each fixture builds into
   its own persistent `target/e2e/<fixture>/` directory, so the first

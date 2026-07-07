@@ -1,0 +1,15 @@
+# End-to-end fixture: a workspace whose root is itself a package, with
+# two members. The workspace declares `ws-api` as the default target,
+# so a run from the root generates that member's outputs.
+[package]
+name = "ws-root"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[workspace]
+resolver = "2"
+members = ["ws-api", "ws-shared"]
+
+[workspace.metadata.frieze]
+package = "ws-api"
