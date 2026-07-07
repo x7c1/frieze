@@ -25,9 +25,7 @@ enum Invocation {
     },
     /// Anything unrecognized; carries the error to print above the
     /// usage message, when there is one.
-    Usage {
-        error: Option<String>,
-    },
+    Usage { error: Option<String> },
 }
 
 fn main() -> ExitCode {

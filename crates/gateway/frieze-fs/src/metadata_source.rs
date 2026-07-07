@@ -444,7 +444,9 @@ output  = "openapi/openapi.yaml"
         let fixture = fixture(manifest);
         let result = FsMetadataSource::new().read(&fixture.root);
         match result {
-            Err(Error::Config(error @ frieze_model::ConfigError::OasVersionCheckInvalid { .. })) => {
+            Err(Error::Config(
+                error @ frieze_model::ConfigError::OasVersionCheckInvalid { .. },
+            )) => {
                 let message = error.to_string();
                 assert!(
                     message.contains("\"3.0\"") && message.contains("\"3.1\""),
@@ -549,11 +551,12 @@ output  = "openapi/openapi.yaml"
         match &result {
             Err(
                 error @ Error::MetadataRead {
-                    cause: MetadataReadCause::UnknownKey {
-                        key,
-                        table,
-                        suggestion,
-                    },
+                    cause:
+                        MetadataReadCause::UnknownKey {
+                            key,
+                            table,
+                            suggestion,
+                        },
                     ..
                 },
             ) => {
