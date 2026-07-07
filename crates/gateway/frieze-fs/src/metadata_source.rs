@@ -279,7 +279,7 @@ fn reject_unknown_keys(
             MetadataReadCause::UnknownKey {
                 key: key.clone(),
                 table: table_name.to_string(),
-                suggestion: crate::edit_distance::suggest(key, known).map(str::to_string),
+                suggestion: frieze_usecase::suggest_key(key, known).map(str::to_string),
             },
         )),
         None => Ok(()),

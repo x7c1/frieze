@@ -36,6 +36,9 @@ pub use gateway::{MetadataSource, OutputSink, PartialSource, SchemasCollector};
 mod generate;
 pub use generate::{GenerateOas, GenerateOasParams, Report, WrittenOutput};
 
+mod edit_distance;
+pub use edit_distance::suggest_key;
+
 mod error;
 pub use error::{
     Error, MetadataReadCause, OutputWriteCause, PartialReadCause, Result, SchemasCollectCause,
