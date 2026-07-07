@@ -26,5 +26,6 @@ pub use collector::CargoSchemasCollector;
 mod resolve;
 pub use resolve::CargoPackageResolver;
 
+mod frieze_source;
 mod inspect;
 mod scratch;

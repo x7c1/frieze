@@ -1,0 +1,4 @@
+openapi: 3.0.3
+info:
+  title: Version Skew API
+  version: 0.1.0

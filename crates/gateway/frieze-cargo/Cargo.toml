@@ -10,6 +10,7 @@ description = "Cargo gateway for frieze: collects registered schemas by building
 frieze-model.workspace = true
 frieze-openapi.workspace = true
 frieze-usecase.workspace = true
+semver.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 [dev-dependencies]

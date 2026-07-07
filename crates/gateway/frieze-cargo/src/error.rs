@@ -30,6 +30,18 @@ pub enum Error {
     /// schema registrations.
     #[error("the target crate disables the frieze `inventory` feature")]
     InventoryDisabled,
+    /// The target crate's declared `frieze` version requirement can
+    /// never match the exact frieze version the scratch crate pins
+    /// (this crate's own version), so cargo would resolve two frieze
+    /// instances and the collection would silently see no schemas.
+    #[error(
+        "the declared frieze requirement `{requirement}` cannot match \
+         the CLI's frieze version {cli_version}"
+    )]
+    FriezeVersionMismatch {
+        requirement: String,
+        cli_version: String,
+    },
     /// The cargo subprocess failed (spawn failure surfaces as
     /// `exit_code: None`). `stderr` carries any additionally captured
     /// output and is empty when everything was already streamed to the

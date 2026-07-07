@@ -315,6 +315,23 @@ pub enum SchemasCollectCause {
          adding \"inventory\" to its `features` list"
     )]
     InventoryDisabled,
+    /// The target crate's declared `frieze` version requirement cannot
+    /// match the frieze version the collector pins, so the two would
+    /// resolve as separate instances and no schemas could be
+    /// collected.
+    #[error(
+        "the target crate requires `frieze = \"{requirement}\"`, which \
+         does not match the frieze version this cargo-frieze collects \
+         with ({cli_version}): align the crate's frieze dependency with \
+         the installed CLI, or install the matching CLI with \
+         `cargo install frieze-cli --version {cli_version}`"
+    )]
+    FriezeVersionMismatch {
+        /// The declared requirement, as cargo normalizes it.
+        requirement: String,
+        /// The exact frieze version this CLI release collects with.
+        cli_version: String,
+    },
 }
 
 /// Renders the `did you mean` suffix of an unknown-key message, or

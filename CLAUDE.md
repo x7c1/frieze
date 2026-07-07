@@ -99,10 +99,12 @@ own `[workspace]` table instead — see the note in the root
 - The tests are serialized through a lock; each fixture builds into
   its own persistent `target/e2e/<fixture>/` directory, so the first
   run is cold (tens of seconds) and reruns hit the incremental cache.
-- The subprocess environment sets `FRIEZE_LOCAL_CRATES_DIR` to the
-  checkout root so the generated scratch crate resolves the
-  unpublished `frieze` / `frieze-usecase` crates by path. Production
-  scratch crates pin the crates.io releases instead.
+- The fixtures declare `frieze` as a path dependency into this
+  checkout, and the generated scratch crate mirrors that path (the
+  collector's rule for a path-declared `frieze`), so the e2e runs
+  resolve the unpublished `frieze` / `frieze-usecase` crates locally
+  and never touch crates.io. Production scratch crates pin the
+  crates.io releases to the CLI's own version instead.
 - Run them alone with `cargo test -p frieze-cli --test generate`.
 
 ## Branch and PR conventions

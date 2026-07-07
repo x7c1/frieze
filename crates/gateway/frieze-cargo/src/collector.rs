@@ -7,6 +7,7 @@ use frieze_model::{PackageMetadata, PackageRoot};
 use frieze_openapi::Components;
 use frieze_usecase::{Error as UsecaseError, Result, SchemasCollectCause, SchemasCollector};
 
+use crate::frieze_source::{resolve_frieze_source, CLI_FRIEZE_VERSION};
 use crate::inspect::{cargo_bin, inspect_package};
 use crate::scratch::prepare_scratch;
 use crate::Error;
@@ -24,10 +25,16 @@ use crate::Error;
 ///    rejected up front: its derive output submits no registrations,
 ///    so a scratch build could only ever produce an empty document.
 ///    The feature is never force-enabled behind the user's back.
-/// 3. The scratch crate is (re)generated under
+/// 3. The scratch crate's own `frieze` / `frieze-usecase` source is
+///    resolved from the target's declaration (see
+///    [`crate::frieze_source`]): a path dependency is mirrored, a
+///    registry requirement must match the version this CLI pins —
+///    anything else would let cargo resolve two frieze instances and
+///    silently collect nothing.
+/// 4. The scratch crate is (re)generated under
 ///    `<target_directory>/frieze/<package>/` and its lockfile is
 ///    seeded from the workspace's.
-/// 4. `cargo run` builds and runs the scratch binary with stdout
+/// 5. `cargo run` builds and runs the scratch binary with stdout
 ///    captured (the components dump) and stderr passed straight
 ///    through to the terminal, so build progress and compile errors
 ///    reach the user exactly as cargo emits them.
@@ -55,7 +62,7 @@ fn collect_components(
     metadata: &PackageMetadata,
 ) -> std::result::Result<Components, Error> {
     let inspection = inspect_package(root, metadata.package_name())?;
-    match &inspection.frieze_dependency {
+    let frieze_source = match &inspection.frieze_dependency {
         None => {
             return Err(Error::PackageInspect {
                 message: format!(
@@ -69,13 +76,14 @@ fn collect_components(
         Some(dependency) if !dependency.inventory_enabled() => {
             return Err(Error::InventoryDisabled);
         }
-        Some(_) => {}
-    }
+        Some(dependency) => resolve_frieze_source(dependency, CLI_FRIEZE_VERSION)?,
+    };
     let scratch_dir = prepare_scratch(
         root,
         metadata.package_name(),
         metadata.features(),
         &inspection,
+        &frieze_source,
     )?;
     let stdout = run_scratch(&scratch_dir)?;
     serde_json::from_slice(&stdout).map_err(Error::StdoutParse)
@@ -118,6 +126,13 @@ fn collect_cause(error: Error) -> SchemasCollectCause {
         }
         Error::PackageInspect { message } => SchemasCollectCause::PackageInspect { message },
         Error::InventoryDisabled => SchemasCollectCause::InventoryDisabled,
+        Error::FriezeVersionMismatch {
+            requirement,
+            cli_version,
+        } => SchemasCollectCause::FriezeVersionMismatch {
+            requirement,
+            cli_version,
+        },
         Error::CargoInvocation { exit_code, stderr } => {
             SchemasCollectCause::CargoInvocation { exit_code, stderr }
         }

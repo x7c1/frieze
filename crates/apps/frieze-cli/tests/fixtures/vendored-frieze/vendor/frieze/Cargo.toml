@@ -1,0 +1,7 @@
+# A stand-in for a vendored frieze copy outside a repository checkout.
+# Never built; it only needs to parse for `cargo metadata --no-deps`.
+[package]
+name = "frieze"
+version = "0.1.0"
+edition = "2021"
+publish = false
