@@ -228,8 +228,7 @@ mod tests {
         let manifest =
             scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[], &pinned());
         assert!(
-            manifest
-                .contains("frieze = { version = \"=0.1.0\", features = [\"inventory\"] }"),
+            manifest.contains("frieze = { version = \"=0.1.0\", features = [\"inventory\"] }"),
             "the frieze dependency must pin the exact release:\n{manifest}"
         );
         assert!(
@@ -246,8 +245,7 @@ mod tests {
             frieze_dir: PathBuf::from("/checkout/crates/libs/frieze"),
             usecase_dir: PathBuf::from("/checkout/crates/domain/frieze-usecase"),
         };
-        let manifest =
-            scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[], &source);
+        let manifest = scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[], &source);
         assert!(
             manifest.contains(
                 "frieze = { path = \"/checkout/crates/libs/frieze\", \

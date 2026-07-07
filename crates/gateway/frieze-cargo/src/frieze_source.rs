@@ -81,13 +81,12 @@ pub(crate) fn resolve_frieze_source(
 /// `0.1.3`, `^0.1.4` does not accept `0.1.3`, `=0.1.0` accepts only
 /// `0.1.0`.
 fn requirement_matches(requirement: &str, version: &str) -> Result<bool, Error> {
-    let requirement = semver::VersionReq::parse(requirement).map_err(|cause| {
-        Error::PackageInspect {
+    let requirement =
+        semver::VersionReq::parse(requirement).map_err(|cause| Error::PackageInspect {
             message: format!(
                 "cannot parse the declared frieze version requirement `{requirement}`: {cause}"
             ),
-        }
-    })?;
+        })?;
     let version = semver::Version::parse(version).map_err(|cause| Error::PackageInspect {
         message: format!("cannot parse the frieze version `{version}`: {cause}"),
     })?;
@@ -184,7 +183,10 @@ mod tests {
     #[test]
     fn a_matching_registry_requirement_pins_the_release() {
         let source = resolve_frieze_source(&registry_dependency("^0.1"), "0.1.3").unwrap();
-        assert_eq!(source, FriezeCrateSource::PinnedRelease { version: "0.1.3" });
+        assert_eq!(
+            source,
+            FriezeCrateSource::PinnedRelease { version: "0.1.3" }
+        );
     }
 
     #[test]
@@ -202,11 +204,7 @@ mod tests {
 
     #[test]
     fn a_git_dependency_is_rejected() {
-        let dependency = dependency(
-            "*",
-            None,
-            Some("git+https://github.com/x7c1/frieze#abcdef"),
-        );
+        let dependency = dependency("*", None, Some("git+https://github.com/x7c1/frieze#abcdef"));
         let result = resolve_frieze_source(&dependency, "0.1.0");
         assert!(
             matches!(
