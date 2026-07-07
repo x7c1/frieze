@@ -71,7 +71,12 @@ fn collect_components(
         }
         Some(_) => {}
     }
-    let scratch_dir = prepare_scratch(root, metadata.package_name(), &inspection)?;
+    let scratch_dir = prepare_scratch(
+        root,
+        metadata.package_name(),
+        metadata.features(),
+        &inspection,
+    )?;
     let stdout = run_scratch(&scratch_dir)?;
     serde_json::from_slice(&stdout).map_err(Error::StdoutParse)
 }

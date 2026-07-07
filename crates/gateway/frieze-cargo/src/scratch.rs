@@ -14,7 +14,7 @@
 
 use std::path::{Path, PathBuf};
 
-use frieze_model::{PackageName, PackageRoot};
+use frieze_model::{CargoFeatureName, PackageName, PackageRoot};
 
 use crate::inspect::PackageInspection;
 use crate::Error;
@@ -34,6 +34,7 @@ pub(crate) const LOCAL_CRATES_DIR_ENV: &str = "FRIEZE_LOCAL_CRATES_DIR";
 pub(crate) fn prepare_scratch(
     root: &PackageRoot,
     package_name: &PackageName,
+    features: &[CargoFeatureName],
     inspection: &PackageInspection,
 ) -> Result<PathBuf, Error> {
     let scratch_dir = inspection
@@ -43,7 +44,7 @@ pub(crate) fn prepare_scratch(
     std::fs::create_dir_all(scratch_dir.join("src")).map_err(Error::ScratchIo)?;
     std::fs::write(
         scratch_dir.join("Cargo.toml"),
-        scratch_manifest(root, package_name),
+        scratch_manifest(root, package_name, features),
     )
     .map_err(Error::ScratchTemplateWrite)?;
     std::fs::write(
@@ -59,14 +60,22 @@ pub(crate) fn prepare_scratch(
 ///
 /// The target crate is a path dependency, so cargo's own change
 /// detection rebuilds the scratch binary exactly when the target crate
-/// changed. The `inventory` feature of frieze is always requested here
-/// (the scratch binary is what iterates the registrations); whether
-/// the *target* crate submits anything is governed by the target's own
-/// dependency declaration and checked before this file is written.
+/// changed. The cargo features declared under
+/// `[package.metadata.frieze] features` are transcribed onto that
+/// dependency, so the scratch build compiles the target with exactly
+/// the configuration the metadata asks for. The `inventory` feature of
+/// frieze is always requested here (the scratch binary is what
+/// iterates the registrations); whether the *target* crate submits
+/// anything is governed by the target's own dependency declaration and
+/// checked before this file is written.
 ///
 /// The empty `[workspace]` table keeps the scratch crate a standalone
 /// workspace even when the build directory sits inside the user's.
-fn scratch_manifest(root: &PackageRoot, package_name: &PackageName) -> String {
+fn scratch_manifest(
+    root: &PackageRoot,
+    package_name: &PackageName,
+    features: &[CargoFeatureName],
+) -> String {
     let version = env!("CARGO_PKG_VERSION");
     let (frieze_dep, frieze_usecase_dep) = match std::env::var_os(LOCAL_CRATES_DIR_ENV) {
         Some(dir) => {
@@ -101,7 +110,7 @@ edition = "2021"
 publish = false
 
 [dependencies]
-{package_name} = {{ path = {root_path} }}
+{package_name} = {{ path = {root_path}{features} }}
 frieze = {frieze_dep}
 frieze-usecase = {frieze_usecase_dep}
 serde_json = "1"
@@ -109,7 +118,23 @@ serde_json = "1"
 [workspace]
 "#,
         root_path = toml_string(&root.as_path().display().to_string()),
+        features = features_fragment(features),
     )
+}
+
+/// Renders the `features = [...]` fragment of the target dependency,
+/// or nothing when the metadata declares no features — the minimal
+/// manifest stays minimal.
+fn features_fragment(features: &[CargoFeatureName]) -> String {
+    if features.is_empty() {
+        return String::new();
+    }
+    let list = features
+        .iter()
+        .map(|feature| toml_string(feature.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(", features = [{list}]")
 }
 
 /// Renders the scratch crate's `main.rs`. The only interpolated value
@@ -181,7 +206,7 @@ mod tests {
     fn manifest_declares_the_target_as_a_path_dependency() {
         let dir = tempfile::tempdir().unwrap();
         let root = root_in(dir.path());
-        let manifest = scratch_manifest(&root, &PackageName::new("my-api").unwrap());
+        let manifest = scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[]);
         assert!(manifest.contains("name = \"frieze-scratch-my-api\""));
         assert!(
             manifest.contains(&format!(
@@ -194,6 +219,24 @@ mod tests {
         assert!(
             manifest.contains("\n[workspace]\n"),
             "the scratch crate must opt out of any enclosing workspace"
+        );
+    }
+
+    #[test]
+    fn manifest_transcribes_the_declared_features_onto_the_target_dependency() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = root_in(dir.path());
+        let features = [
+            CargoFeatureName::new("extra").unwrap(),
+            CargoFeatureName::new("json-schema").unwrap(),
+        ];
+        let manifest = scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &features);
+        assert!(
+            manifest.contains(&format!(
+                "my-api = {{ path = \"{}\", features = [\"extra\", \"json-schema\"] }}",
+                root.as_path().display()
+            )),
+            "manifest should enable the declared features on the target:\n{manifest}"
         );
     }
 
