@@ -1,0 +1,22 @@
+# End-to-end fixture: the declared `frieze` version requirement can
+# never match the running cargo-frieze, so the schema collection is
+# rejected with a curated error before any build starts. (Nothing here
+# is ever resolved or built: the CLI inspects the declaration with
+# `cargo metadata --no-deps` only.)
+[package]
+name = "version-skew"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = "=99.99.99"
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"
+
+# This fixture is its own workspace root: without this table, cargo
+# attaches the package to the enclosing repository workspace.
+[workspace]

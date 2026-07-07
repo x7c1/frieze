@@ -1,0 +1,4 @@
+openapi: 3.0.3
+info:
+  title: Vendored Frieze API
+  version: 0.1.0

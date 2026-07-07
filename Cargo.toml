@@ -31,6 +31,8 @@ exclude = [
     "crates/apps/frieze-cli/tests/fixtures/mixed-formats",
     "crates/apps/frieze-cli/tests/fixtures/feature-gated",
     "crates/apps/frieze-cli/tests/fixtures/version-mismatch",
+    "crates/apps/frieze-cli/tests/fixtures/version-skew",
+    "crates/apps/frieze-cli/tests/fixtures/vendored-frieze",
     "crates/apps/frieze-cli/tests/fixtures/unknown-key",
     "crates/apps/frieze-cli/tests/fixtures/bad-extension",
     "crates/apps/frieze-cli/tests/fixtures/workspace",
@@ -39,15 +41,22 @@ exclude = [
     "crates/apps/frieze-cli/tests/fixtures/workspace-unknown-key",
 ]
 
+# Shared crates.io metadata: every crate in this workspace is
+# published, ships the same version (see RELEASING.md), and inherits
+# the repository README as its crates.io landing page.
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/x7c1/frieze"
+readme = "README.md"
+keywords = ["openapi", "swagger", "schema", "derive", "codegen"]
+categories = ["web-programming", "development-tools"]
 
 [workspace.dependencies]
 indexmap = { version = "2.14", features = ["serde"] }
 inventory = "0.3"
+semver = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"

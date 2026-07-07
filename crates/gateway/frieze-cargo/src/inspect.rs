@@ -34,8 +34,18 @@ pub(crate) struct PackageInspection {
 /// The shape of the target package's declared `frieze` dependency.
 #[derive(Debug)]
 pub(crate) struct FriezeDependency {
-    uses_default_features: bool,
-    features: Vec<String>,
+    pub(crate) uses_default_features: bool,
+    pub(crate) features: Vec<String>,
+    /// The declared version requirement, as cargo normalizes it
+    /// (`"0.1"` becomes `"^0.1"`; a requirement-less path dependency
+    /// reports `"*"`).
+    pub(crate) requirement: String,
+    /// The resolved directory of a path dependency; `None` for
+    /// registry and git sources.
+    pub(crate) path: Option<PathBuf>,
+    /// The dependency source (`registry+...`, `git+...`); `None` for
+    /// path dependencies.
+    pub(crate) source: Option<String>,
 }
 
 impl FriezeDependency {
@@ -134,7 +144,12 @@ pub(crate) fn parse_inspection(
         .as_array()
         .into_iter()
         .flatten()
-        .find(|dependency| dependency["name"].as_str() == Some("frieze"))
+        // Only a normal dependency (`kind: null`) makes the derive
+        // output part of the lib target; a dev- or build-dependency
+        // registers nothing the scratch binary could collect.
+        .find(|dependency| {
+            dependency["name"].as_str() == Some("frieze") && dependency["kind"].is_null()
+        })
         .map(|dependency| FriezeDependency {
             uses_default_features: dependency["uses_default_features"]
                 .as_bool()
@@ -145,6 +160,9 @@ pub(crate) fn parse_inspection(
                 .flatten()
                 .filter_map(|feature| feature.as_str().map(str::to_owned))
                 .collect(),
+            requirement: dependency["req"].as_str().unwrap_or("*").to_owned(),
+            path: dependency["path"].as_str().map(PathBuf::from),
+            source: dependency["source"].as_str().map(str::to_owned),
         });
     Ok(PackageInspection {
         target_directory,
@@ -167,6 +185,8 @@ fn inspect_error(message: String) -> Error {
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use super::*;
 
     fn canned_metadata(dependencies: Value) -> Value {
@@ -233,6 +253,56 @@ mod tests {
                 "feature `{feature}` should re-enable inventory"
             );
         }
+    }
+
+    #[test]
+    fn the_dependency_requirement_path_and_source_are_extracted() {
+        let json = canned_metadata(serde_json::json!([{
+            "name": "frieze",
+            "uses_default_features": true,
+            "features": [],
+            "req": "^0.1",
+            "source": "registry+https://github.com/rust-lang/crates.io-index",
+        }]));
+        let inspection = parse_inspection(&json, &package_name()).unwrap();
+        let dependency = inspection.frieze_dependency.unwrap();
+        assert_eq!(dependency.requirement, "^0.1");
+        assert!(dependency.path.is_none());
+        assert_eq!(
+            dependency.source.as_deref(),
+            Some("registry+https://github.com/rust-lang/crates.io-index")
+        );
+
+        let json = canned_metadata(serde_json::json!([{
+            "name": "frieze",
+            "uses_default_features": true,
+            "features": [],
+            "req": "*",
+            "path": "/work/frieze/crates/libs/frieze",
+            "source": null,
+        }]));
+        let inspection = parse_inspection(&json, &package_name()).unwrap();
+        let dependency = inspection.frieze_dependency.unwrap();
+        assert_eq!(dependency.requirement, "*");
+        assert_eq!(
+            dependency.path.as_deref(),
+            Some(Path::new("/work/frieze/crates/libs/frieze"))
+        );
+        assert!(dependency.source.is_none());
+    }
+
+    #[test]
+    fn a_dev_only_frieze_dependency_does_not_count() {
+        // Only a normal dependency links the derive output into the
+        // lib target; a dev-dependency must not satisfy the check.
+        let json = canned_metadata(serde_json::json!([{
+            "name": "frieze",
+            "uses_default_features": true,
+            "features": [],
+            "kind": "dev",
+        }]));
+        let inspection = parse_inspection(&json, &package_name()).unwrap();
+        assert!(inspection.frieze_dependency.is_none());
     }
 
     #[test]

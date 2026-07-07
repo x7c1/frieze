@@ -4,6 +4,9 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Generate OpenAPI Schema Objects from Rust types via proc-macros."
 
 [features]
@@ -21,9 +24,12 @@ frieze-model.workspace = true
 frieze-macros.workspace = true
 inventory = { workspace = true, optional = true }
 
+# The internal dev-dependencies deliberately carry no `version`:
+# version-less path dev-dependencies are stripped by `cargo publish`,
+# so the published package does not depend on them being released.
 [dev-dependencies]
-frieze-openapi.workspace = true
-frieze-usecase.workspace = true
+frieze-openapi = { path = "../frieze-openapi" }
+frieze-usecase = { path = "../../domain/frieze-usecase" }
 insta.workspace = true
 serde.workspace = true
 serde_json.workspace = true

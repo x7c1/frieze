@@ -393,6 +393,22 @@ fn schemas_collect_inventory_disabled() {
 }
 
 #[test]
+fn schemas_collect_frieze_version_mismatch() {
+    assert_eq!(
+        schemas_collect(SchemasCollectCause::FriezeVersionMismatch {
+            requirement: "^0.2".to_string(),
+            cli_version: "0.1.0".to_string(),
+        }),
+        "failed to collect schemas from the target crate: the target \
+         crate requires `frieze = \"^0.2\"`, which does not match the \
+         frieze version this cargo-frieze collects with (0.1.0): align \
+         the crate's frieze dependency with the installed CLI, or \
+         install the matching CLI with \
+         `cargo install frieze-cli --version 0.1.0`"
+    );
+}
+
+#[test]
 fn output_write_causes() {
     let paths = paths();
     let render = |cause: OutputWriteCause| {

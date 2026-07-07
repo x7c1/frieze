@@ -1,0 +1,23 @@
+# End-to-end fixture: the `frieze` path dependency points at a
+# vendored copy that is not a checkout of the frieze repository, so
+# the companion `frieze-usecase` crate cannot be located next to it.
+# The run must fail with a curated error before any build starts.
+[package]
+name = "vendored-frieze"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+frieze = { path = "vendor/frieze" }
+
+[[package.metadata.frieze.outputs]]
+name    = "default"
+partial = "openapi/partial.yaml"
+output  = "generated/openapi.yaml"
+
+# This fixture is its own workspace root: without this table, cargo
+# attaches the package to the enclosing repository workspace. The
+# vendored path dependency below is pulled in as a member of this
+# fixture workspace automatically.
+[workspace]

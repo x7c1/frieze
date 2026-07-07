@@ -4,12 +4,16 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 description = "Cargo gateway for frieze: collects registered schemas by building and running a scratch crate."
 
 [dependencies]
 frieze-model.workspace = true
 frieze-openapi.workspace = true
 frieze-usecase.workspace = true
+semver.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 [dev-dependencies]

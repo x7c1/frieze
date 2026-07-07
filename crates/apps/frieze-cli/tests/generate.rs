@@ -18,9 +18,10 @@
 //!   same types.
 //!
 //! Configuration mistakes (an unknown key, an unsupported output
-//! extension, an `oas-version` mismatch) are covered by dedicated
-//! fixtures whose runs fail before any build starts — those tests are
-//! cheap and skip the build lock.
+//! extension, an `oas-version` mismatch, a frieze version requirement
+//! the CLI cannot match, a frieze path dependency outside a checkout)
+//! are covered by dedicated fixtures whose runs fail before any build
+//! starts — those tests are cheap and skip the build lock.
 //!
 //! Workspace fixtures (`workspace`, `virtual-workspace`, plus two
 //! buildless error fixtures) exercise target-package resolution: the
@@ -60,9 +61,11 @@ fn fixture_dir(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// Runs `cargo-frieze generate` inside the fixture directory, with the
-/// scratch crate's frieze dependencies redirected to this checkout and
-/// a per-fixture build directory.
+/// Runs `cargo-frieze generate` inside the fixture directory with a
+/// per-fixture build directory. The fixtures declare `frieze` as a
+/// path dependency into this checkout, so the generated scratch crate
+/// mirrors that path (the collector's rule for path-declared frieze)
+/// and the runs never touch crates.io.
 fn run_generate(fixture: &str) -> std::process::Output {
     run_generate_args(fixture, &[])
 }
@@ -80,7 +83,6 @@ fn run_generate_from(fixture: &str, subdir: &str, args: &[&str]) -> std::process
         .arg("generate")
         .args(args)
         .current_dir(fixture_dir(fixture).join(subdir))
-        .env("FRIEZE_LOCAL_CRATES_DIR", repo_root())
         .env(
             "CARGO_TARGET_DIR",
             repo_root().join("target/e2e").join(fixture),
@@ -696,6 +698,63 @@ fn an_unknown_workspace_metadata_key_suggests_the_intended_one() {
             && stderr.contains("did you mean `package`?"),
         "stderr should reject the typo with a suggestion, got:\n{stderr}"
     );
+}
+
+#[test]
+fn a_frieze_requirement_the_cli_cannot_match_is_a_curated_error() {
+    // No lock: the run fails at the version-requirement check inside
+    // the package inspection, before any build.
+    let fixture = fixture_dir("version-skew");
+    let output_file = fixture.join("generated/openapi.yaml");
+    let _ = std::fs::remove_file(&output_file);
+
+    let output = run_generate("version-skew");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "generate must fail on the frieze version skew"
+    );
+    // The message names both sides — the declared requirement and the
+    // CLI's frieze version — plus the two ways out. The CLI version in
+    // the message is this workspace's shared version, which is also
+    // this test binary's own package version.
+    let cli_version = env!("CARGO_PKG_VERSION");
+    for needle in [
+        "requires `frieze = \"=99.99.99\"`",
+        &format!("this cargo-frieze collects with ({cli_version})"),
+        &format!("cargo install frieze-cli --version {cli_version}"),
+    ] {
+        assert!(
+            stderr.contains(needle),
+            "stderr should contain {needle:?}, got:\n{stderr}"
+        );
+    }
+    assert!(
+        !output_file.exists(),
+        "no output may be written when collection is rejected"
+    );
+}
+
+#[test]
+fn a_frieze_path_dependency_outside_a_checkout_is_a_curated_error() {
+    // No lock: locating frieze-usecase next to the vendored path fails
+    // inside the package inspection, before any build.
+    let output = run_generate("vendored-frieze");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !output.status.success(),
+        "generate must fail for a frieze path outside a checkout"
+    );
+    for needle in [
+        "does not sit inside a checkout of the frieze repository",
+        "frieze-usecase",
+        "vendor/frieze",
+    ] {
+        assert!(
+            stderr.contains(needle),
+            "stderr should contain {needle:?}, got:\n{stderr}"
+        );
+    }
 }
 
 #[test]

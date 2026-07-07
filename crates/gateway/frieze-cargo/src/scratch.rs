@@ -16,18 +16,9 @@ use std::path::{Path, PathBuf};
 
 use frieze_model::{CargoFeatureName, PackageName, PackageRoot};
 
+use crate::frieze_source::FriezeCrateSource;
 use crate::inspect::PackageInspection;
 use crate::Error;
-
-/// The environment variable that redirects the scratch crate's
-/// `frieze` / `frieze-usecase` dependencies to a local checkout of
-/// this workspace (its value is the checkout's root directory).
-///
-/// This exists for this repository's own end-to-end tests, which must
-/// resolve the unpublished frieze crates by path; it is not part of
-/// the public contract. When unset, the scratch crate depends on the
-/// crates.io releases pinned to this crate's own version.
-pub(crate) const LOCAL_CRATES_DIR_ENV: &str = "FRIEZE_LOCAL_CRATES_DIR";
 
 /// Writes (or rewrites) the scratch crate for `package_name` and
 /// returns its directory.
@@ -36,6 +27,7 @@ pub(crate) fn prepare_scratch(
     package_name: &PackageName,
     features: &[CargoFeatureName],
     inspection: &PackageInspection,
+    frieze_source: &FriezeCrateSource,
 ) -> Result<PathBuf, Error> {
     let scratch_dir = inspection
         .target_directory
@@ -44,7 +36,7 @@ pub(crate) fn prepare_scratch(
     std::fs::create_dir_all(scratch_dir.join("src")).map_err(Error::ScratchIo)?;
     std::fs::write(
         scratch_dir.join("Cargo.toml"),
-        scratch_manifest(root, package_name, features),
+        scratch_manifest(root, package_name, features, frieze_source),
     )
     .map_err(Error::ScratchTemplateWrite)?;
     std::fs::write(
@@ -69,33 +61,35 @@ pub(crate) fn prepare_scratch(
 /// anything is governed by the target's own dependency declaration and
 /// checked before this file is written.
 ///
+/// The `frieze` / `frieze-usecase` dependencies follow the resolved
+/// [`FriezeCrateSource`]: the crates.io releases pinned to this
+/// crate's own version, or — when the target itself declares `frieze`
+/// as a path dependency — the same local checkout, so both crates
+/// resolve one frieze instance either way.
+///
 /// The empty `[workspace]` table keeps the scratch crate a standalone
 /// workspace even when the build directory sits inside the user's.
 fn scratch_manifest(
     root: &PackageRoot,
     package_name: &PackageName,
     features: &[CargoFeatureName],
+    frieze_source: &FriezeCrateSource,
 ) -> String {
-    let version = env!("CARGO_PKG_VERSION");
-    let (frieze_dep, frieze_usecase_dep) = match std::env::var_os(LOCAL_CRATES_DIR_ENV) {
-        Some(dir) => {
-            let dir = Path::new(&dir);
-            (
-                format!(
-                    "{{ path = {}, features = [\"inventory\"] }}",
-                    toml_string(&dir.join("crates/libs/frieze").display().to_string())
-                ),
-                format!(
-                    "{{ path = {} }}",
-                    toml_string(
-                        &dir.join("crates/domain/frieze-usecase")
-                            .display()
-                            .to_string()
-                    )
-                ),
-            )
-        }
-        None => (
+    let (frieze_dep, frieze_usecase_dep) = match frieze_source {
+        FriezeCrateSource::LocalCheckout {
+            frieze_dir,
+            usecase_dir,
+        } => (
+            format!(
+                "{{ path = {}, features = [\"inventory\"] }}",
+                toml_string(&frieze_dir.display().to_string())
+            ),
+            format!(
+                "{{ path = {} }}",
+                toml_string(&usecase_dir.display().to_string())
+            ),
+        ),
+        FriezeCrateSource::PinnedRelease { version } => (
             format!("{{ version = \"={version}\", features = [\"inventory\"] }}"),
             format!("{{ version = \"={version}\" }}"),
         ),
@@ -202,11 +196,16 @@ mod tests {
         PackageRoot::try_from_path(dir).unwrap()
     }
 
+    fn pinned() -> FriezeCrateSource {
+        FriezeCrateSource::PinnedRelease { version: "0.1.0" }
+    }
+
     #[test]
     fn manifest_declares_the_target_as_a_path_dependency() {
         let dir = tempfile::tempdir().unwrap();
         let root = root_in(dir.path());
-        let manifest = scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[]);
+        let manifest =
+            scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[], &pinned());
         assert!(manifest.contains("name = \"frieze-scratch-my-api\""));
         assert!(
             manifest.contains(&format!(
@@ -223,6 +222,45 @@ mod tests {
     }
 
     #[test]
+    fn manifest_pins_the_frieze_release_to_the_exact_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = root_in(dir.path());
+        let manifest =
+            scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[], &pinned());
+        assert!(
+            manifest.contains("frieze = { version = \"=0.1.0\", features = [\"inventory\"] }"),
+            "the frieze dependency must pin the exact release:\n{manifest}"
+        );
+        assert!(
+            manifest.contains("frieze-usecase = { version = \"=0.1.0\" }"),
+            "the frieze-usecase dependency must pin the same release:\n{manifest}"
+        );
+    }
+
+    #[test]
+    fn manifest_mirrors_a_local_checkout() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = root_in(dir.path());
+        let source = FriezeCrateSource::LocalCheckout {
+            frieze_dir: PathBuf::from("/checkout/crates/libs/frieze"),
+            usecase_dir: PathBuf::from("/checkout/crates/domain/frieze-usecase"),
+        };
+        let manifest = scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &[], &source);
+        assert!(
+            manifest.contains(
+                "frieze = { path = \"/checkout/crates/libs/frieze\", \
+                 features = [\"inventory\"] }"
+            ),
+            "the frieze dependency must mirror the checkout path:\n{manifest}"
+        );
+        assert!(
+            manifest
+                .contains("frieze-usecase = { path = \"/checkout/crates/domain/frieze-usecase\" }"),
+            "the frieze-usecase dependency must come from the same checkout:\n{manifest}"
+        );
+    }
+
+    #[test]
     fn manifest_transcribes_the_declared_features_onto_the_target_dependency() {
         let dir = tempfile::tempdir().unwrap();
         let root = root_in(dir.path());
@@ -230,7 +268,12 @@ mod tests {
             CargoFeatureName::new("extra").unwrap(),
             CargoFeatureName::new("json-schema").unwrap(),
         ];
-        let manifest = scratch_manifest(&root, &PackageName::new("my-api").unwrap(), &features);
+        let manifest = scratch_manifest(
+            &root,
+            &PackageName::new("my-api").unwrap(),
+            &features,
+            &pinned(),
+        );
         assert!(
             manifest.contains(&format!(
                 "my-api = {{ path = \"{}\", features = [\"extra\", \"json-schema\"] }}",
