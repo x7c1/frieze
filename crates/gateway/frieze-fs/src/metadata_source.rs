@@ -264,7 +264,9 @@ fn required_str<'a>(
 }
 
 /// Rejects any key of `table` outside `known`, so typos surface as
-/// errors instead of silently changing behaviour.
+/// errors instead of silently changing behaviour. A key within a small
+/// edit distance of a known one is reported with that key as a
+/// suggestion.
 fn reject_unknown_keys(
     table: &toml::map::Map<String, Value>,
     known: &[&str],
@@ -277,6 +279,7 @@ fn reject_unknown_keys(
             MetadataReadCause::UnknownKey {
                 key: key.clone(),
                 table: table_name.to_string(),
+                suggestion: crate::edit_distance::suggest(key, known).map(str::to_string),
             },
         )),
         None => Ok(()),
@@ -502,11 +505,31 @@ output  = "openapi/openapi.yaml"
             matches!(
                 &result,
                 Err(Error::MetadataRead {
-                    cause: MetadataReadCause::UnknownKey { key, table },
+                    cause: MetadataReadCause::UnknownKey { key, table, suggestion },
                     ..
-                }) if key == "outpts" && table == SECTION_TABLE
+                }) if key == "outpts"
+                    && table == SECTION_TABLE
+                    && suggestion.as_deref() == Some("outputs")
             ),
-            "expected the unknown key to be rejected, got {result:?}"
+            "expected the unknown key to be rejected with a suggestion, got {result:?}"
+        );
+    }
+
+    #[test]
+    fn unknown_section_key_without_a_near_miss_gets_no_suggestion() {
+        let manifest = "[package]\nname = \"my-api\"\n\
+                        [package.metadata.frieze]\ntargets = []\n";
+        let fixture = fixture(manifest);
+        let result = FsMetadataSource::new().read(&fixture.root);
+        assert!(
+            matches!(
+                &result,
+                Err(Error::MetadataRead {
+                    cause: MetadataReadCause::UnknownKey { key, suggestion, .. },
+                    ..
+                }) if key == "targets" && suggestion.is_none()
+            ),
+            "expected no suggestion for a distant key, got {result:?}"
         );
     }
 
@@ -523,16 +546,28 @@ output  = "openapi/openapi.yaml"
 "#;
         let fixture = fixture(manifest);
         let result = FsMetadataSource::new().read(&fixture.root);
-        assert!(
-            matches!(
-                &result,
-                Err(Error::MetadataRead {
-                    cause: MetadataReadCause::UnknownKey { key, table },
+        match &result {
+            Err(
+                error @ Error::MetadataRead {
+                    cause: MetadataReadCause::UnknownKey {
+                        key,
+                        table,
+                        suggestion,
+                    },
                     ..
-                }) if key == "parital" && table == OUTPUTS_TABLE
-            ),
-            "expected the typo key to be rejected, got {result:?}"
-        );
+                },
+            ) => {
+                assert_eq!(key, "parital");
+                assert_eq!(table, OUTPUTS_TABLE);
+                assert_eq!(suggestion.as_deref(), Some("partial"));
+                // The rendered message carries the suggestion.
+                assert!(
+                    error.to_string().contains("did you mean `partial`?"),
+                    "got: {error}"
+                );
+            }
+            other => panic!("expected the typo key to be rejected, got {other:?}"),
+        }
     }
 
     #[test]

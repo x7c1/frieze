@@ -130,9 +130,16 @@ pub enum MetadataReadCause {
     MissingPackageTable,
     /// A table under `[package.metadata.frieze]` contains a key the
     /// schema does not define. Unknown keys are rejected rather than
-    /// silently ignored.
-    #[error("unknown key `{key}` in `{table}`")]
-    UnknownKey { key: String, table: String },
+    /// silently ignored; when the key is a near-miss of a known one,
+    /// the message suggests it.
+    #[error("unknown key `{key}` in `{table}`{}", render_suggestion(suggestion))]
+    UnknownKey {
+        key: String,
+        table: String,
+        /// The closest known key of the table, when one is within a
+        /// small edit distance of `key`.
+        suggestion: Option<String>,
+    },
     /// A required key is absent from one of the frieze metadata
     /// tables.
     #[error("missing required key `{key}` in `{table}`")]
@@ -202,6 +209,15 @@ pub enum SchemasCollectCause {
          so its schemas cannot be collected"
     )]
     InventoryDisabled,
+}
+
+/// Renders the `did you mean` suffix of an unknown-key message, or
+/// nothing when no known key is close enough to suggest.
+fn render_suggestion(suggestion: &Option<String>) -> String {
+    match suggestion {
+        Some(key) => format!(" (did you mean `{key}`?)"),
+        None => String::new(),
+    }
 }
 
 /// Renders the detail suffix of a failed cargo invocation: the exit
