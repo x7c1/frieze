@@ -164,7 +164,7 @@ fn attach_description(mut schema: ObjectSchema, description: Option<&str>) -> Ob
 /// `nullable: true` under OAS 3.0, `oneOf` against `{type: "null"}`
 /// under 3.1) is synthesized at serialization time.
 ///
-/// References whose name maps to one of the nine primitive scalar
+/// References whose name maps to one of the eleven primitive scalar
 /// conventions ([`primitive_property_type_for`]) are **inlined** at the
 /// leaf position as the matching scalar shape (`{type: integer, format:
 /// int64}`, `{type: string}`, ...). Generic derive output for
@@ -186,6 +186,12 @@ fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
         // string under serde's default representation, so the declared
         // `format` matches the actual wire shape.
         PropertyType::Uuid => (SchemaType::String, Some("uuid"), None),
+        // `chrono::DateTime<Tz>` serializes as an RFC 3339 timestamp for
+        // every time zone, and `chrono::NaiveDate` as an ISO 8601
+        // calendar date, both under serde's default representation — so
+        // the declared `format` matches the actual wire shape.
+        PropertyType::DateTime => (SchemaType::String, Some("date-time"), None),
+        PropertyType::Date => (SchemaType::String, Some("date"), None),
         PropertyType::Array(inner) => {
             return ObjectSchema {
                 ty: Some(SchemaType::Array),

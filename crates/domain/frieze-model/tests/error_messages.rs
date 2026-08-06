@@ -47,10 +47,10 @@ fn reserved_schema_name() {
         error.to_string(),
         "schema `Int64` is registered under a name reserved for a \
          primitive scalar (Int32 / Int64 / UInt32 / UInt64 / Float / \
-         Double / Boolean / String / Uuid); references to it would be \
-         inlined as that scalar instead of pointing at the schema \
-         (rename the Rust type, or put it under a `#[frieze(namespace)]` \
-         `mod` so its registered name carries that mod's ident as a \
-         prefix)"
+         Double / Boolean / String / Uuid / DateTime / Date); references \
+         to it would be inlined as that scalar instead of pointing at \
+         the schema (rename the Rust type, or put it under a \
+         `#[frieze(namespace)]` `mod` so its registered name carries \
+         that mod's ident as a prefix)"
     );
 }

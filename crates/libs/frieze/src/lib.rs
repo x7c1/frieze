@@ -38,6 +38,30 @@
 //!
 //! Enabling the feature does not put `uuid` into the consumer's
 //! namespace — depend on `uuid` 1.x directly as well to name the type.
+//!
+//! # chrono date/time fields (the `chrono04` feature)
+//!
+//! The opt-in `chrono04` Cargo feature (off by default) implements
+//! [`Schema`] and [`Register`] for `chrono::DateTime<Tz>` and
+//! `chrono::NaiveDate`, naming their schemas `DateTime` and `Date`.
+//! The `DateTime<Tz>` impl is blanket over every
+//! `Tz: chrono::TimeZone`, so the schema name carries no time zone.
+//! Fields of those types emit `{type: string, format: date-time}` and
+//! `{type: string, format: date}` respectively, matching chrono's
+//! serde defaults (an RFC 3339 timestamp and an ISO 8601 calendar
+//! date).
+//!
+//! `chrono::NaiveDateTime` is deliberately left without an impl: it
+//! carries no UTC offset, so its serde output is not an RFC 3339
+//! `date-time`, and a field of that type fails with a trait-bound
+//! error rather than being mapped to a format it does not honour.
+//!
+//! As with the Rust primitives, neither type gets an [`IsRegistrable`]
+//! impl — the shapes are inlined at every reference position — and the
+//! names `DateTime` / `Date` are reserved by [`SchemasBuilder`] whether
+//! or not the feature is on. Enabling the feature does not put `chrono`
+//! into the consumer's namespace: depend on `chrono` 0.4 directly as
+//! well to name the types.
 
 pub use frieze_macros::{frieze, Schema};
 

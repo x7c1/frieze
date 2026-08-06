@@ -9,14 +9,16 @@ unit-variant enum is also a valid field type; it rides on the same
 
 ## Scalars
 
-| Scalar Rust type | Maps to OAS                                            |
-|------------------|--------------------------------------------------------|
-| `i32`, `i64`     | `type: integer, format: int32 / int64`                 |
-| `u32`, `u64`     | `type: integer, format: int32 / int64, minimum: 0`     |
-| `f32`, `f64`     | `type: number, format: float / double`                 |
-| `bool`           | `type: boolean`                                        |
-| `String`         | `type: string`                                         |
-| `uuid::Uuid`     | `type: string, format: uuid` (`uuid1` feature)         |
+| Scalar Rust type       | Maps to OAS                                            |
+|------------------------|--------------------------------------------------------|
+| `i32`, `i64`           | `type: integer, format: int32 / int64`                 |
+| `u32`, `u64`           | `type: integer, format: int32 / int64, minimum: 0`     |
+| `f32`, `f64`           | `type: number, format: float / double`                 |
+| `bool`                 | `type: boolean`                                        |
+| `String`               | `type: string`                                         |
+| `uuid::Uuid`           | `type: string, format: uuid` (`uuid1` feature)         |
+| `chrono::DateTime<Tz>` | `type: string, format: date-time` (`chrono04` feature) |
+| `chrono::NaiveDate`    | `type: string, format: date` (`chrono04` feature)      |
 
 `T` below stands for any of these scalars; `U` stands for another
 `Schema`-deriving struct.
@@ -83,22 +85,110 @@ The **name** `Uuid` is
 [reserved](#primitive-scalar-names-are-reserved) whether or not the
 feature is enabled.
 
+### chrono date and time (`chrono04` feature)
+
+`chrono::DateTime<Tz>` and `chrono::NaiveDate` are opt-in scalars:
+enable the `chrono04` feature on the `frieze` dependency to make them
+usable as field types, and depend on the `chrono` crate yourself. The
+feature only turns on frieze's impls for those types — it does not put
+`chrono` into your crate's namespace, so without your own `Cargo.toml`
+entry, `use chrono::NaiveDate;` does not resolve.
+
+```toml
+frieze = { version = "...", features = ["chrono04"] }
+chrono = { version = "0.4", features = ["serde"] }
+```
+
+The `04` in `chrono04` is chrono's `0.4` release series: chrono is
+still pre-1.0, so `0.4` is the range Cargo treats as compatible, and
+`chrono = "0.4"` is the entry to declare. A `DateTime` from another
+series is a different type that does not implement `Schema`, so such a
+field fails with a trait-bound error. The `serde` feature belongs to
+`chrono`, not to frieze — frieze never serializes your struct, but a
+struct that derives `Serialize` / `Deserialize` around a chrono field
+does not compile without it.
+
+```rust
+use chrono::{DateTime, NaiveDate, Utc};
+use frieze::Schema;
+
+#[derive(Schema)]
+struct Booking {
+    created_at: DateTime<Utc>,
+    checkout_on: NaiveDate,
+}
+```
+
+```yaml
+Booking:
+  type: object
+  required: [created_at, checkout_on]
+  properties:
+    created_at: { type: string, format: date-time }
+    checkout_on: { type: string, format: date }
+```
+
+Both formats are accurate against chrono's serde defaults:
+`DateTime<Tz>` writes an RFC 3339 timestamp and `NaiveDate` an ISO 8601
+calendar date (`2015-09-18`), and frieze rejects at compile time every
+serde attribute that would change a field's wire representation; see
+[Other `#[serde(...)]` attributes](#other-serde-attributes-unsupported).
+
+The time zone is part of the Rust type but not of the schema:
+`DateTime<Utc>`, `DateTime<FixedOffset>`, and `DateTime<Local>` all
+name the schema `DateTime` and all emit
+`{type: string, format: date-time}`, because every one of them
+serializes as an RFC 3339 string carrying its own offset. Those three
+are also the only time zones chrono implements `Deserialize` for: a
+field typed with another `Tz` (`chrono_tz::Tz`, say) still gets its
+schema, but `#[derive(Deserialize)]` on the struct fails to compile,
+and the usual `deserialize_with` escape hatch is
+[rejected](#other-serde-attributes-unsupported) by frieze.
+
+The [qualified-path restriction](#restrictions-on-field-position-types)
+applies as usual, so write `DateTime<Utc>` rather than
+`chrono::DateTime<chrono::Utc>`.
+
+Both types compose with `Option`, `Vec`, and `Maybe` under the same
+[composite-shape rules](#composite-shapes-presence-x-nullability) as
+every other scalar. Because they are leaf scalars rather than `$ref`s,
+the nullable forms are the plain scalar ones (`nullable: true` under
+OAS 3.0, `type: [string, "null"]` under 3.1), not the `allOf` / `oneOf`
+reference wraps.
+
+The **names** `DateTime` and `Date` are
+[reserved](#primitive-scalar-names-are-reserved) whether or not the
+feature is enabled.
+
+#### `NaiveDateTime` is not supported
+
+`chrono::NaiveDateTime` has **no** `Schema` impl, so a field of that
+type fails with the usual trait-bound error. This is deliberate: a
+naive timestamp carries no UTC offset, and serde writes it as
+`2015-09-18T23:56:04` — which is not an RFC 3339 `date-time`. Mapping
+it to `format: date-time` anyway would break the rule that the declared
+format describes what actually goes on the wire. Use `DateTime<Utc>`
+(or another `Tz`) when the value is a real instant; if a naive
+timestamp genuinely is the wire format, model the field as `String`.
+
 ### Primitive `Schema` implementations
 
 Primitive scalar types implement the `Schema` trait directly, with
 schema names that follow the OAS type/format convention:
 
-| Rust   | `<Type as Schema>::name()` |
-|--------|----------------------------|
-| `i32`  | `Int32`                    |
-| `i64`  | `Int64`                    |
-| `u32`  | `UInt32`                   |
-| `u64`  | `UInt64`                   |
-| `f32`  | `Float`                    |
-| `f64`  | `Double`                   |
-| `bool` | `Boolean`                  |
-| `String` | `String`                 |
-| `uuid::Uuid` | `Uuid`               |
+| Rust                   | `<Type as Schema>::name()` |
+|------------------------|----------------------------|
+| `i32`                  | `Int32`                    |
+| `i64`                  | `Int64`                    |
+| `u32`                  | `UInt32`                   |
+| `u64`                  | `UInt64`                   |
+| `f32`                  | `Float`                    |
+| `f64`                  | `Double`                   |
+| `bool`                 | `Boolean`                  |
+| `String`               | `String`                   |
+| `uuid::Uuid`           | `Uuid`                     |
+| `chrono::DateTime<Tz>` | `DateTime`                 |
+| `chrono::NaiveDate`    | `Date`                     |
 
 The primary purpose of these impls is to let primitives appear as
 generic arguments — `Box<i64>`, `Page<String>`, etc. — so that derive
@@ -379,13 +469,13 @@ Int64_Container:
 No `components/schemas/Int64` entry is emitted, no
 `Schemas::add::<i64>()` call is needed, and
 `Schemas::add::<Container<i64>>().build()` succeeds standalone. The
-same inline treatment applies to all nine primitive scalars (`Int32`,
+same inline treatment applies to all eleven primitive scalars (`Int32`,
 `Int64`, `UInt32`, `UInt64`, `Float`, `Double`, `Boolean`, `String`,
-`Uuid`).
+`Uuid`, `DateTime`, `Date`).
 
 ### Primitive scalar names are reserved
 
-Because every reference to those nine names is inlined, registering
+Because every reference to those eleven names is inlined, registering
 your own schema under one of them would produce an entry that nothing
 can ever point at. `SchemasBuilder::build` therefore rejects it:
 
@@ -424,9 +514,11 @@ With `default-features = false` the attribute has no effect on the
 registered name, so renaming is the only remedy in that configuration.
 
 The reservation itself is feature-independent: `Uuid` is rejected even
-in a build without the [`uuid1` feature](#uuiduuid-uuid1-feature),
-because the inlining that makes the name unreachable happens in the
-boundary conversion, which has no view of the feature.
+in a build without the [`uuid1` feature](#uuiduuid-uuid1-feature), and
+`DateTime` / `Date` even without the
+[`chrono04` feature](#chrono-date-and-time-chrono04-feature), because
+the inlining that makes the name unreachable happens in the boundary
+conversion, which has no view of the features.
 
 ### Owned-wrapper composition
 

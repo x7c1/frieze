@@ -55,22 +55,25 @@ the release order.
    - the `version = "..."` of every internal crate entry under
      `[workspace.dependencies]` (these become the version requirements
      of the published manifests, so they must name the new version).
-2. **Run the verification matrix** (all ten commands must pass;
+2. **Run the verification matrix** (all thirteen commands must pass;
    `cargo test --workspace` includes the end-to-end suite, and the
-   `-p frieze --features uuid1` runs are the only ones that compile the
-   `uuid::Uuid` impls):
+   `-p frieze --features uuid1` / `--features chrono04` runs are the
+   only ones that compile the `uuid::Uuid` and chrono impls):
 
    ```console
    cargo fmt --all -- --check
    cargo build  --workspace
    cargo build  --workspace --no-default-features
    cargo build  -p frieze --features uuid1
+   cargo build  -p frieze --features chrono04
    cargo clippy --workspace --all-targets -- -D warnings
    cargo clippy --workspace --all-targets --no-default-features -- -D warnings
    cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings
+   cargo clippy -p frieze --all-targets --features chrono04 -- -D warnings
    cargo test   --workspace
    cargo test   --workspace --no-default-features
    cargo test   -p frieze --features uuid1
+   cargo test   -p frieze --features chrono04
    ```
 
 3. **Dry-run the publish** — packages, verifies, and orders all nine

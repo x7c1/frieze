@@ -28,14 +28,15 @@ impl SchemasBuilder {
     /// dedup — the normal case for a transitive root reached through
     /// multiple paths.
     ///
-    /// A name that exactly matches one of the nine primitive scalar
+    /// A name that exactly matches one of the eleven primitive scalar
     /// names ([`primitive_property_type_for`]) is likewise recorded and
     /// reported as [`Error::ReservedSchemaName`]. Every registration
     /// path (`add::<T>()`, transitive `register_into`, inventory
     /// collection) funnels through here, so hooking the check at this
-    /// point covers all of them. The set is feature-independent:
-    /// `Uuid` is reserved even when the `uuid1` feature is off, because
-    /// the boundary inlines a `Reference("Uuid")` either way.
+    /// point covers all of them. The set is feature-independent: `Uuid`
+    /// is reserved even when the `uuid1` feature is off, and `DateTime`
+    /// / `Date` even when `chrono04` is off, because the boundary
+    /// inlines the matching `Reference(...)` either way.
     pub fn push_unique(&mut self, schema: ModelSchema) {
         let Some(name) = schema.name().cloned() else {
             // Schemas with no registration name (e.g. `Schema::Scalar`)

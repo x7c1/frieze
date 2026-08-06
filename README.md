@@ -360,6 +360,46 @@ change a field's representation. `Uuid` composes with `Option`, `Vec`,
 and `Maybe` exactly like the built-in scalars — see
 [`docs/field-shapes.md`](docs/field-shapes.md#uuiduuid-uuid1-feature).
 
+## chrono date/time fields (the `chrono04` feature)
+
+`chrono::DateTime<Tz>` and `chrono::NaiveDate` are usable as field
+types once the opt-in `chrono04` feature is enabled. As with `uuid1`,
+the `chrono` crate stays your own dependency: the feature turns on
+frieze's impls for the types; it does not bring the crate into your
+namespace.
+
+```toml
+frieze = { version = "...", features = ["chrono04"] }
+chrono = { version = "0.4", features = ["serde"] }
+```
+
+The `04` in `chrono04` is chrono's `0.4` release series — chrono is
+still pre-1.0, so declare `chrono = "0.4"`, the range Cargo treats as
+compatible. A `DateTime` from a different series does not implement
+`Schema`. The `serde` feature is `chrono`'s own: frieze does not need
+it, but a struct deriving `Serialize` / `Deserialize` around a chrono
+field does.
+
+```rust
+use chrono::{DateTime, NaiveDate, Utc};
+use frieze::Schema;
+
+#[derive(Schema)]
+struct Booking {
+    created_at: DateTime<Utc>,   // -> { type: string, format: date-time }
+    checkout_on: NaiveDate,      // -> { type: string, format: date }
+}
+```
+
+The declared formats match what goes on the wire: serde writes
+`DateTime<Tz>` as an RFC 3339 timestamp for **every** time zone (so all
+of them share the single schema name `DateTime`) and `NaiveDate` as an
+ISO 8601 calendar date. `chrono::NaiveDateTime` is deliberately
+unsupported — it carries no offset, so it is not an RFC 3339
+`date-time`. Both supported types compose with `Option`, `Vec`, and
+`Maybe` exactly like the built-in scalars — see
+[`docs/field-shapes.md`](docs/field-shapes.md#chrono-date-and-time-chrono04-feature).
+
 ## Auto-collection via `inventory`
 
 `SchemasBuilder::new().from_inventory()` is available out of the box —
