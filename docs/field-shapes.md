@@ -318,6 +318,46 @@ No `components/schemas/Int64` entry is emitted, no
 same inline treatment applies to all eight primitive scalars (`Int32`,
 `Int64`, `UInt32`, `UInt64`, `Float`, `Double`, `Boolean`, `String`).
 
+### Primitive scalar names are reserved
+
+Because every reference to those eight names is inlined, registering
+your own schema under one of them would produce an entry that nothing
+can ever point at. `SchemasBuilder::build` therefore rejects it:
+
+```rust
+#[derive(Schema)]
+struct Int64 {              // registers as `Int64`
+    value: i64,
+}
+```
+
+```text
+Err(ReservedSchemaName { name: SchemaName("Int64") })
+```
+
+Only an **exact** match is reserved. Composed generic names
+(`Int64_Container` from `Container<i64>`) and namespaced names
+(`v1.Int64`, which always carry a dot) are unaffected. There are two
+remedies: rename the Rust type, or keep the name and put the type
+under a `#[frieze(namespace)]` `mod`, which prefixes the registered
+name:
+
+```rust
+// the attribute takes no argument: the mod's own ident is the
+// namespace name
+#[frieze(namespace)]
+pub mod v1 {
+    #[derive(Schema)]
+    pub struct Int64 {      // registers as `v1.Int64`
+        pub value: i64,
+    }
+}
+```
+
+The prefix comes from the `inventory` feature, which is on by default.
+With `default-features = false` the attribute has no effect on the
+registered name, so renaming is the only remedy in that configuration.
+
 ### Owned-wrapper composition
 
 `Box<T>`, `Rc<T>`, and `Arc<T>` are

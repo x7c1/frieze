@@ -9,16 +9,20 @@ use crate::register::{IsRegistrable, Register};
 
 /// In-progress collection of schemas.
 ///
-/// `conflict` records the first same-name / different-content collision
-/// observed by [`SchemasBuilder::push_unique`]. It is surfaced as
-/// [`Error::SchemaConflict`] from [`SchemasBuilder::build`] — the
-/// builder follows the same fail-at-finalization pattern as
-/// [`Error::UnresolvedReference`] so `register_into` callers and the
-/// derive expansion can keep pushing through `push_unique` without
-/// threading a `Result` through every registration site.
+/// `reserved` holds the first name that collides with a primitive
+/// scalar name and surfaces as [`Error::ReservedSchemaName`];
+/// `conflict` holds the first same-name / different-content collision
+/// and surfaces as [`Error::SchemaConflict`]. Both are observed by
+/// [`SchemasBuilder::push_unique`] and reported from
+/// [`SchemasBuilder::build`]: the builder follows the same
+/// fail-at-finalization pattern as [`Error::UnresolvedReference`] so
+/// `register_into` callers and the derive expansion can keep pushing
+/// through `push_unique` without threading a `Result` through every
+/// registration site.
 #[derive(Debug, Default)]
 pub struct SchemasBuilder {
     schemas: Vec<ModelSchema>,
+    reserved: Option<Error>,
     conflict: Option<Error>,
 }
 
@@ -69,6 +73,13 @@ impl SchemasBuilder {
     /// [`Self::build`]. Same-name / same-content pushes remain a silent
     /// dedup — the normal case for a transitive root reached through
     /// multiple paths.
+    ///
+    /// A name that exactly matches one of the eight primitive scalar
+    /// names ([`primitive_property_type_for`]) is likewise recorded and
+    /// reported as [`Error::ReservedSchemaName`]. Every registration
+    /// path (`add::<T>()`, transitive `register_into`, inventory
+    /// collection) funnels through here, so hooking the check at this
+    /// point covers all of them.
     pub fn push_unique(&mut self, schema: ModelSchema) {
         let Some(name) = schema.name().cloned() else {
             // Schemas with no registration name (e.g. `Schema::Scalar`)
@@ -78,6 +89,13 @@ impl SchemasBuilder {
             self.schemas.push(schema);
             return;
         };
+        // A reserved name is recorded, but the entry is still pushed:
+        // `build` fails regardless, and dropping it here would defeat the
+        // `contains_name` guard the derived `register_into` uses to break
+        // recursion through a self-referential type.
+        if primitive_property_type_for(&name).is_some() && self.reserved.is_none() {
+            self.reserved = Some(Error::ReservedSchemaName { name: name.clone() });
+        }
         if let Some(existing) = self.schemas.iter().find(|s| s.name() == Some(&name)) {
             if existing != &schema && self.conflict.is_none() {
                 self.conflict = Some(Error::SchemaConflict {
@@ -131,13 +149,18 @@ impl SchemasBuilder {
     /// synthesized tag field must merge into an object body, not into a
     /// scalar-shaped or already-discriminated value.
     ///
-    /// Same-name / different-content conflicts recorded by
-    /// [`Self::push_unique`] surface here as [`Error::SchemaConflict`]
-    /// before any other validation runs: the first such conflict is
-    /// reported and downstream `$ref` / `oneOf` checks are skipped, since
-    /// the rest of the collection cannot be trusted once a registration
-    /// disagreement is known.
+    /// Registration problems recorded by [`Self::push_unique`] surface
+    /// here before any other validation runs: once a registration is
+    /// known to be wrong the rest of the collection cannot be trusted,
+    /// so the `$ref` / `oneOf` checks described above are skipped. A
+    /// reserved name ([`Error::ReservedSchemaName`]) is reported ahead
+    /// of a same-name / different-content conflict
+    /// ([`Error::SchemaConflict`]) — a schema occupying a primitive
+    /// scalar's name is the more fundamental misuse.
     pub fn build(mut self) -> Result<Schemas, Error> {
+        if let Some(reserved) = self.reserved.take() {
+            return Err(reserved);
+        }
         if let Some(conflict) = self.conflict.take() {
             return Err(conflict);
         }
@@ -398,6 +421,116 @@ mod tests {
             }
             other => panic!("expected SchemaConflict, got {:?}", other),
         }
+    }
+
+    /// Registered under the reserved primitive name `Int64`, which the
+    /// boundary conversion inlines as the scalar shape at every
+    /// reference position. Registering it must be rejected instead of
+    /// leaving the entry silently unreferenced.
+    struct DummyInt64;
+
+    impl Schema for DummyInt64 {
+        fn name() -> String {
+            "Int64".to_string()
+        }
+        fn schema() -> frieze_model::Schema {
+            frieze_model::Schema::new_object(
+                "Int64",
+                vec![Property::new("value", PropertyType::Int64, Presence::Required).unwrap()],
+            )
+            .unwrap()
+        }
+    }
+    impl Register for DummyInt64 {}
+    impl IsRegistrable for DummyInt64 {}
+
+    #[test]
+    fn build_rejects_reserved_scalar_name() {
+        let err = SchemasBuilder::new()
+            .add::<DummyInt64>()
+            .build()
+            .unwrap_err();
+        assert_eq!(
+            err,
+            Error::ReservedSchemaName {
+                name: SchemaName::new("Int64").unwrap(),
+            }
+        );
+    }
+
+    /// Composed generic name that merely *starts* with a reserved name
+    /// (`Container<i64>` registers as `Int64_Container`). Only exact
+    /// matches are reserved, so this must keep building.
+    struct DummyInt64Container;
+
+    impl Schema for DummyInt64Container {
+        fn name() -> String {
+            "Int64_Container".to_string()
+        }
+        fn schema() -> frieze_model::Schema {
+            frieze_model::Schema::new_object(
+                "Int64_Container",
+                vec![Property::new("value", PropertyType::Int64, Presence::Required).unwrap()],
+            )
+            .unwrap()
+        }
+    }
+    impl Register for DummyInt64Container {}
+    impl IsRegistrable for DummyInt64Container {}
+
+    /// Namespaced name whose bare segment is a reserved name
+    /// (`#[frieze(namespace)] mod v1 { struct Int64 }`). A
+    /// namespaced name always carries a dot, so it can never equal a
+    /// reserved bare name and stays acceptable.
+    struct DummyNamespacedInt64;
+
+    impl Schema for DummyNamespacedInt64 {
+        fn name() -> String {
+            "v1.Int64".to_string()
+        }
+        fn schema() -> frieze_model::Schema {
+            frieze_model::Schema::new_object(
+                "v1.Int64",
+                vec![Property::new("value", PropertyType::Int64, Presence::Required).unwrap()],
+            )
+            .unwrap()
+        }
+    }
+    impl Register for DummyNamespacedInt64 {}
+    impl IsRegistrable for DummyNamespacedInt64 {}
+
+    #[test]
+    fn build_accepts_names_that_only_resemble_reserved_scalars() {
+        let schemas = SchemasBuilder::new()
+            .add::<DummyInt64Container>()
+            .add::<DummyNamespacedInt64>()
+            .build()
+            .expect("only an exact match with a reserved scalar name is rejected");
+        assert!(schemas
+            .by_name
+            .contains_key(&SchemaName::new("Int64_Container").unwrap()));
+        assert!(schemas
+            .by_name
+            .contains_key(&SchemaName::new("v1.Int64").unwrap()));
+    }
+
+    #[test]
+    fn build_reports_reserved_name_before_schema_conflict() {
+        // `DummyUser` / `DummyUserAlt` disagree on `User`; the reserved
+        // name is the more fundamental misuse and must win over the
+        // conflict.
+        let err = SchemasBuilder::new()
+            .add::<DummyUser>()
+            .add::<DummyUserAlt>()
+            .add::<DummyInt64>()
+            .build()
+            .unwrap_err();
+        assert_eq!(
+            err,
+            Error::ReservedSchemaName {
+                name: SchemaName::new("Int64").unwrap(),
+            }
+        );
     }
 
     #[test]
