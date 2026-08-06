@@ -3,9 +3,9 @@
 use crate::schema_name::SchemaName;
 
 /// Maps a [`SchemaName`] to its primitive leaf [`PropertyType`] if the
-/// name matches one of the eight primitive scalar conventions
+/// name matches one of the nine primitive scalar conventions
 /// (`Int32` / `Int64` / `UInt32` / `UInt64` / `Float` / `Double` /
-/// `Boolean` / `String`).
+/// `Boolean` / `String` / `Uuid`).
 ///
 /// Generic instantiations whose argument is a primitive (e.g.
 /// `Container<i64>`) emit `PropertyType::Reference(SchemaName("Int64"))`
@@ -22,7 +22,14 @@ use crate::schema_name::SchemaName;
 /// - the boundary conversion in `frieze-usecase`, which inlines the
 ///   leaf scalar shape (`{type: integer, format: int64}`,
 ///   `{type: string}`, ...) at the reference position instead of
-///   emitting a dangling `$ref: #/components/schemas/Int64`.
+///   emitting a dangling `$ref: #/components/schemas/Int64`;
+/// - the reserved-name check in `frieze::SchemasBuilder::push_unique`,
+///   which rejects registering a user schema under one of these names
+///   (references to it would be inlined and never point at the entry).
+///
+/// Because all three callers read the same table, the reservation is
+/// **unconditional**: `Uuid` is reserved whether or not the `frieze`
+/// crate's optional `uuid1` feature is enabled.
 ///
 /// Returns `None` for any other name; the caller then falls back to its
 /// normal "registered reference" treatment.
@@ -36,6 +43,7 @@ pub fn primitive_property_type_for(name: &SchemaName) -> Option<PropertyType> {
         "Double" => Some(PropertyType::Double),
         "Boolean" => Some(PropertyType::Boolean),
         "String" => Some(PropertyType::String),
+        "Uuid" => Some(PropertyType::Uuid),
         _ => None,
     }
 }
@@ -86,6 +94,13 @@ pub enum PropertyType {
     String,
     /// Maps to OpenAPI `type: boolean` (no format).
     Boolean,
+    /// Maps to OpenAPI `type: string, format: uuid`.
+    ///
+    /// The variant lives here — next to the Rust primitives — rather
+    /// than behind the `frieze` crate's optional `uuid1` feature, so
+    /// that the name `Uuid` is inlined and reserved consistently
+    /// regardless of how the user built `frieze`.
+    Uuid,
     /// Maps to OpenAPI `type: array` with `items` describing the element
     /// schema.
     Array(Box<PropertyType>),
@@ -117,6 +132,7 @@ mod tests {
             ("Double", PropertyType::Double),
             ("Boolean", PropertyType::Boolean),
             ("String", PropertyType::String),
+            ("Uuid", PropertyType::Uuid),
         ];
         for (name, expected) in cases {
             let actual = primitive_property_type_for(&SchemaName::new(*name).unwrap());
@@ -130,7 +146,15 @@ mod tests {
 
     #[test]
     fn primitive_lookup_returns_none_for_non_primitive_names() {
-        for input in ["User", "Int64_Container", "string", "INT64", "Int128"] {
+        for input in [
+            "User",
+            "Int64_Container",
+            "string",
+            "INT64",
+            "Int128",
+            "UUID",
+            "v1.Uuid",
+        ] {
             let name = SchemaName::new(input).unwrap();
             assert!(
                 primitive_property_type_for(&name).is_none(),

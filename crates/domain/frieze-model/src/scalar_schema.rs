@@ -4,7 +4,8 @@
 //! object / string-enum / oneOf variants.
 //!
 //! Scalar schemas exist to let primitive Rust types (`i32`, `i64`, `u32`,
-//! `u64`, `f32`, `f64`, `bool`, `String`) implement the
+//! `u64`, `f32`, `f64`, `bool`, `String` — plus `uuid::Uuid` when the
+//! `frieze` crate's `uuid1` feature is on) implement the
 //! `frieze::Schema` trait so they can appear as generic arguments
 //! (`Box<i64>`, `Page<String>`) without forcing a wrapper struct. They are
 //! intentionally **not** registered under `#/components/schemas`: the
@@ -44,7 +45,8 @@ impl ScalarSchema {
             | PropertyType::Float
             | PropertyType::Double
             | PropertyType::String
-            | PropertyType::Boolean => Ok(Self {
+            | PropertyType::Boolean
+            | PropertyType::Uuid => Ok(Self {
                 property_type,
                 description: None,
             }),
@@ -102,6 +104,7 @@ mod tests {
             PropertyType::Double,
             PropertyType::String,
             PropertyType::Boolean,
+            PropertyType::Uuid,
         ] {
             let result = ScalarSchema::new(ty.clone());
             assert!(

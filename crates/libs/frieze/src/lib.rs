@@ -24,6 +24,20 @@
 //! with `default-features = false`. With the feature off, the derive's
 //! submission site expands to a no-op so feature-gated code paths in
 //! user crates stay valid in both configurations.
+//!
+//! # `uuid::Uuid` fields (the `uuid1` feature)
+//!
+//! The opt-in `uuid1` Cargo feature (off by default) implements
+//! [`Schema`] and [`Register`] for `uuid::Uuid`, making it usable as a
+//! `#[derive(Schema)]` field type that emits `{type: string, format:
+//! uuid}`. Like the Rust primitives, it deliberately gets no
+//! [`IsRegistrable`] impl: the shape is inlined at every reference
+//! position instead of being registered under `#/components/schemas`,
+//! and the name `Uuid` is reserved by [`SchemasBuilder`] whether or not
+//! the feature is on.
+//!
+//! Enabling the feature does not put `uuid` into the consumer's
+//! namespace — depend on `uuid` 1.x directly as well to name the type.
 
 pub use frieze_macros::{frieze, Schema};
 

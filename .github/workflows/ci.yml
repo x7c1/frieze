@@ -22,23 +22,35 @@ jobs:
       - name: cargo fmt
         run: cargo fmt --all -- --check
       # The OAS version (3.0 / 3.1) is per-document runtime data, so a
-      # single test run exercises both output shapes. The only feature
-      # axis left is `inventory` (on by default): the
-      # `--no-default-features` steps keep the opt-out path — no_std /
-      # WASM-leaning consumers without linker-based registration —
-      # green alongside the default one.
+      # single test run exercises both output shapes. Two feature axes
+      # remain, both declared on the `frieze` crate:
+      #
+      # - `inventory` (on by default): the `--no-default-features`
+      #   steps keep the opt-out path — no_std / WASM-leaning consumers
+      #   without linker-based registration — green alongside the
+      #   default one.
+      # - `uuid1` (off by default): the `-p frieze --features uuid1`
+      #   steps cover the `uuid::Uuid` impls and their snapshot tests,
+      #   which no other step compiles. `frieze` is the only crate
+      #   declaring the feature, hence the `-p` scope.
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: cargo clippy (no default features)
         run: cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+      - name: cargo clippy (uuid1)
+        run: cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings
       - name: cargo build
         run: cargo build --workspace
       - name: cargo build (no default features)
         run: cargo build --workspace --no-default-features
+      - name: cargo build (uuid1)
+        run: cargo build -p frieze --features uuid1
       - name: cargo test
         run: cargo test --workspace
       - name: cargo test (no default features)
         run: cargo test --workspace --no-default-features
+      - name: cargo test (uuid1)
+        run: cargo test -p frieze --features uuid1
 
   validate-title:
     name: validate-title
