@@ -24,6 +24,12 @@
 //! | `f64`  | `Double`  |
 //! | `bool` | `Boolean` |
 //! | `String` | `String` |
+//!
+//! With the optional `uuid1` feature on, `uuid::Uuid` joins that table
+//! under the name `Uuid`: not a Rust primitive, but a leaf scalar that
+//! behaves like one here. Only the impls are feature-gated — the
+//! `Uuid` leaf and its reserved name live unconditionally in
+//! `frieze-model`.
 
 use frieze_model::{PropertyType, Schema as ModelSchema};
 
@@ -67,6 +73,9 @@ impl_primitive_schema!(f32, "Float", Float);
 impl_primitive_schema!(f64, "Double", Double);
 impl_primitive_schema!(bool, "Boolean", Boolean);
 impl_primitive_schema!(String, "String", String);
+
+#[cfg(feature = "uuid1")]
+impl_primitive_schema!(uuid::Uuid, "Uuid", Uuid);
 
 #[cfg(test)]
 mod tests {
@@ -124,6 +133,20 @@ mod tests {
     fn string_schema_is_scalar_string() {
         let schema = <String as Schema>::schema();
         let expected = ModelSchema::Scalar(ScalarSchema::new(PropertyType::String).unwrap());
+        assert_eq!(schema, expected);
+    }
+
+    #[cfg(feature = "uuid1")]
+    #[test]
+    fn uuid_name_is_uuid() {
+        assert_eq!(<uuid::Uuid as Schema>::name(), "Uuid");
+    }
+
+    #[cfg(feature = "uuid1")]
+    #[test]
+    fn uuid_schema_is_scalar_uuid() {
+        let schema = <uuid::Uuid as Schema>::schema();
+        let expected = ModelSchema::Scalar(ScalarSchema::new(PropertyType::Uuid).unwrap());
         assert_eq!(schema, expected);
     }
 }

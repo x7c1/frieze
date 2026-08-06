@@ -326,6 +326,40 @@ differently (`nullable: true` vs `type: [..., "null"]`); see
 table, the version-specific shapes for nullable references, and the
 runtime `Version` handle.
 
+## `uuid::Uuid` fields (the `uuid1` feature)
+
+`uuid::Uuid` is usable as a field type once the opt-in `uuid1` feature
+is enabled. The `uuid` crate stays your own dependency: the feature
+turns on frieze's impls for the type; it does not bring the crate into
+your namespace.
+
+```toml
+frieze = { version = "...", features = ["uuid1"] }
+uuid = { version = "1", features = ["serde"] }
+```
+
+The `1` in `uuid1` is the supported major version — a `Uuid` from a
+different major does not implement `Schema`. The `serde` feature is
+`uuid`'s own: frieze does not need it, but a struct deriving
+`Serialize` / `Deserialize` around a `Uuid` field does.
+
+```rust
+use frieze::Schema;
+use uuid::Uuid;
+
+#[derive(Schema)]
+struct Session {
+    id: Uuid,            // -> { type: string, format: uuid }
+}
+```
+
+The declared `format: uuid` matches what goes on the wire: serde
+serializes `uuid::Uuid` as the RFC 4122 hyphenated lowercase string,
+and frieze rejects at compile time every serde attribute that would
+change a field's representation. `Uuid` composes with `Option`, `Vec`,
+and `Maybe` exactly like the built-in scalars — see
+[`docs/field-shapes.md`](docs/field-shapes.md#uuiduuid-uuid1-feature).
+
 ## Auto-collection via `inventory`
 
 `SchemasBuilder::new().from_inventory()` is available out of the box —

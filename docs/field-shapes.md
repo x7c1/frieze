@@ -16,9 +16,72 @@ unit-variant enum is also a valid field type; it rides on the same
 | `f32`, `f64`     | `type: number, format: float / double`                 |
 | `bool`           | `type: boolean`                                        |
 | `String`         | `type: string`                                         |
+| `uuid::Uuid`     | `type: string, format: uuid` (`uuid1` feature)         |
 
 `T` below stands for any of these scalars; `U` stands for another
 `Schema`-deriving struct.
+
+### `uuid::Uuid` (`uuid1` feature)
+
+`uuid::Uuid` is an opt-in scalar: enable the `uuid1` feature on the
+`frieze` dependency to make it usable as a field type, and depend on
+the `uuid` crate yourself. The feature only turns on frieze's impls
+for the type — it does not put `uuid` into your crate's namespace, so
+without your own `Cargo.toml` entry, `use uuid::Uuid;` does not
+resolve.
+
+```toml
+frieze = { version = "...", features = ["uuid1"] }
+uuid = { version = "1", features = ["serde"] }
+```
+
+The `1` in `uuid1` is the supported major version: `Uuid` from another
+major (`uuid` 0.8, say) is a different type that does not implement
+`Schema`, so such a field fails with a trait-bound error. The `serde`
+feature belongs to `uuid`, not to frieze — frieze never serializes
+your struct, but a struct that derives `Serialize` / `Deserialize`
+around a `Uuid` field does not compile without it.
+
+```rust
+use frieze::Schema;
+use uuid::Uuid;
+
+#[derive(Schema)]
+struct Session {
+    id: Uuid,
+}
+```
+
+```yaml
+Session:
+  type: object
+  required: [id]
+  properties:
+    id: { type: string, format: uuid }
+```
+
+The field type must be written unqualified (`Uuid`, brought into scope
+with `use uuid::Uuid;`) — the
+[qualified-path restriction](#restrictions-on-field-position-types)
+applies here like it does to any other named type.
+
+`format: uuid` is accurate because serde's default representation of
+`uuid::Uuid` is the RFC 4122 hyphenated lowercase string, and frieze
+rejects at compile time every serde attribute that would change a
+field's wire representation (`with`, `serialize_with`, `into`, ...);
+see
+[Other `#[serde(...)]` attributes](#other-serde-attributes-unsupported).
+
+`Option<Uuid>`, `Vec<Uuid>`, and `Maybe<Uuid>` follow the same
+[composite-shape rules](#composite-shapes-presence-x-nullability) as
+every other scalar. Because `Uuid` is a leaf scalar rather than a
+`$ref`, the nullable forms are the plain scalar ones (`nullable: true`
+under OAS 3.0, `type: [string, "null"]` under 3.1), not the
+`allOf` / `oneOf` reference wraps.
+
+The **name** `Uuid` is
+[reserved](#primitive-scalar-names-are-reserved) whether or not the
+feature is enabled.
 
 ### Primitive `Schema` implementations
 
@@ -35,6 +98,7 @@ schema names that follow the OAS type/format convention:
 | `f64`  | `Double`                   |
 | `bool` | `Boolean`                  |
 | `String` | `String`                 |
+| `uuid::Uuid` | `Uuid`               |
 
 The primary purpose of these impls is to let primitives appear as
 generic arguments — `Box<i64>`, `Page<String>`, etc. — so that derive
@@ -315,12 +379,13 @@ Int64_Container:
 No `components/schemas/Int64` entry is emitted, no
 `Schemas::add::<i64>()` call is needed, and
 `Schemas::add::<Container<i64>>().build()` succeeds standalone. The
-same inline treatment applies to all eight primitive scalars (`Int32`,
-`Int64`, `UInt32`, `UInt64`, `Float`, `Double`, `Boolean`, `String`).
+same inline treatment applies to all nine primitive scalars (`Int32`,
+`Int64`, `UInt32`, `UInt64`, `Float`, `Double`, `Boolean`, `String`,
+`Uuid`).
 
 ### Primitive scalar names are reserved
 
-Because every reference to those eight names is inlined, registering
+Because every reference to those nine names is inlined, registering
 your own schema under one of them would produce an entry that nothing
 can ever point at. `SchemasBuilder::build` therefore rejects it:
 
@@ -357,6 +422,11 @@ pub mod v1 {
 The prefix comes from the `inventory` feature, which is on by default.
 With `default-features = false` the attribute has no effect on the
 registered name, so renaming is the only remedy in that configuration.
+
+The reservation itself is feature-independent: `Uuid` is rejected even
+in a build without the [`uuid1` feature](#uuiduuid-uuid1-feature),
+because the inlining that makes the name unreachable happens in the
+boundary conversion, which has no view of the feature.
 
 ### Owned-wrapper composition
 

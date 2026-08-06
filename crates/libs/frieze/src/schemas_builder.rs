@@ -74,12 +74,14 @@ impl SchemasBuilder {
     /// dedup — the normal case for a transitive root reached through
     /// multiple paths.
     ///
-    /// A name that exactly matches one of the eight primitive scalar
+    /// A name that exactly matches one of the nine primitive scalar
     /// names ([`primitive_property_type_for`]) is likewise recorded and
     /// reported as [`Error::ReservedSchemaName`]. Every registration
     /// path (`add::<T>()`, transitive `register_into`, inventory
     /// collection) funnels through here, so hooking the check at this
-    /// point covers all of them.
+    /// point covers all of them. The set is feature-independent:
+    /// `Uuid` is reserved even when the `uuid1` feature is off, because
+    /// the boundary inlines a `Reference("Uuid")` either way.
     pub fn push_unique(&mut self, schema: ModelSchema) {
         let Some(name) = schema.name().cloned() else {
             // Schemas with no registration name (e.g. `Schema::Scalar`)
@@ -252,7 +254,7 @@ fn first_unresolved_in_schema<'a>(
 /// whose name is not registered in `schemas`, walking
 /// [`PropertyType::Array`] and [`PropertyType::Nullable`].
 ///
-/// A reference whose name matches one of the eight primitive scalar
+/// A reference whose name matches one of the nine primitive scalar
 /// names ([`primitive_property_type_for`]) is treated as resolved even
 /// when no such entry is registered: primitives implement `Schema` (so
 /// they can appear as generic arguments) but not `IsRegistrable`, so
@@ -282,7 +284,8 @@ fn first_unresolved_reference<'a>(
         | PropertyType::Float
         | PropertyType::Double
         | PropertyType::String
-        | PropertyType::Boolean => None,
+        | PropertyType::Boolean
+        | PropertyType::Uuid => None,
     }
 }
 
@@ -454,6 +457,42 @@ mod tests {
             err,
             Error::ReservedSchemaName {
                 name: SchemaName::new("Int64").unwrap(),
+            }
+        );
+    }
+
+    /// Registered under the reserved primitive name `Uuid`. The struct
+    /// is deliberately **not** behind `#[cfg(feature = "uuid1")]`: the
+    /// reservation comes from `primitive_property_type_for`, which the
+    /// boundary consults regardless of the feature, so a build without
+    /// `uuid1` must reject the name just as firmly.
+    struct DummyUuid;
+
+    impl Schema for DummyUuid {
+        fn name() -> String {
+            "Uuid".to_string()
+        }
+        fn schema() -> frieze_model::Schema {
+            frieze_model::Schema::new_object(
+                "Uuid",
+                vec![Property::new("value", PropertyType::String, Presence::Required).unwrap()],
+            )
+            .unwrap()
+        }
+    }
+    impl Register for DummyUuid {}
+    impl IsRegistrable for DummyUuid {}
+
+    #[test]
+    fn build_rejects_reserved_uuid_name_regardless_of_feature() {
+        let err = SchemasBuilder::new()
+            .add::<DummyUuid>()
+            .build()
+            .unwrap_err();
+        assert_eq!(
+            err,
+            Error::ReservedSchemaName {
+                name: SchemaName::new("Uuid").unwrap(),
             }
         );
     }

@@ -164,7 +164,7 @@ fn attach_description(mut schema: ObjectSchema, description: Option<&str>) -> Ob
 /// `nullable: true` under OAS 3.0, `oneOf` against `{type: "null"}`
 /// under 3.1) is synthesized at serialization time.
 ///
-/// References whose name maps to one of the eight primitive scalar
+/// References whose name maps to one of the nine primitive scalar
 /// conventions ([`primitive_property_type_for`]) are **inlined** at the
 /// leaf position as the matching scalar shape (`{type: integer, format:
 /// int64}`, `{type: string}`, ...). Generic derive output for
@@ -182,6 +182,10 @@ fn property_type_to_object_schema(ty: &PropertyType) -> ObjectSchema {
         PropertyType::Double => (SchemaType::Number, Some("double"), None),
         PropertyType::String => (SchemaType::String, None, None),
         PropertyType::Boolean => (SchemaType::Boolean, None, None),
+        // `uuid::Uuid` serializes as the RFC 4122 hyphenated lowercase
+        // string under serde's default representation, so the declared
+        // `format` matches the actual wire shape.
+        PropertyType::Uuid => (SchemaType::String, Some("uuid"), None),
         PropertyType::Array(inner) => {
             return ObjectSchema {
                 ty: Some(SchemaType::Array),

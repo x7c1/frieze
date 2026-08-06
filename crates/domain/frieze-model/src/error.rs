@@ -63,7 +63,7 @@ pub enum Error {
         incoming: Box<crate::Schema>,
     },
     /// A schema was registered under a name reserved for one of the
-    /// eight primitive scalars ([`crate::primitive_property_type_for`]).
+    /// nine primitive scalars ([`crate::primitive_property_type_for`]).
     ///
     /// Such a registration is silently broken rather than merely
     /// redundant: the boundary conversion replaces every
@@ -88,10 +88,11 @@ pub enum Error {
     #[error(
         "schema `{name}` is registered under a name reserved for a \
          primitive scalar (Int32 / Int64 / UInt32 / UInt64 / Float / \
-         Double / Boolean / String); references to it would be inlined \
-         as that scalar instead of pointing at the schema (rename the \
-         Rust type, or put it under a `#[frieze(namespace)]` `mod` so \
-         its registered name carries that mod's ident as a prefix)"
+         Double / Boolean / String / Uuid); references to it would be \
+         inlined as that scalar instead of pointing at the schema \
+         (rename the Rust type, or put it under a `#[frieze(namespace)]` \
+         `mod` so its registered name carries that mod's ident as a \
+         prefix)"
     )]
     ReservedSchemaName { name: SchemaName },
     /// A `$ref` resolution failure detected by
@@ -138,8 +139,8 @@ pub enum Error {
     },
     #[error(
         "scalar schema requires a leaf PropertyType (Int32 / Int64 / \
-         UInt32 / UInt64 / Float / Double / Boolean / String); composite \
-         variants (Array / Nullable / Reference) are not scalar"
+         UInt32 / UInt64 / Float / Double / Boolean / String / Uuid); \
+         composite variants (Array / Nullable / Reference) are not scalar"
     )]
     NonScalarPropertyType,
     /// The partial OAS document handed to `compose` already contains

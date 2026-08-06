@@ -69,18 +69,24 @@ upon — refer to them by their crate-specific roles instead.
 ## Build / Test matrix
 
 The OAS version (3.0 / 3.1) is per-document runtime data, so one test
-run covers both output shapes. The only feature axis is `inventory`
-(on by default; the `--no-default-features` runs keep the opt-out
-path for no_std / WASM-leaning consumers green):
+run covers both output shapes. Two feature axes remain, both declared
+on the `frieze` crate: `inventory` (on by default; the
+`--no-default-features` runs keep the opt-out path for no_std /
+WASM-leaning consumers green) and `uuid1` (off by default and declared
+only by `frieze`, so the `uuid::Uuid` impls need their own `-p frieze`
+runs):
 
 ```
 cargo fmt --all -- --check
 cargo build  --workspace
 cargo build  --workspace --no-default-features
+cargo build  -p frieze --features uuid1
 cargo clippy --workspace --all-targets -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features -- -D warnings
+cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings
 cargo test   --workspace
 cargo test   --workspace --no-default-features
+cargo test   -p frieze --features uuid1
 ```
 
 ### End-to-end tests
