@@ -48,18 +48,52 @@ pub enum Error {
     /// rendering.
     ///
     /// Recovery: rename one of the colliding types, or attach
-    /// `#[frieze(namespace = "...")]` to a containing `mod` so the two
-    /// types acquire distinct fully-qualified registration names.
+    /// `#[frieze(namespace)]` to a containing `mod` so the two types
+    /// acquire distinct fully-qualified registration names. The
+    /// attribute takes no argument — the mod's own ident is the
+    /// namespace name.
     #[error(
         "schema `{name}` was registered twice with different definitions \
-         (use `#[frieze(namespace = ...)]` on a containing `mod` to give \
-         them distinct fully-qualified names, or rename one of the types)"
+         (use `#[frieze(namespace)]` on a containing `mod` to give them \
+         distinct fully-qualified names, or rename one of the types)"
     )]
     SchemaConflict {
         name: SchemaName,
         existing: Box<crate::Schema>,
         incoming: Box<crate::Schema>,
     },
+    /// A schema was registered under a name reserved for one of the
+    /// eight primitive scalars ([`crate::primitive_property_type_for`]).
+    ///
+    /// Such a registration is silently broken rather than merely
+    /// redundant: the boundary conversion replaces every
+    /// [`crate::PropertyType::Reference`] that names a primitive with
+    /// that scalar's leaf shape, so no `$ref` ever points at the
+    /// registered entry and it sits unreferenced under
+    /// `components/schemas`. [`Error::SchemaConflict`] cannot catch it
+    /// either — primitives are never registered, so there is no name
+    /// collision to observe.
+    ///
+    /// Only an exact match is reserved. Composed generic names
+    /// (`Int64_Container`) and namespaced names (`v1.Int64`, which
+    /// always carry a dot) are unaffected.
+    ///
+    /// Like [`Error::SchemaConflict`], the error is recorded by
+    /// `frieze::SchemasBuilder::push_unique` at registration time and
+    /// reported when the builder is finalized.
+    ///
+    /// Recovery: rename the Rust type, or attach `#[frieze(namespace)]`
+    /// (which takes no argument) to a containing `mod` so the registered
+    /// name carries that mod's ident as a prefix.
+    #[error(
+        "schema `{name}` is registered under a name reserved for a \
+         primitive scalar (Int32 / Int64 / UInt32 / UInt64 / Float / \
+         Double / Boolean / String); references to it would be inlined \
+         as that scalar instead of pointing at the schema (rename the \
+         Rust type, or put it under a `#[frieze(namespace)]` `mod` so \
+         its registered name carries that mod's ident as a prefix)"
+    )]
+    ReservedSchemaName { name: SchemaName },
     /// A `$ref` resolution failure detected by
     /// [`crate::Schemas`]-consuming code (typically
     /// `frieze::SchemasBuilder::build`).
