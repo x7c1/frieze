@@ -63,7 +63,8 @@ impl SchemasBuilder {
 mod tests {
     use super::SchemasBuilder;
     use crate::schemas_builder::testing::{
-        DummyInt64, DummyInt64Container, DummyNamespacedInt64, DummyUser, DummyUserAlt, DummyUuid,
+        DummyDate, DummyDateTime, DummyInt64, DummyInt64Container, DummyNamespacedInt64, DummyUser,
+        DummyUserAlt, DummyUuid,
     };
     use frieze_model::{Error, SchemaName};
 
@@ -133,6 +134,34 @@ mod tests {
             err,
             Error::ReservedSchemaName {
                 name: SchemaName::new("Uuid").unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn build_rejects_reserved_date_time_name_regardless_of_feature() {
+        let err = SchemasBuilder::new()
+            .add::<DummyDateTime>()
+            .build()
+            .unwrap_err();
+        assert_eq!(
+            err,
+            Error::ReservedSchemaName {
+                name: SchemaName::new("DateTime").unwrap(),
+            }
+        );
+    }
+
+    #[test]
+    fn build_rejects_reserved_date_name_regardless_of_feature() {
+        let err = SchemasBuilder::new()
+            .add::<DummyDate>()
+            .build()
+            .unwrap_err();
+        assert_eq!(
+            err,
+            Error::ReservedSchemaName {
+                name: SchemaName::new("Date").unwrap(),
             }
         );
     }

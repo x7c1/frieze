@@ -82,7 +82,7 @@ pub(super) fn first_unresolved_in_schema<'a>(
 /// whose name is not registered in `schemas`, walking
 /// [`PropertyType::Array`] and [`PropertyType::Nullable`].
 ///
-/// A reference whose name matches one of the nine primitive scalar
+/// A reference whose name matches one of the eleven primitive scalar
 /// names ([`primitive_property_type_for`]) is treated as resolved even
 /// when no such entry is registered: primitives implement `Schema` (so
 /// they can appear as generic arguments) but not `IsRegistrable`, so
@@ -113,7 +113,9 @@ fn first_unresolved_reference<'a>(
         | PropertyType::Double
         | PropertyType::String
         | PropertyType::Boolean
-        | PropertyType::Uuid => None,
+        | PropertyType::Uuid
+        | PropertyType::DateTime
+        | PropertyType::Date => None,
     }
 }
 

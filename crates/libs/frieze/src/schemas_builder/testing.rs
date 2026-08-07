@@ -8,6 +8,12 @@
 //! reporting, unresolved-reference detection) without depending on the
 //! derive.
 
+mod dummy_date;
+pub(super) use dummy_date::DummyDate;
+
+mod dummy_date_time;
+pub(super) use dummy_date_time::DummyDateTime;
+
 mod dummy_int64;
 pub(super) use dummy_int64::DummyInt64;
 

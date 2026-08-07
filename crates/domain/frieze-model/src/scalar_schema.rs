@@ -5,7 +5,8 @@
 //!
 //! Scalar schemas exist to let primitive Rust types (`i32`, `i64`, `u32`,
 //! `u64`, `f32`, `f64`, `bool`, `String` — plus `uuid::Uuid` when the
-//! `frieze` crate's `uuid1` feature is on) implement the
+//! `frieze` crate's `uuid1` feature is on, and `chrono::DateTime<Tz>` /
+//! `chrono::NaiveDate` when its `chrono04` feature is on) implement the
 //! `frieze::Schema` trait so they can appear as generic arguments
 //! (`Box<i64>`, `Page<String>`) without forcing a wrapper struct. They are
 //! intentionally **not** registered under `#/components/schemas`: the
@@ -46,7 +47,9 @@ impl ScalarSchema {
             | PropertyType::Double
             | PropertyType::String
             | PropertyType::Boolean
-            | PropertyType::Uuid => Ok(Self {
+            | PropertyType::Uuid
+            | PropertyType::DateTime
+            | PropertyType::Date => Ok(Self {
                 property_type,
                 description: None,
             }),
@@ -105,6 +108,8 @@ mod tests {
             PropertyType::String,
             PropertyType::Boolean,
             PropertyType::Uuid,
+            PropertyType::DateTime,
+            PropertyType::Date,
         ] {
             let result = ScalarSchema::new(ty.clone());
             assert!(

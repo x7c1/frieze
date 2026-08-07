@@ -3,9 +3,9 @@
 use crate::schema_name::SchemaName;
 
 /// Maps a [`SchemaName`] to its primitive leaf [`PropertyType`] if the
-/// name matches one of the nine primitive scalar conventions
+/// name matches one of the eleven primitive scalar conventions
 /// (`Int32` / `Int64` / `UInt32` / `UInt64` / `Float` / `Double` /
-/// `Boolean` / `String` / `Uuid`).
+/// `Boolean` / `String` / `Uuid` / `DateTime` / `Date`).
 ///
 /// Generic instantiations whose argument is a primitive (e.g.
 /// `Container<i64>`) emit `PropertyType::Reference(SchemaName("Int64"))`
@@ -29,7 +29,8 @@ use crate::schema_name::SchemaName;
 ///
 /// Because all three callers read the same table, the reservation is
 /// **unconditional**: `Uuid` is reserved whether or not the `frieze`
-/// crate's optional `uuid1` feature is enabled.
+/// crate's optional `uuid1` feature is enabled, and likewise `DateTime`
+/// / `Date` regardless of its `chrono04` feature.
 ///
 /// Returns `None` for any other name; the caller then falls back to its
 /// normal "registered reference" treatment.
@@ -44,6 +45,8 @@ pub fn primitive_property_type_for(name: &SchemaName) -> Option<PropertyType> {
         "Boolean" => Some(PropertyType::Boolean),
         "String" => Some(PropertyType::String),
         "Uuid" => Some(PropertyType::Uuid),
+        "DateTime" => Some(PropertyType::DateTime),
+        "Date" => Some(PropertyType::Date),
         _ => None,
     }
 }
@@ -101,6 +104,19 @@ pub enum PropertyType {
     /// that the name `Uuid` is inlined and reserved consistently
     /// regardless of how the user built `frieze`.
     Uuid,
+    /// Maps to OpenAPI `type: string, format: date-time` — an RFC 3339
+    /// timestamp, the serde form of `chrono::DateTime<Tz>` for every
+    /// time zone.
+    ///
+    /// Like [`PropertyType::Uuid`], the variant is unconditional even
+    /// though the impls that produce it live behind the `frieze`
+    /// crate's optional `chrono04` feature.
+    DateTime,
+    /// Maps to OpenAPI `type: string, format: date` — an ISO 8601
+    /// calendar date, the serde form of `chrono::NaiveDate`.
+    ///
+    /// Unconditional for the same reason as [`PropertyType::DateTime`].
+    Date,
     /// Maps to OpenAPI `type: array` with `items` describing the element
     /// schema.
     Array(Box<PropertyType>),
@@ -133,6 +149,8 @@ mod tests {
             ("Boolean", PropertyType::Boolean),
             ("String", PropertyType::String),
             ("Uuid", PropertyType::Uuid),
+            ("DateTime", PropertyType::DateTime),
+            ("Date", PropertyType::Date),
         ];
         for (name, expected) in cases {
             let actual = primitive_property_type_for(&SchemaName::new(*name).unwrap());
@@ -154,6 +172,8 @@ mod tests {
             "Int128",
             "UUID",
             "v1.Uuid",
+            "NaiveDate",
+            "Datetime",
         ] {
             let name = SchemaName::new(input).unwrap();
             assert!(

@@ -66,6 +66,7 @@ proc-macro2 = "1.0"
 thiserror = "2.0"
 toml = "1"
 uuid = { version = "1", default-features = false }
+chrono = { version = "0.4", default-features = false }
 insta = { version = "1.48", features = ["yaml"] }
 trybuild = "1"
 tempfile = "3"

@@ -142,21 +142,25 @@ The `discriminator.mapping` block is deliberately omitted (see
 Both OAS versions are exercised by the same test run — the
 version-paired snapshot tests build documents with explicit
 `Version::V3_0` / `Version::V3_1` arguments. The matrix varies only
-the two features the `frieze` crate declares — `inventory` (on by
-default, opt-out for no_std / WASM targets) and `uuid1` (off by
-default, the `uuid::Uuid` scalar):
+the three features the `frieze` crate declares — `inventory` (on by
+default, opt-out for no_std / WASM targets), `uuid1` (off by default,
+the `uuid::Uuid` scalar), and `chrono04` (off by default, the
+`chrono::DateTime<Tz>` / `chrono::NaiveDate` scalars):
 
 ```
 cargo fmt --all -- --check
 cargo build  --workspace
 cargo build  --workspace --no-default-features
 cargo build  -p frieze --features uuid1
+cargo build  -p frieze --features chrono04
 cargo clippy --workspace --all-targets -- -D warnings
 cargo clippy --workspace --all-targets --no-default-features -- -D warnings
 cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings
+cargo clippy -p frieze --all-targets --features chrono04 -- -D warnings
 cargo test   --workspace
 cargo test   --workspace --no-default-features
 cargo test   -p frieze --features uuid1
+cargo test   -p frieze --features chrono04
 ```
 
 Every configuration must remain green; CI runs the matrix on every PR.
