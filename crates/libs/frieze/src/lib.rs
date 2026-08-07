@@ -44,12 +44,18 @@
 //! The opt-in `chrono04` Cargo feature (off by default) implements
 //! [`Schema`] and [`Register`] for `chrono::DateTime<Tz>` and
 //! `chrono::NaiveDate`, naming their schemas `DateTime` and `Date`.
-//! The `DateTime<Tz>` impl is blanket over every
-//! `Tz: chrono::TimeZone`, so the schema name carries no time zone.
 //! Fields of those types emit `{type: string, format: date-time}` and
 //! `{type: string, format: date}` respectively, matching chrono's
 //! serde defaults (an RFC 3339 timestamp and an ISO 8601 calendar
 //! date).
+//!
+//! `Tz` is restricted to `chrono::Utc`, `chrono::FixedOffset` and
+//! `chrono::Local`, the only time zones chrono implements
+//! `Deserialize` for — RFC 3339 carries a numeric offset and no zone
+//! name, so a named zone never survives the round trip. All three
+//! share the schema name `DateTime`, which therefore carries no time
+//! zone; any other `Tz` fails with the ordinary missing-`Schema`
+//! trait-bound error.
 //!
 //! `chrono::NaiveDateTime` is deliberately left without an impl: it
 //! carries no UTC offset, so its serde output is not an RFC 3339

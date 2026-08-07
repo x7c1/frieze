@@ -24,7 +24,8 @@ inventory = ["dep:inventory"]
 # reserved for the scalar whether or not this feature is on.
 uuid1 = ["dep:uuid"]
 # chrono date/time field support (off by default). Enables the
-# `Schema` / `Register` impls for `chrono::DateTime<Tz>` and
+# `Schema` / `Register` impls for `chrono::DateTime<Utc>`,
+# `chrono::DateTime<FixedOffset>`, `chrono::DateTime<Local>` and
 # `chrono::NaiveDate`, so `#[derive(Schema)]` fields of those types emit
 # `{type: string, format: date-time}` / `{type: string, format: date}`.
 # The names `DateTime` and `Date` are reserved for those scalars whether
@@ -37,14 +38,17 @@ frieze-macros.workspace = true
 inventory = { workspace = true, optional = true }
 uuid = { workspace = true, optional = true }
 # `default-features = false` (inherited from the workspace entry) keeps
-# chrono's `clock` / `std` / `wasmbind` defaults out of the graph —
-# frieze only names the types, it never reads a clock. Consequence for
-# the tests here: `chrono::Local` lives behind `clock`, so only `Utc` /
-# `FixedOffset` are nameable inside this workspace. chrono's `serde`
-# support is a separate opt-in feature that nothing here enables; a
-# consumer deriving `Serialize` / `Deserialize` turns it on through its
-# own dependency entry.
-chrono = { workspace = true, optional = true }
+# chrono's `oldtime` / `wasmbind` defaults out of the graph — frieze
+# only names the types, it never reads a clock. `clock` is the one
+# default put back: `chrono::Local` lives behind it, and the impl set
+# has to cover all three time zones chrono can deserialize (`Utc`,
+# `FixedOffset`, `Local`) for "has a `Schema`" to mean "round-trips the
+# wire". The feature only reaches the graph of a consumer that opted
+# into `chrono04`, which depends on `chrono` itself anyway. chrono's
+# `serde` support is a separate opt-in feature that nothing here
+# enables; a consumer deriving `Serialize` / `Deserialize` turns it on
+# through its own dependency entry.
+chrono = { workspace = true, optional = true, features = ["clock"] }
 
 # The internal dev-dependencies deliberately carry no `version`:
 # version-less path dev-dependencies are stripped by `cargo publish`,
