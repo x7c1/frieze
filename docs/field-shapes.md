@@ -20,6 +20,10 @@ unit-variant enum is also a valid field type; it rides on the same
 | `chrono::DateTime<Tz>` | `type: string, format: date-time` (`chrono04` feature) |
 | `chrono::NaiveDate`    | `type: string, format: date` (`chrono04` feature)      |
 
+`Tz` is restricted to `Utc`, `FixedOffset` and `Local` — the time zones
+that survive a round trip through the wire; see
+[chrono date and time](#chrono-date-and-time-chrono04-feature).
+
 `T` below stands for any of these scalars; `U` stands for another
 `Schema`-deriving struct.
 
@@ -108,6 +112,14 @@ field fails with a trait-bound error. The `serde` feature belongs to
 struct that derives `Serialize` / `Deserialize` around a chrono field
 does not compile without it.
 
+The one chrono feature frieze does need is `clock`, which `chrono04`
+turns on for the whole dependency graph: `chrono::Local` — and the
+`Deserialize` impl for `DateTime<Local>` — lives behind it, so the
+impls cannot cover all three supported time zones without it. Cargo
+unifies features, so it reaches your build even if your own `chrono`
+entry sets `default-features = false`, and it brings `iana-time-zone`
+along.
+
 ```rust
 use chrono::{DateTime, NaiveDate, Utc};
 use frieze::Schema;
@@ -138,12 +150,16 @@ The time zone is part of the Rust type but not of the schema:
 `DateTime<Utc>`, `DateTime<FixedOffset>`, and `DateTime<Local>` all
 name the schema `DateTime` and all emit
 `{type: string, format: date-time}`, because every one of them
-serializes as an RFC 3339 string carrying its own offset. Those three
-are also the only time zones chrono implements `Deserialize` for: a
-field typed with another `Tz` (`chrono_tz::Tz`, say) still gets its
-schema, but `#[derive(Deserialize)]` on the struct fails to compile,
-and the usual `deserialize_with` escape hatch is
-[rejected](#other-serde-attributes-unsupported) by frieze.
+serializes as an RFC 3339 string carrying its own offset.
+
+Those three are also the **only** time zones with a `Schema` impl,
+because they are the only ones chrono implements `Deserialize` for: a
+schema exists exactly where the value round-trips. A field typed with
+another `Tz` (`chrono_tz::Tz`, say) fails with the usual trait-bound
+error, exactly like any other unsupported type. RFC 3339 carries a
+numeric offset and no zone name, so a named zone is not representable
+on the wire at all. Convert to `Utc` or `FixedOffset` at the boundary
+of your API types, or carry the zone name as a separate `String` field.
 
 The [qualified-path restriction](#restrictions-on-field-position-types)
 applies as usual, so write `DateTime<Utc>` rather than
@@ -168,8 +184,9 @@ naive timestamp carries no UTC offset, and serde writes it as
 `2015-09-18T23:56:04` — which is not an RFC 3339 `date-time`. Mapping
 it to `format: date-time` anyway would break the rule that the declared
 format describes what actually goes on the wire. Use `DateTime<Utc>`
-(or another `Tz`) when the value is a real instant; if a naive
-timestamp genuinely is the wire format, model the field as `String`.
+(or one of the other two supported time zones) when the value is a real
+instant; if a naive timestamp genuinely is the wire format, model the
+field as `String`.
 
 ### Primitive `Schema` implementations
 

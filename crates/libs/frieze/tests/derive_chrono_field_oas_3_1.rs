@@ -3,9 +3,11 @@
 //! 3.1 encodes by folding `"null"` into the `type` sequence.
 //!
 //! `DateTime<Utc>` and `DateTime<FixedOffset>` sit side by side to pin
-//! the blanket impl over the time zone: both render the identical
-//! `{type: string, format: date-time}` shape, because chrono's serde
-//! default writes an RFC 3339 string for every `Tz`.
+//! that the time zone stays out of the schema: both render the
+//! identical `{type: string, format: date-time}` shape, because chrono's
+//! serde default writes an RFC 3339 string either way. (`DateTime<Local>`
+//! is the third supported time zone, covered by the unit tests instead:
+//! naming it here would only repeat the same rendered shape.)
 #![cfg(feature = "chrono04")]
 
 use chrono::{DateTime, FixedOffset, NaiveDate, Utc};

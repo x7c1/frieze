@@ -28,14 +28,27 @@
 //! Optional features add further leaf scalars to that table — not Rust
 //! primitives, but types that behave like one here:
 //!
-//! | Rust                     | name       | feature    |
-//! |--------------------------|------------|------------|
-//! | `uuid::Uuid`             | `Uuid`     | `uuid1`    |
-//! | `chrono::DateTime<Tz>`   | `DateTime` | `chrono04` |
-//! | `chrono::NaiveDate`      | `Date`     | `chrono04` |
+//! | Rust                            | name       | feature    |
+//! |---------------------------------|------------|------------|
+//! | `uuid::Uuid`                    | `Uuid`     | `uuid1`    |
+//! | `chrono::DateTime<Utc>`         | `DateTime` | `chrono04` |
+//! | `chrono::DateTime<FixedOffset>` | `DateTime` | `chrono04` |
+//! | `chrono::DateTime<Local>`       | `DateTime` | `chrono04` |
+//! | `chrono::NaiveDate`             | `Date`     | `chrono04` |
 //!
 //! Only the impls are feature-gated — the matching leaf variants and
 //! their reserved names live unconditionally in `frieze-model`.
+//!
+//! `chrono::DateTime<Tz>` gets those three impls and no more, even
+//! though chrono can *serialize* every `Tz`. RFC 3339 carries a numeric
+//! offset and no zone name, so `Utc`, `FixedOffset` and `Local` are
+//! exactly the time zones chrono implements `Deserialize` for; pinning
+//! the impl set to them makes "has a frieze schema" coincide with
+//! "round-trips the wire". A field typed with any other `Tz`
+//! (`chrono_tz::Tz`, say) fails at derive time with the ordinary
+//! missing-`Schema` trait-bound error, exactly like every other
+//! unsupported type, instead of obtaining a schema that the struct's own
+//! `#[derive(Deserialize)]` cannot honour.
 //!
 //! `chrono::NaiveDateTime` is deliberately absent: it carries no UTC
 //! offset, so serde writes it as a naive `2015-09-18T23:56:04` rather
@@ -92,36 +105,24 @@ impl_primitive_schema!(uuid::Uuid, "Uuid", Uuid);
 #[cfg(feature = "chrono04")]
 impl_primitive_schema!(chrono::NaiveDate, "Date", Date);
 
-/// `chrono::DateTime<Tz>` is generic over its time zone, so it needs a
-/// hand-written impl rather than the macro above. The schema is the
-/// same for every `Tz` — including the name, which stays `"DateTime"`
-/// instead of composing the type argument in the way generic user
-/// structs do (`Container<i64>` → `Int64_Container`). That is what
-/// makes the type usable as a field: the derive emits
-/// `Reference(<DateTime<Utc> as Schema>::name())`, and only the bare
-/// name `DateTime` is inlined as the leaf scalar by the boundary.
-///
-/// A per-`Tz` name would be wrong on the wire as well: serde's default
-/// representation is an RFC 3339 string for every time zone, so all of
-/// them describe the same `{type: string, format: date-time}` shape.
+// One impl per time zone rather than a single impl generic over `Tz`;
+// the module doc explains why the set is pinned to the three time zones
+// chrono can deserialize.
+//
+// All three share the schema name `"DateTime"` instead of composing the
+// type argument the way generic user structs do (`Container<i64>` →
+// `Int64_Container`). That is what makes them usable as fields: the
+// derive emits `Reference(<DateTime<Utc> as Schema>::name())`, and only
+// the bare name `DateTime` is inlined as the leaf scalar by the
+// boundary. A per-`Tz` name would be wrong on the wire as well, since
+// all three describe the same `{type: string, format: date-time}`
+// shape.
 #[cfg(feature = "chrono04")]
-impl<Tz: chrono::TimeZone> Schema for chrono::DateTime<Tz> {
-    fn name() -> String {
-        String::from("DateTime")
-    }
-    fn schema() -> ModelSchema {
-        ModelSchema::new_scalar(PropertyType::DateTime).expect(PRIMITIVE_SCALAR_INVARIANT_MSG)
-    }
-}
-
+impl_primitive_schema!(chrono::DateTime<chrono::Utc>, "DateTime", DateTime);
 #[cfg(feature = "chrono04")]
-impl<Tz: chrono::TimeZone> Register for chrono::DateTime<Tz> {
-    fn register_into(_builder: &mut SchemasBuilder) {
-        // No-op for the same reason as the macro-generated impls: leaf
-        // scalars are inlined at the boundary, never registered under
-        // `#/components/schemas`.
-    }
-}
+impl_primitive_schema!(chrono::DateTime<chrono::FixedOffset>, "DateTime", DateTime);
+#[cfg(feature = "chrono04")]
+impl_primitive_schema!(chrono::DateTime<chrono::Local>, "DateTime", DateTime);
 
 #[cfg(test)]
 mod tests {
@@ -198,7 +199,7 @@ mod tests {
 
     #[cfg(feature = "chrono04")]
     #[test]
-    fn date_time_name_is_date_time_for_every_time_zone() {
+    fn date_time_name_is_date_time_for_every_supported_time_zone() {
         assert_eq!(
             <chrono::DateTime<chrono::Utc> as Schema>::name(),
             "DateTime"
@@ -207,11 +208,15 @@ mod tests {
             <chrono::DateTime<chrono::FixedOffset> as Schema>::name(),
             "DateTime"
         );
+        assert_eq!(
+            <chrono::DateTime<chrono::Local> as Schema>::name(),
+            "DateTime"
+        );
     }
 
     #[cfg(feature = "chrono04")]
     #[test]
-    fn date_time_schema_is_scalar_date_time_for_every_time_zone() {
+    fn date_time_schema_is_scalar_date_time_for_every_supported_time_zone() {
         let expected = ModelSchema::Scalar(ScalarSchema::new(PropertyType::DateTime).unwrap());
         assert_eq!(
             <chrono::DateTime<chrono::Utc> as Schema>::schema(),
@@ -219,6 +224,10 @@ mod tests {
         );
         assert_eq!(
             <chrono::DateTime<chrono::FixedOffset> as Schema>::schema(),
+            expected
+        );
+        assert_eq!(
+            <chrono::DateTime<chrono::Local> as Schema>::schema(),
             expected
         );
     }

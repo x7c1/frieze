@@ -362,11 +362,11 @@ and `Maybe` exactly like the built-in scalars — see
 
 ## chrono date/time fields (the `chrono04` feature)
 
-`chrono::DateTime<Tz>` and `chrono::NaiveDate` are usable as field
-types once the opt-in `chrono04` feature is enabled. As with `uuid1`,
-the `chrono` crate stays your own dependency: the feature turns on
-frieze's impls for the types; it does not bring the crate into your
-namespace.
+`chrono::DateTime<Tz>` (for `Tz` = `Utc`, `FixedOffset` or `Local`) and
+`chrono::NaiveDate` are usable as field types once the opt-in
+`chrono04` feature is enabled. As with `uuid1`, the `chrono` crate
+stays your own dependency: the feature turns on frieze's impls for the
+types; it does not bring the crate into your namespace.
 
 ```toml
 frieze = { version = "...", features = ["chrono04"] }
@@ -380,6 +380,12 @@ compatible. A `DateTime` from a different series does not implement
 it, but a struct deriving `Serialize` / `Deserialize` around a chrono
 field does.
 
+One chrono feature frieze does need is `clock`, which `chrono04` turns
+on for the whole dependency graph: `Local` lives behind it, so the
+impls cannot cover all three time zones without it. It reaches your
+build even if your own `chrono` entry sets `default-features = false`,
+and brings `iana-time-zone` with it.
+
 ```rust
 use chrono::{DateTime, NaiveDate, Utc};
 use frieze::Schema;
@@ -391,13 +397,22 @@ struct Booking {
 }
 ```
 
-The declared formats match what goes on the wire: serde writes
-`DateTime<Tz>` as an RFC 3339 timestamp for **every** time zone (so all
-of them share the single schema name `DateTime`) and `NaiveDate` as an
-ISO 8601 calendar date. `chrono::NaiveDateTime` is deliberately
-unsupported — it carries no offset, so it is not an RFC 3339
-`date-time`. Both supported types compose with `Option`, `Vec`, and
-`Maybe` exactly like the built-in scalars — see
+The declared formats match what goes on the wire: serde writes a
+`DateTime` as an RFC 3339 timestamp and `NaiveDate` as an ISO 8601
+calendar date. The three supported time zones share the single schema
+name `DateTime`, since the wire shape is the same for all of them.
+
+Those three are also the only time zones chrono can deserialize, so a
+schema exists exactly where the value round-trips. Any other `Tz`
+(`chrono_tz::Tz`, say) fails with the usual trait-bound error; RFC 3339
+has no room for a zone name anyway, so convert to `Utc` / `FixedOffset`
+at the API boundary, or carry the zone name as a separate `String`
+field.
+
+`chrono::NaiveDateTime` is deliberately unsupported for a related
+reason: it carries no offset, so it is not an RFC 3339 `date-time`.
+Both supported types compose with `Option`, `Vec`, and `Maybe` exactly
+like the built-in scalars — see
 [`docs/field-shapes.md`](docs/field-shapes.md#chrono-date-and-time-chrono04-feature).
 
 ## Auto-collection via `inventory`
