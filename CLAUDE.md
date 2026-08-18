@@ -156,4 +156,6 @@ When you change behaviour, also update the matching specification file:
 - Supported field shapes, compile-error categories, `Maybe<T>` handling, nested-struct (`$ref`) behaviour → [`docs/field-shapes.md`](docs/field-shapes.md)
 - Output ordering, canonical key order, the empty-container omission rule → [`docs/output-ordering.md`](docs/output-ordering.md)
 - OAS feature flags, per-version encoding differences, the build/test matrix → [`docs/oas-versions.md`](docs/oas-versions.md)
+- Library usage surface (crate roles, `compose`, `inventory` collection) → [`docs/library.md`](docs/library.md)
+- CLI behaviour (`cargo frieze generate` configuration, workspace resolution, `--check`) → [`docs/cli.md`](docs/cli.md)
 - End-user-visible behaviour or quick-start surface → also check [`README.md`](README.md)

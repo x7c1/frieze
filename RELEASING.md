@@ -115,8 +115,9 @@ resolves against the checkout:
 
 2. Create a minimal package that depends on the released `frieze`
    (one `#[derive(Schema)]` type, one partial document, one
-   `[[package.metadata.frieze.outputs]]` entry — the README's CLI
-   quick start is exactly this) and run:
+   `[[package.metadata.frieze.outputs]]` entry — the from-zero
+   walk-through in [`docs/cli.md`](docs/cli.md) is exactly this) and
+   run:
 
    ```console
    cargo frieze generate
@@ -128,9 +129,10 @@ resolves against the checkout:
 
 ### After the first release only
 
-The README carries "until the crates are published on crates.io"
-caveats (install from a checkout, path dependencies). Remove them once
-the first publish has actually happened.
+The README's Status section and [`docs/cli.md`](docs/cli.md) carry
+"until the crates are published on crates.io" caveats (install from a
+checkout, path dependencies). Remove them once the first publish has
+actually happened.
 
 ## What the version-skew check means for users
 
