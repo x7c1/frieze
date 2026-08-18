@@ -1,6 +1,6 @@
 //! `Option<T>` paired with `#[serde(skip_serializing_if = "Option::is_none")]`
 //! produces the optional + non-nullable shape (`Option<T>` with
-//! `skip_serializing_if` in `docs/field-shapes/README.md`). The field name is
+//! `skip_serializing_if` in `docs/field-shapes/composite-shapes.md`). The field name is
 //! **dropped** from the `required` array and no `nullable` marker appears.
 //!
 //! This file also serves as a contract test that the macro inspects field-

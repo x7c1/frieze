@@ -1,6 +1,6 @@
 //! `Option<User>` with `#[serde(skip_serializing_if = "Option::is_none")]`
 //! produces the optional + non-nullable shape (`Option<U>` with
-//! `skip_serializing_if` in `docs/field-shapes/README.md`). The field is dropped
+//! `skip_serializing_if` in `docs/field-shapes/composite-shapes.md`). The field is dropped
 //! from `required` and the referenced schema is emitted as a plain `$ref`
 //! (no `allOf` / `oneOf` wrap, since the value is not nullable on the
 //! wire). Identical output under both OAS versions.

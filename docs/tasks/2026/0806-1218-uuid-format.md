@@ -4,7 +4,7 @@ pipeline_phase: null
 plan: null
 base_ref: null
 retries_remaining: 1
-check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo build -p frieze --features uuid1 && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && cargo test -p frieze --features uuid1 && grep -q 'format: uuid' docs/field-shapes/README.md && grep -q uuid1 .github/workflows/ci.yml"
+check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo build -p frieze --features uuid1 && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && cargo test -p frieze --features uuid1 && grep -q 'format: uuid' docs/field-shapes/scalars.md && grep -q uuid1 .github/workflows/ci.yml"
 assignee: null
 branch: task/0806-1218-uuid-format
 created_at: 2026-08-06T12:18:13Z
@@ -62,7 +62,7 @@ ninth primitive". Concretely:
   `uuid1` feature path (mirroring the existing no-default-features steps),
   and update the build/test matrix documented in `CLAUDE.md` and, if it
   describes the matrix, `docs/oas-versions/README.md`.
-- Docs: extend `docs/field-shapes/README.md` with the `uuid::Uuid` field shape
+- Docs: extend `docs/field-shapes/scalars.md` with the `uuid::Uuid` field shape
   (the emitted schema, the wire guarantee, composition with
   `Option`/`Vec`/`Maybe`, and the feature flag). Check `README.md` for any
   user-visible surface that should mention the feature.
@@ -87,7 +87,7 @@ Work test-first: write the failing tests below before the implementation.
       and the pinned wording tests in
       `crates/domain/frieze-model/tests/error_messages.rs` are updated to
       match.
-- [x] `docs/field-shapes/README.md` documents the `uuid::Uuid` mapping including
+- [x] `docs/field-shapes/scalars.md` documents the `uuid::Uuid` mapping including
       the literal `format: uuid` (the grep gate in `check_command` enforces
       it).
 - [x] `.github/workflows/ci.yml` gains `uuid1` feature steps (the grep gate

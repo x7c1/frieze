@@ -69,7 +69,7 @@ In particular, do NOT introduce:
   inside this repository.
 
 When a concept is referenced inside this repository, prefer the canonical
-wording defined in [`docs/field-shapes/README.md`](docs/field-shapes/README.md),
+wording defined in [`docs/field-shapes/`](docs/field-shapes/README.md),
 [`docs/output-ordering/README.md`](docs/output-ordering/README.md),
 [`docs/oas-versions/README.md`](docs/oas-versions/README.md),
 [`docs/architecture/README.md`](docs/architecture/README.md), or this
@@ -84,7 +84,7 @@ descriptions, documentation) are written in English.
 When you change behaviour, also update the matching specification file:
 
 - Workspace layout, dependency direction, crate-boundary invariants, terminology → [`docs/architecture/README.md`](docs/architecture/README.md)
-- Supported field shapes, compile-error categories, `Maybe<T>` handling, nested-struct (`$ref`) behaviour → [`docs/field-shapes/README.md`](docs/field-shapes/README.md)
+- Supported field shapes, compile-error categories, `Maybe<T>` handling, nested-struct (`$ref`) behaviour → [`docs/field-shapes/`](docs/field-shapes/README.md)
 - Output ordering, canonical key order, the empty-container omission rule → [`docs/output-ordering/README.md`](docs/output-ordering/README.md)
 - OAS feature flags, per-version encoding differences, the build/test matrix → [`docs/oas-versions/README.md`](docs/oas-versions/README.md)
 - Library usage surface (crate roles, `compose`, `inventory` collection) → [`docs/library/README.md`](docs/library/README.md)

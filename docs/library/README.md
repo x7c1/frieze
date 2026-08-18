@@ -83,7 +83,7 @@ the single source of truth for that slot.
 A `///` doc comment on the struct or on any field becomes the OAS
 `description` for that schema or property — written once in Rust,
 rendered automatically. See
-[Doc comments to `description`](../field-shapes/README.md#doc-comments-to-description)
+[Doc comments to `description`](../field-shapes/descriptions.md)
 for the full mapping (enum-level and per-variant doc-comments are
 composed into the enum schema's `description`).
 
@@ -94,14 +94,14 @@ and `enum` values match the names serde will produce on the wire. The
 precedence rule, the uniqueness check, and the list of serde
 attributes frieze cannot encode into a single OAS schema (and
 therefore rejects at compile time) are documented under
-[Wire names](../field-shapes/README.md#wire-names-rename-and-rename_all).
+[Wire names](../field-shapes/wire-names.md).
 
 ## Optionality, in one paragraph
 
 OpenAPI separates two concepts that Rust users often conflate:
 **presence** (does the key appear in the object?) and **nullability**
 (can the value be `null`?). `frieze` keeps them orthogonal — see the
-[composite shapes table](../field-shapes/README.md#composite-shapes-presence-x-nullability)
+[composite shapes table](../field-shapes/composite-shapes.md)
 for the full mapping. The short version: `Option<T>` alone is
 required-and-nullable (matching serde's default behaviour),
 `Option<T>` + `skip_serializing_if` is optional-and-non-nullable, and
