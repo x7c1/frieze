@@ -13,7 +13,7 @@ The specification is split by topic:
 |----------------------------------------------------------|--------------------------------------------------------------------------------------------------|
 | [scalars.md](scalars.md)                                 | The scalar set, the opt-in `uuid1` / `chrono04` scalars, and the primitive `Schema` impls        |
 | [composite-shapes.md](composite-shapes.md)               | Presence × nullability: `Option` / `Vec` / `Maybe`, the `Maybe` attribute check, rejected shapes |
-| [nested-structs.md](nested-structs.md)                   | `$ref` emission, explicit transitive closure, nullable references per OAS version                |
+| [nested-structs.md](nested-structs.md)                   | `$ref` emission, automatic transitive registration, nullable references per OAS version          |
 | [owned-wrappers.md](owned-wrappers.md)                   | Transparent `Box<T>` / `Rc<T>` / `Arc<T>` and recursive types                                    |
 | [generics.md](generics.md)                               | Generic structs and enums, schema-name composition, reserved primitive names                     |
 | [unit-variant-enums.md](unit-variant-enums.md)           | String-enum schemas from unit-variant enums                                                      |

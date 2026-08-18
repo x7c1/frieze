@@ -1,0 +1,6 @@
+error: frieze: `#[serde(default)]` is only supported on a `Maybe<T>` field, together with `#[serde(skip_serializing_if = "Maybe::is_missing")]`.
+ --> tests/ui/serde_default_non_maybe_unsupported.rs:6:5
+  |
+6 | /     #[serde(default)]
+7 | |     id: i64,
+  | |___________^

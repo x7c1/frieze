@@ -1,0 +1,5 @@
+error: frieze: `#[serde(crate)]` is not supported because frieze cannot verify its effect on the generated schema.
+ --> tests/ui/serde_unknown_unsupported.rs:5:9
+  |
+5 | #[serde(crate = "serde")]
+  |         ^^^^^^^^^^^^^^^

@@ -26,7 +26,8 @@ never appears in serialized output, so the wire format carries only
 the standard `openapi:` field.
 
 The parser (`Version::parse_from_openapi`) is patch-tolerant: any
-`3.0.x` string lifts to `Version::V3_0` and any `3.1.x` to
+`3.0.x` string with a decimal patch number lifts to `Version::V3_0`, and
+the corresponding `3.1.x` form lifts to
 `Version::V3_1` — OAS patch releases are editorial-only and never
 change schema shape — and the bare `3.0` / `3.1` forms are also
 accepted. Deserializing a document whose `openapi:` field is missing,
@@ -124,8 +125,8 @@ nullable-reference wrap as a nullable nested-struct reference; see
 the table above.
 
 The `discriminator.mapping` block is deliberately omitted (see
-[Internally-tagged enums](../field-shapes/internally-tagged-enums.md) in
-`field-shapes.md` for the rationale).
+[Internally-tagged enums](../field-shapes/internally-tagged-enums.md) for
+the rationale).
 
 ### Why the difference
 

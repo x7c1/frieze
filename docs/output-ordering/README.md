@@ -17,8 +17,8 @@ maps as unordered.
 Renaming changes the **key text** in `properties` / `required` / `enum`
 but never the order — declaration order is the single source of order
 truth for fields and variants alike. The
-[Wire names](../field-shapes/wire-names.md) section
-of `field-shapes.md` defines how each wire name is derived.
+[Wire names](../field-shapes/wire-names.md) defines how each wire name is
+derived.
 
 `IndexMap` is used internally where insertion order matters; `BTreeMap`
 where alphabetical order is desired.

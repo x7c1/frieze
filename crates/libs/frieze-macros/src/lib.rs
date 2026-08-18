@@ -32,8 +32,9 @@
 //! The struct mapping is driven by syntactic type recognition plus a
 //! small fixed set of serde attributes the macro reads: `rename`,
 //! `rename_all`, `default`, `skip_serializing_if`, and (for enum
-//! containers) `tag`. Any other `#[serde(...)]` entry that frieze
-//! cannot faithfully encode into a single OAS schema (`alias`,
+//! containers) `tag`. Any other `#[serde(...)]` entry is rejected because
+//! frieze cannot verify that a single OAS schema matches its effect
+//! (`alias`,
 //! `flatten`, `content`, `untagged`, `transparent`,
 //! `rename_all_fields`, `with` / `serialize_with` /
 //! `deserialize_with`, `from` / `try_from` / `into`, `skip` /
@@ -50,7 +51,10 @@
 //! | `Vec<T>`                                                         | required | array, items as T  |
 //! | `Vec<Option<T>>`                                                 | required | array, items nullable |
 //! | `Option<Vec<T>>`                                                 | required | nullable array     |
+//! | `Option<Vec<T>>` + `#[serde(skip_serializing_if = "Option::is_none")]` | optional | non-nullable array |
 //! | `Option<Vec<Option<T>>>`                                         | required | nullable array, items nullable |
+//! | `Maybe<Vec<T>>`                                                  | optional | nullable array     |
+//! | `Maybe<Vec<Option<T>>>`                                          | optional | nullable array, items nullable |
 //!
 //! # Rejected shapes (compile error)
 //!
