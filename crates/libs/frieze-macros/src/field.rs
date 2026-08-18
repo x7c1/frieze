@@ -94,7 +94,7 @@ pub(crate) fn parse_field(
         }
         // Scalar `T` inside Option — either optional + non-nullable
         // (with `skip_serializing_if = "Option::is_none"`) or required +
-        // nullable (serde default). See `docs/field-shapes.md`.
+        // nullable (serde default). See `docs/field-shapes/README.md`.
         let scalar = scalar_property_type_expr(inner).map_err(|_| {
             syn::Error::new_spanned(ty, unsupported_inside_message(inner, "Option<...>"))
         })?;

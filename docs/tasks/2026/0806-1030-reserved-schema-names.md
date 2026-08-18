@@ -4,7 +4,7 @@ pipeline_phase: null
 plan: null
 base_ref: null
 retries_remaining: 1
-check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && grep -q ReservedSchemaName docs/field-shapes.md"
+check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && grep -q ReservedSchemaName docs/field-shapes/README.md"
 assignee: null
 branch: task/0806-1030-reserved-schema-names
 created_at: 2026-08-06T10:30:46Z
@@ -22,7 +22,7 @@ scalar shape instead of emitting a `$ref` (see
 `primitive_property_type_for` in `crates/domain/frieze-model/src/property_type.rs`
 and `property_type_to_object_schema` in
 `crates/domain/frieze-usecase/src/boundary.rs`; the behaviour is documented in
-`docs/field-shapes.md` around the "primitive references are inlined" section).
+`docs/field-shapes/README.md` around the "primitive references are inlined" section).
 
 Consequence: if a user defines their own `#[derive(Schema)] pub struct Int64`
 (or any type whose registered schema name exactly equals a reserved name),
@@ -69,9 +69,9 @@ Requirements:
 - [x] The error's `Display` message names the offending schema and contains
       both remedies (rename / `#[frieze(namespace)]`), pinned by a unit test
       following the placement of the existing error-message pin tests.
-- [x] `docs/field-shapes.md` documents the reserved-name rejection next to
+- [x] `docs/field-shapes/README.md` documents the reserved-name rejection next to
       the primitive-inline section, mentioning `ReservedSchemaName`
-      (`grep -q ReservedSchemaName docs/field-shapes.md` is appended to
+      (`grep -q ReservedSchemaName docs/field-shapes/README.md` is appended to
       `check_command`, so the check phase enforces it).
 
 ## Out of scope

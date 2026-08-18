@@ -1,6 +1,6 @@
 //! `Option<T>` paired with `#[serde(skip_serializing_if = "Option::is_none")]`
 //! produces the optional + non-nullable shape (`Option<T>` with
-//! `skip_serializing_if` in `docs/field-shapes.md`). Under OAS 3.1 this
+//! `skip_serializing_if` in `docs/field-shapes/README.md`). Under OAS 3.1 this
 //! means the field is dropped from `required` **and** the `type` stays as
 //! a scalar (no `"null"` fold).
 

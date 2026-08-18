@@ -116,7 +116,7 @@ resolves against the checkout:
 2. Create a minimal package that depends on the released `frieze`
    (one `#[derive(Schema)]` type, one partial document, one
    `[[package.metadata.frieze.outputs]]` entry — the from-zero
-   walk-through in [`docs/cli.md`](docs/cli.md) is exactly this) and
+   walk-through in [`docs/cli/README.md`](docs/cli/README.md) is exactly this) and
    run:
 
    ```console
@@ -129,7 +129,7 @@ resolves against the checkout:
 
 ### After the first release only
 
-The README's Status section and [`docs/cli.md`](docs/cli.md) carry
+The README's Status section and [`docs/cli/README.md`](docs/cli/README.md) carry
 "until the crates are published on crates.io" caveats (install from a
 checkout, path dependencies). Remove them once the first publish has
 actually happened.

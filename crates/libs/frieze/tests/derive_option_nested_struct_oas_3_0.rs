@@ -1,6 +1,6 @@
 //! `Option<User>` (serde default — no `skip_serializing_if`) produces
 //! the required + nullable shape (`Option<U>` serde default in
-//! `docs/field-shapes.md`). Under OAS 3.0, a nullable reference is
+//! `docs/field-shapes/README.md`). Under OAS 3.0, a nullable reference is
 //! expressed with `allOf` + `nullable: true` because the spec disallows
 //! sibling keys on a `$ref` schema.
 

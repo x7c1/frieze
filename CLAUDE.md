@@ -6,59 +6,14 @@ Published as `x7c1/frieze` on GitHub. License: GPL-3.0-or-later.
 This file is for AI agents working in this repository. End-user-facing
 specification lives in [`docs/`](docs/) and [`README.md`](README.md).
 
-## Repository layout
+## Architecture
 
-This is a Cargo workspace.
+The workspace layout, dependency direction, crate-boundary invariants,
+and terminology rules are specified in
+[`docs/architecture/README.md`](docs/architecture/README.md), expanded
+here:
 
-```
-crates/
-  apps/
-    frieze-cli           # bin `cargo-frieze`: the `cargo frieze generate` subcommand
-  gateway/
-    frieze-fs            # Filesystem gateway: package metadata, partials, outputs
-    frieze-cargo         # Cargo gateway: schema collection via a scratch crate
-  domain/
-    frieze-model         # Domain types whose invariants are enforced by the type system
-    frieze-usecase       # Boundary conversion, document composition, gateway traits, GenerateOas interactor
-  libs/
-    frieze-openapi       # Plain representation of the OpenAPI Specification (+ to_yaml)
-    frieze-macros        # proc-macro crate
-    frieze-wire          # Composition root: injects the concrete gateways into the interactors
-    frieze               # User-facing API: Schema / Register traits + SchemasBuilder registry
-```
-
-## Dependency direction and invariants
-
-```
-frieze-cli     -> frieze-wire, frieze-usecase, frieze-model
-frieze-wire    -> frieze-fs, frieze-cargo, frieze-usecase
-frieze-fs      -> frieze-usecase, frieze-model, frieze-openapi
-frieze-cargo   -> frieze-usecase, frieze-model, frieze-openapi
-frieze-usecase -> frieze-model, frieze-openapi
-frieze         -> frieze-model, frieze-macros
-```
-
-(`frieze-macros` has no runtime dependency on the other crates: the
-tokens it emits resolve through `::frieze::__private`. `frieze` also
-dev-depends on `frieze-openapi` / `frieze-usecase` for its integration
-tests.)
-
-1. `frieze-model` depends on nothing else within frieze (and minimally on external crates).
-2. `frieze-openapi` does not know about `frieze-model` or `frieze-usecase`.
-3. Only `frieze-usecase` performs the boundary conversion between `frieze-openapi` and `frieze-model`.
-4. `frieze-model` types use private fields + constructor functions; they cannot be built via struct literals.
-5. `frieze-macros` only touches the `Schema` / `Register` traits and the `__private` helpers defined in `frieze`; it never constructs `frieze-openapi` types, and reaches `frieze-model` constructors only through `::frieze::__private`.
-6. Gateway crates (`frieze-fs`, `frieze-cargo`) implement the gateway traits defined in `frieze-usecase`; they do not know about each other.
-7. `frieze-usecase` does not depend on any gateway crate — it holds only the trait definitions and the interactors written against them.
-8. Concrete gateway types are known only to `frieze-wire` and to the gateway crates themselves; `frieze-cli` obtains the assembled interactor through `frieze-wire` and never names a gateway type.
-
-## Terminology
-
-The term **"DTO"** is **not** used here. `frieze-openapi` types are a
-plain representation of the OAS specification; `frieze-model` types are
-validated domain types that uphold internal invariants. Lumping them as
-"DTOs" hides the responsibility difference the architecture is built
-upon — refer to them by their crate-specific roles instead.
+@docs/architecture/README.md
 
 ## Development workflow
 
@@ -72,7 +27,7 @@ The OAS version (3.0 / 3.1) is per-document runtime data, so one test
 run covers both output shapes. Three feature axes remain (`inventory`,
 `uuid1`, `chrono04`), giving a 13-command fmt / build / clippy / test
 matrix. The command list and its rationale live in
-[`docs/oas-versions.md` § Build / Test](docs/oas-versions.md#build--test);
+[`docs/oas-versions/README.md` § Build / Test](docs/oas-versions/README.md#build--test);
 CI (`.github/workflows/ci.yml`) runs the same steps on every PR. Run
 the full matrix locally before opening a PR.
 
@@ -114,10 +69,12 @@ In particular, do NOT introduce:
   inside this repository.
 
 When a concept is referenced inside this repository, prefer the canonical
-wording defined in [`docs/field-shapes.md`](docs/field-shapes.md),
-[`docs/output-ordering.md`](docs/output-ordering.md),
-[`docs/oas-versions.md`](docs/oas-versions.md), or this `CLAUDE.md` itself —
-not an abbreviation that only makes sense in an upstream tracker.
+wording defined in [`docs/field-shapes/README.md`](docs/field-shapes/README.md),
+[`docs/output-ordering/README.md`](docs/output-ordering/README.md),
+[`docs/oas-versions/README.md`](docs/oas-versions/README.md),
+[`docs/architecture/README.md`](docs/architecture/README.md), or this
+`CLAUDE.md` itself — not an abbreviation that only makes sense in an
+upstream tracker.
 
 All artifacts pushed to this repository (code, comments, commit messages, PR
 descriptions, documentation) are written in English.
@@ -126,9 +83,10 @@ descriptions, documentation) are written in English.
 
 When you change behaviour, also update the matching specification file:
 
-- Supported field shapes, compile-error categories, `Maybe<T>` handling, nested-struct (`$ref`) behaviour → [`docs/field-shapes.md`](docs/field-shapes.md)
-- Output ordering, canonical key order, the empty-container omission rule → [`docs/output-ordering.md`](docs/output-ordering.md)
-- OAS feature flags, per-version encoding differences, the build/test matrix → [`docs/oas-versions.md`](docs/oas-versions.md)
-- Library usage surface (crate roles, `compose`, `inventory` collection) → [`docs/library.md`](docs/library.md)
-- CLI behaviour (`cargo frieze generate` configuration, workspace resolution, `--check`) → [`docs/cli.md`](docs/cli.md)
+- Workspace layout, dependency direction, crate-boundary invariants, terminology → [`docs/architecture/README.md`](docs/architecture/README.md)
+- Supported field shapes, compile-error categories, `Maybe<T>` handling, nested-struct (`$ref`) behaviour → [`docs/field-shapes/README.md`](docs/field-shapes/README.md)
+- Output ordering, canonical key order, the empty-container omission rule → [`docs/output-ordering/README.md`](docs/output-ordering/README.md)
+- OAS feature flags, per-version encoding differences, the build/test matrix → [`docs/oas-versions/README.md`](docs/oas-versions/README.md)
+- Library usage surface (crate roles, `compose`, `inventory` collection) → [`docs/library/README.md`](docs/library/README.md)
+- CLI behaviour (`cargo frieze generate` configuration, workspace resolution, `--check`) → [`docs/cli/README.md`](docs/cli/README.md)
 - End-user-visible behaviour or quick-start surface → also check [`README.md`](README.md)

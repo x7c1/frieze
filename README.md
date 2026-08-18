@@ -65,18 +65,19 @@ println!("{}", frieze_openapi::to_yaml(&document));
 
 The same pipeline is available with no generation code at all:
 `cargo frieze generate` builds the declared documents straight from
-`Cargo.toml` metadata — see [`docs/cli.md`](docs/cli.md).
+`Cargo.toml` metadata — see [`docs/cli/`](docs/cli/README.md).
 
 ## Documentation
 
-| File                                                 | Topic                                                              |
-|------------------------------------------------------|--------------------------------------------------------------------|
-| [`docs/library.md`](docs/library.md)                 | Library walk-through: crate roles, `compose`, schema collection    |
-| [`docs/cli.md`](docs/cli.md)                         | The `cargo frieze generate` subcommand, workspaces, CI `--check`   |
-| [`docs/field-shapes.md`](docs/field-shapes.md)       | Field types, presence/nullability, `uuid` / `chrono` support       |
-| [`docs/oas-versions.md`](docs/oas-versions.md)       | OAS version handling and version differences                       |
-| [`docs/output-ordering.md`](docs/output-ordering.md) | Output ordering guarantees                                         |
-| [`RELEASING.md`](RELEASING.md)                       | Release procedure and version policy                               |
+| Directory                                               | Topic                                                            |
+|---------------------------------------------------------|------------------------------------------------------------------|
+| [`docs/library/`](docs/library/README.md)               | Library walk-through: crate roles, `compose`, schema collection  |
+| [`docs/cli/`](docs/cli/README.md)                       | The `cargo frieze generate` subcommand, workspaces, CI `--check` |
+| [`docs/field-shapes/`](docs/field-shapes/README.md)     | Field types, presence/nullability, `uuid` / `chrono` support     |
+| [`docs/oas-versions/`](docs/oas-versions/README.md)     | OAS version handling and version differences                     |
+| [`docs/output-ordering/`](docs/output-ordering/README.md) | Output ordering guarantees                                     |
+| [`docs/architecture/`](docs/architecture/README.md)     | Workspace layout, dependency direction, crate-boundary invariants |
+| [`RELEASING.md`](RELEASING.md)                          | Release procedure and version policy                             |
 
 ## License
 
