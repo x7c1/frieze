@@ -1,0 +1,6 @@
+error: frieze: `#[serde(skip_serializing_if = "Vec::is_empty")]` is only supported on an `Option<T>` or `Maybe<T>` field.
+ --> tests/ui/serde_skip_predicate_unsupported.rs:6:5
+  |
+6 | /     #[serde(skip_serializing_if = "Vec::is_empty")]
+7 | |     tags: Vec<String>,
+  | |_____________________^

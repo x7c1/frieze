@@ -9,10 +9,7 @@
 
 use syn::Attribute;
 
-/// Position context for [`scan_serde_attrs`]. Currently unused for
-/// branching — every position rejects the same DEFER attribute set —
-/// but kept so future changes can vary the diagnostic per site without
-/// reshuffling call sites.
+/// Position context for [`scan_serde_attrs`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SerdePosition {
     StructContainer,
@@ -27,10 +24,7 @@ pub(crate) enum SerdePosition {
 /// Walks every meta entry once and either:
 ///
 /// - records a SUPPORT value into one of the fields, or
-/// - rejects an unsupported (DEFER) form with a compile error, or
-/// - silently skips an attribute frieze does not interpret (e.g.
-///   `crate = "..."`) after consuming its value so the walker can
-///   continue.
+/// - rejects an unsupported (DEFER) form with a compile error.
 ///
 /// Returning a single struct rather than scattering one-purpose readers
 /// across the macro keeps every diagnostic for a given site routed
@@ -49,15 +43,14 @@ pub(crate) struct SerdeScan {
     pub(crate) rename_all: Option<(String, proc_macro2::Span)>,
     /// `true` when the field carries the bare `#[serde(default)]`.
     /// Custom-default forms like `#[serde(default = "path")]` are
-    /// consumed but do **not** set this flag — the `Maybe<T>` gate
-    /// requires the bare form.
+    /// rejected — the `Maybe<T>` gate requires the bare form.
     pub(crate) default_bare: bool,
     /// The literal string of the `skip_serializing_if = "..."`
     /// attribute, if present. The two values currently recognised by
     /// frieze are `"Option::is_none"` (switches an `Option<T>` field to
     /// optional / non-nullable) and `"Maybe::is_missing"` (part of the
-    /// required `Maybe<T>` attribute pair). Other predicates are stored
-    /// verbatim but have no effect on the generated schema.
+    /// required `Maybe<T>` attribute pair). Other predicates are rejected
+    /// by the field-shape parser.
     pub(crate) skip_serializing_if: Option<String>,
     /// `#[serde(tag = "literal")]` on an enum container, if present.
     /// Drives the internal-tagged `oneOf` expansion in
@@ -79,12 +72,9 @@ const ADJACENT_TAGGING_MSG: &str = "frieze: adjacent tagging (`#[serde(tag = \".
 /// error here so a single scan covers both data extraction and the
 /// unsupported-attribute check.
 ///
-/// The `position` argument is currently informational — every Rust site
-/// rejects the same DEFER set — but kept so future versions can tighten
-/// the rules per site without rerouting calls.
 pub(crate) fn scan_serde_attrs(
     attrs: &[Attribute],
-    _position: SerdePosition,
+    position: SerdePosition,
 ) -> Result<SerdeScan, syn::Error> {
     let mut scan = SerdeScan::default();
     for attr in attrs {
@@ -95,15 +85,22 @@ pub(crate) fn scan_serde_attrs(
             let name = match meta.path.get_ident() {
                 Some(i) => i.to_string(),
                 None => {
-                    // Qualified meta paths inside `#[serde(...)]` are not
-                    // standard, but consume any value form so the walker
-                    // can advance.
                     consume_meta_value(&meta)?;
-                    return Ok(());
+                    return Err(meta.error(
+                        "frieze: qualified paths inside `#[serde(...)]` are not supported.",
+                    ));
                 }
             };
             match name.as_str() {
                 "rename" => {
+                    if matches!(
+                        position,
+                        SerdePosition::StructContainer | SerdePosition::EnumContainer
+                    ) {
+                        return Err(meta.error(
+                            "frieze: `#[serde(rename = \"...\")]` on a container is not supported; schema-name renaming is not yet modelled.",
+                        ));
+                    }
                     if meta.input.peek(syn::token::Paren) {
                         return Err(meta.error(DIRECTION_SPLIT_RENAME_MSG));
                     }
@@ -113,6 +110,14 @@ pub(crate) fn scan_serde_attrs(
                     }
                 }
                 "rename_all" => {
+                    if matches!(
+                        position,
+                        SerdePosition::StructField | SerdePosition::EnumVariant
+                    ) {
+                        return Err(meta.error(
+                            "frieze: `#[serde(rename_all = \"...\")]` is only supported on a struct or enum container.",
+                        ));
+                    }
                     if meta.input.peek(syn::token::Paren) {
                         return Err(meta.error(DIRECTION_SPLIT_RENAME_ALL_MSG));
                     }
@@ -122,17 +127,26 @@ pub(crate) fn scan_serde_attrs(
                     }
                 }
                 "default" => {
+                    if position != SerdePosition::StructField {
+                        return Err(meta.error(
+                            "frieze: `#[serde(default)]` is only supported on a `Maybe<T>` struct field.",
+                        ));
+                    }
                     if meta.input.peek(syn::Token![=]) {
-                        // `default = "path"`: consume and ignore. The
-                        // bare form is the only one the `Maybe<T>` gate
-                        // accepts, so a custom default is effectively
-                        // not bare.
                         let _: syn::LitStr = meta.value()?.parse()?;
+                        return Err(meta.error(
+                            "frieze: custom `#[serde(default = \"...\")]` is not supported; a `Maybe<T>` field requires bare `#[serde(default)]`.",
+                        ));
                     } else {
                         scan.default_bare = true;
                     }
                 }
                 "skip_serializing_if" => {
+                    if position != SerdePosition::StructField {
+                        return Err(meta.error(
+                            "frieze: `#[serde(skip_serializing_if = \"...\")]` is only supported on an `Option<T>` or `Maybe<T>` struct field.",
+                        ));
+                    }
                     let lit: syn::LitStr = meta.value()?.parse()?;
                     scan.skip_serializing_if = Some(lit.value());
                 }
@@ -144,6 +158,11 @@ pub(crate) fn scan_serde_attrs(
                     return Err(meta.error("frieze: `#[serde(flatten)]` on a field is not supported."));
                 }
                 "tag" => {
+                    if position != SerdePosition::EnumContainer {
+                        return Err(meta.error(
+                            "frieze: `#[serde(tag = \"...\")]` is only supported on an enum container.",
+                        ));
+                    }
                     let lit: syn::LitStr = meta.value()?.parse()?;
                     if scan.tag.is_none() {
                         scan.tag = Some((lit.value(), lit.span()));
@@ -200,12 +219,10 @@ pub(crate) fn scan_serde_attrs(
                     return Err(meta.error("frieze: `#[serde(into)]` is not supported."));
                 }
                 _ => {
-                    // Unknown to frieze. Consume the value (if any) so
-                    // the walker can move past this entry and silently
-                    // skip — serde may grow more attributes that have
-                    // no schema impact, and we don't want to break user
-                    // code over them.
                     consume_meta_value(&meta)?;
+                    return Err(meta.error(format!(
+                        "frieze: `#[serde({name})]` is not supported because frieze cannot verify its effect on the generated schema."
+                    )));
                 }
             }
             Ok(())

@@ -44,7 +44,7 @@ tests.)
 1. `frieze-model` depends on nothing else within frieze (and minimally on external crates).
 2. `frieze-openapi` does not know about `frieze-model` or `frieze-usecase`.
 3. Only `frieze-usecase` performs the boundary conversion between `frieze-openapi` and `frieze-model`.
-4. `frieze-model` types use private fields + constructor functions; they cannot be built via struct literals.
+4. `frieze-model` validates values at constructor boundaries. Identifier-like newtypes keep private fields, while aggregate schema types expose their fields for boundary conversion; callers that mutate or construct those aggregates directly are responsible for preserving their documented invariants.
 5. `frieze-macros` only touches the `Schema` / `Register` traits and the `__private` helpers defined in `frieze`; it never constructs `frieze-openapi` types, and reaches `frieze-model` constructors only through `::frieze::__private`.
 6. Gateway crates (`frieze-fs`, `frieze-cargo`) implement the gateway traits defined in `frieze-usecase`; they do not know about each other.
 7. `frieze-usecase` does not depend on any gateway crate — it holds only the trait definitions and the interactors written against them.

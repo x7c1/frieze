@@ -1,0 +1,5 @@
+error: frieze: custom `#[serde(default = "...")]` is not supported; a `Maybe<T>` field requires bare `#[serde(default)]`.
+  --> tests/ui/serde_custom_default_unsupported.rs:10:13
+   |
+10 |     #[serde(default = "fallback")]
+   |             ^^^^^^^^^^^^^^^^^^^^

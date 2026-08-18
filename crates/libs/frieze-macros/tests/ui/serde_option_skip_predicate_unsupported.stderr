@@ -1,0 +1,6 @@
+error: frieze: unsupported `skip_serializing_if` predicate `skip_name` on `Option<T>`; use `Option::is_none`.
+  --> tests/ui/serde_option_skip_predicate_unsupported.rs:10:5
+   |
+10 | /     #[serde(skip_serializing_if = "skip_name")]
+11 | |     name: Option<String>,
+   | |________________________^

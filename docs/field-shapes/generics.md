@@ -67,29 +67,27 @@ The composition is intentionally flat and uses the same `_` separator
 the OAS component-name pattern accepts. Collisions are possible in
 principle (a 2-arg `Pair<A, B_C>` and a 3-arg `Triple<A, B, C>` with a
 common base name could produce the same string); the
-[duplicate-schema check](nested-structs.md#explicit-transitive-closure) at
+[duplicate-schema check](nested-structs.md#automatic-transitive-registration) at
 `Schemas::build()` reports them by name when they occur.
 
 ## Registration of generic instantiations
 
-Each generic instantiation is a distinct schema entry and must be
-registered on the builder explicitly:
+Each generic instantiation is a distinct schema entry. Registering an
+instantiation as a root also registers every type reachable through its
+fields:
 
 ```rust
 frieze::SchemasBuilder::new()
-    .add::<Page<User>>()    // registers `User_Page`
-    .add::<User>()          // registers `User`
+    .add::<Page<User>>()    // registers both `User_Page` and `User`
     .build()?;
 ```
 
-A struct that references a generic instantiation in a field (`profile:
-Page<User>`) sees its `$ref` resolved through the standard
-[transitive-closure walk](nested-structs.md#explicit-transitive-closure); the builder
-reports the missing target by its composed name:
-
-```text
-Err(UnresolvedReference(SchemaName("User_Page")))
-```
+A non-generic root that references a concrete instantiation in a field
+(`profile: Page<User>`) registers `Page<User>` and `User` through the same
+[transitive registration walk](nested-structs.md#automatic-transitive-registration).
+Because generic definitions cannot submit an inventory root, use an
+explicit `add::<Page<User>>()` only when that instantiation is not reachable
+from any non-generic root but should still appear as a standalone component.
 
 ## Primitive arguments are inlined, not referenced
 
@@ -214,14 +212,11 @@ themselves generic structs (`Container<T>`), the per-variant
 because `Container<T>: IsStructSchema` holds whenever `T: Schema` does
 (the struct derive carries the `IsStructSchema` impl forward through
 the same `T: Schema` bound). Each generic-struct instantiation is a
-distinct schema entry and must be registered explicitly alongside the
-enum:
+distinct schema entry and is registered transitively from the enum:
 
 ```rust
 frieze::SchemasBuilder::new()
-    .add::<Event<i64, String>>()    // registers `Int64_String_Event`
-    .add::<Container<i64>>()        // registers `Int64_Container`
-    .add::<Container<String>>()     // registers `String_Container`
+    .add::<Event<i64, String>>() // also registers both Container instances
     .build()?;
 ```
 

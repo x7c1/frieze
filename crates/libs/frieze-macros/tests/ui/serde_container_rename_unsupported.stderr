@@ -1,0 +1,5 @@
+error: frieze: `#[serde(rename = "...")]` on a container is not supported; schema-name renaming is not yet modelled.
+ --> tests/ui/serde_container_rename_unsupported.rs:5:9
+  |
+5 | #[serde(rename = "WireUser")]
+  |         ^^^^^^

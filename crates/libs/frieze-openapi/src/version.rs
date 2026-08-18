@@ -48,10 +48,11 @@ impl Version {
     ///
     /// Accepts the bare major.minor forms (`"3.0"`, `"3.1"`) and any
     /// patch release in the supported range (`"3.0.3"`, `"3.1.10"`,
-    /// ...) — the patch part is not interpreted, since patch releases
-    /// never change schema shape. An empty string yields
-    /// [`VersionParseError::Empty`]; anything outside the supported
-    /// major.minor range yields [`VersionParseError::Unsupported`].
+    /// ...) — the patch part must contain decimal digits but is otherwise
+    /// not interpreted, since patch releases never change schema shape.
+    /// An empty string yields [`VersionParseError::Empty`]; anything
+    /// outside the supported major.minor range yields
+    /// [`VersionParseError::Unsupported`].
     pub fn parse_from_openapi(s: &str) -> Result<Self, VersionParseError> {
         if s.is_empty() {
             return Err(VersionParseError::Empty);
@@ -64,7 +65,7 @@ impl Version {
                 return Ok(version);
             }
             if let Some(patch) = rest.strip_prefix('.') {
-                if !patch.is_empty() {
+                if !patch.is_empty() && patch.chars().all(|c| c.is_ascii_digit()) {
                     return Ok(version);
                 }
             }
@@ -150,7 +151,9 @@ mod tests {
 
     #[test]
     fn rejects_garbage_input() {
-        for got in ["abc", "3", "v3.0", "3.0-rc1", "3.0."] {
+        for got in [
+            "abc", "3", "v3.0", "3.0-rc1", "3.0.", "3.0.foo", "3.1.-1", "3.1.0.1",
+        ] {
             assert_eq!(
                 Version::parse_from_openapi(got).unwrap_err(),
                 VersionParseError::Unsupported {

@@ -72,6 +72,8 @@ pub(crate) fn parse_field(
         let element = inner_to_property_type_expr(inner, ty, "Maybe<...>")?;
         Ok((nullable_property_type_expr(element), presence_optional()))
     } else if let Some(inner) = unwrap_option(ty) {
+        reject_default_outside_maybe(field, scan)?;
+        validate_option_skip_predicate(field, scan)?;
         if unwrap_option(inner).is_some() {
             return Err(syn::Error::new_spanned(
                 ty,
@@ -90,7 +92,11 @@ pub(crate) fn parse_field(
         if let Some(vec_inner) = unwrap_vec(inner) {
             let element = vec_element_property_type_expr(ty, vec_inner)?;
             let array = array_property_type_expr(element);
-            return Ok((nullable_property_type_expr(array), presence_required()));
+            return if is_option_skip_predicate(scan) {
+                Ok((array, presence_optional()))
+            } else {
+                Ok((nullable_property_type_expr(array), presence_required()))
+            };
         }
         // Scalar `T` inside Option — either optional + non-nullable
         // (with `skip_serializing_if = "Option::is_none"`) or required +
@@ -109,9 +115,11 @@ pub(crate) fn parse_field(
             Ok((nullable_property_type_expr(scalar), presence_required()))
         }
     } else if let Some(vec_inner) = unwrap_vec(ty) {
+        reject_non_shape_serde_attrs(field, scan)?;
         let element = vec_element_property_type_expr(ty, vec_inner)?;
         Ok((array_property_type_expr(element), presence_required()))
     } else {
+        reject_non_shape_serde_attrs(field, scan)?;
         // Pass the error through verbatim so the dedicated "qualified
         // paths" / "generic type parameters" messages from
         // `reference_property_type_expr` reach the user. The generic
@@ -119,6 +127,41 @@ pub(crate) fn parse_field(
         let pt = scalar_property_type_expr(ty)?;
         Ok((pt, presence_required()))
     }
+}
+
+fn reject_default_outside_maybe(field: &Field, scan: &SerdeScan) -> Result<(), syn::Error> {
+    if !scan.default_bare {
+        return Ok(());
+    }
+    Err(syn::Error::new_spanned(
+        field,
+        "frieze: `#[serde(default)]` is only supported on a `Maybe<T>` field, together with `#[serde(skip_serializing_if = \"Maybe::is_missing\")]`.",
+    ))
+}
+
+fn validate_option_skip_predicate(field: &Field, scan: &SerdeScan) -> Result<(), syn::Error> {
+    match scan.skip_serializing_if.as_deref() {
+        None | Some("Option::is_none") => Ok(()),
+        Some(predicate) => Err(syn::Error::new_spanned(
+            field,
+            format!(
+                "frieze: unsupported `skip_serializing_if` predicate `{predicate}` on `Option<T>`; use `Option::is_none`."
+            ),
+        )),
+    }
+}
+
+fn reject_non_shape_serde_attrs(field: &Field, scan: &SerdeScan) -> Result<(), syn::Error> {
+    reject_default_outside_maybe(field, scan)?;
+    if let Some(predicate) = scan.skip_serializing_if.as_deref() {
+        return Err(syn::Error::new_spanned(
+            field,
+            format!(
+                "frieze: `#[serde(skip_serializing_if = \"{predicate}\")]` is only supported on an `Option<T>` or `Maybe<T>` field."
+            ),
+        ));
+    }
+    Ok(())
 }
 
 /// Validates that a `Maybe<T>` field carries both serde attributes

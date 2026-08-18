@@ -20,11 +20,14 @@ For each field or variant the wire name is computed as:
    apply the mode to the Rust identifier.
 3. Otherwise, the wire name is the Rust identifier verbatim.
 
-This mirrors serde's own precedence. The wire name flows everywhere the
-identifier used to — the `properties` map key, the `required` entries,
-the `$ref`-side reference target name, and the per-variant bullet rows
-inside an enum-level `description` (see
+This mirrors serde's own precedence. A field wire name flows to its
+`properties` map key and `required` entry. A variant wire name flows to
+its string-enum value or discriminator tag constraint and to the
+per-variant bullet row inside an enum-level `description` (see
 [Enum variant docs](descriptions.md#enum-variant-docs)).
+
+`$ref` targets do not come from field wire names. They come from the
+referenced field type's `Schema::name()`.
 
 The two `rename_all` rules (`apply_to_field` and `apply_to_variant` in
 serde's terminology) differ — for instance `rename_all = "camelCase"`
@@ -63,13 +66,16 @@ where a `rename_all` rule would synthesise an empty result.
 
 ## Other `#[serde(...)]` attributes (unsupported)
 
-The macro reads a small fixed allow-list (`rename`, `rename_all`,
-`default`, `skip_serializing_if`) and rejects every other serde
-attribute it understands, because each of them encodes a behaviour a
-single OAS schema cannot faithfully represent:
+The macro reads a small fixed allow-list: field / variant `rename`,
+container `rename_all`, enum-container `tag`, bare `default` on a
+`Maybe<T>` field, and the exact `skip_serializing_if` predicates used by
+`Option<T>` and `Maybe<T>`. It rejects every other serde attribute because
+frieze cannot verify that a single generated OAS schema matches its wire
+behaviour:
 
 | `#[serde(...)]`                       | Why frieze rejects it                                                                          |
 |---------------------------------------|------------------------------------------------------------------------------------------------|
+| container `rename = "..."`           | Renaming the component schema and every `$ref` target is not yet modelled.                     |
 | `alias = "..."`                       | Deserialize-only acceptance list; nothing on the OAS side accepts "additional names".          |
 | `flatten`                             | Splices a sub-object's fields into the parent; the OAS schema would need synthetic flattening. |
 | `content = "..."`                     | Adjacent tagging (`tag` + `content`) is not supported — use internal tagging without `content`. |
@@ -80,6 +86,9 @@ single OAS schema cannot faithfully represent:
 | `with = "..."` / `serialize_with` / `deserialize_with` | Replaces the (de)serialization with a custom path; frieze cannot infer the wire shape.   |
 | `from = "..."` / `try_from = "..."` / `into = "..."` | Goes through a different type during (de)serialize; the wire shape is no longer the Rust type. |
 | `other`                               | Catch-all variant for deserialize; no OAS counterpart.                                         |
+| custom `default = "..."` or bare `default` outside `Maybe<T>` | Changes missing-field behaviour outside frieze's three-state mapping.          |
+| any other `skip_serializing_if` predicate | Frieze cannot infer when the field disappears from an arbitrary predicate.                  |
 
-Attributes the macro doesn't recognise (e.g. serde's `crate = "..."`)
-are passed through silently — they don't affect the generated schema.
+Unrecognised entries (for example serde's `crate = "..."`) are rejected
+as well. This fail-closed rule prevents a newly added or misspelled serde
+attribute from silently making the schema diverge from the wire shape.

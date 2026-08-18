@@ -27,9 +27,10 @@ struct User {
 }
 ```
 
-Both `Status` and `User` must be registered on the same
-`SchemasBuilder`; the build resolves the `$ref` from `User.status`
-to the registered `Status` schema.
+Registering `User` also registers `Status` through the derived transitive
+`Register` walk, so the `$ref` from `User.status` resolves without a second
+`add::<Status>()` call. With the default `inventory` feature, both
+non-generic types are also available through `from_inventory()`.
 
 ## Supported `rename_all` modes
 

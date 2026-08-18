@@ -16,13 +16,23 @@ scalar from [scalars.md](scalars.md); `U` stands for another
 | `Vec<T>`                                                              | required | array, items as `T`               |
 | `Vec<Option<T>>`                                                      | required | array, nullable items             |
 | `Option<Vec<T>>`                                                      | required | nullable array                    |
+| `Option<Vec<T>>` + `#[serde(skip_serializing_if = "Option::is_none")]` | optional | non-nullable array                |
 | `Option<Vec<Option<T>>>`                                              | required | nullable array, nullable items    |
+| `Option<Vec<Option<T>>>` + `#[serde(skip_serializing_if = "Option::is_none")]` | optional | non-nullable array, nullable items |
+| `Maybe<Vec<T>>`                                                       | optional | nullable array                    |
+| `Maybe<Vec<Option<T>>>`                                               | optional | nullable array, nullable items    |
 | `U` (another `Schema`-deriving struct)                                | required | `$ref` to `U`                     |
 | `Option<U>` (serde default)                                           | required | nullable `$ref`                   |
 | `Option<U>` + `#[serde(skip_serializing_if = "Option::is_none")]`     | optional | non-nullable `$ref`               |
 | `Maybe<U>`                                                            | optional | nullable `$ref`                   |
 | `Vec<U>`                                                              | required | array of `$ref`                   |
 | `Vec<Option<U>>`                                                      | required | array of nullable `$ref`          |
+| `Option<Vec<U>>`                                                      | required | nullable array of `$ref`          |
+| `Option<Vec<U>>` + `#[serde(skip_serializing_if = "Option::is_none")]` | optional | non-nullable array of `$ref`      |
+| `Option<Vec<Option<U>>>`                                              | required | nullable array of nullable `$ref` |
+| `Option<Vec<Option<U>>>` + `#[serde(skip_serializing_if = "Option::is_none")]` | optional | non-nullable array of nullable `$ref` |
+| `Maybe<Vec<U>>`                                                       | optional | nullable array of `$ref`          |
+| `Maybe<Vec<Option<U>>>`                                               | optional | nullable array of nullable `$ref` |
 
 ## Notes
 
@@ -32,6 +42,9 @@ scalar from [scalars.md](scalars.md); `U` stands for another
   **optional + non-nullable**, pair `Option<T>` with the standard
   `#[serde(skip_serializing_if = "Option::is_none")]` attribute. The
   derive inspects that attribute and switches branches accordingly.
+- The same `Option::is_none` rule applies when `T` is an array:
+  `Option<Vec<T>>` is a required nullable array by default and an optional
+  non-nullable array with the attribute.
 - **`Maybe<T>` is the dedicated three-state type** for "missing / null /
   present" — the one combination not expressible by `Option<T>` alone.
   Defined in `frieze-model` (`use frieze_model::Maybe;`). Add
@@ -43,7 +56,7 @@ scalar from [scalars.md](scalars.md); `U` stands for another
 
 ## Compile-time validation of `Maybe<T>` fields
 
-`Maybe<T>` only behaves correctly under serde when paired with the
+`Maybe<T>` (including `Maybe<Vec<T>>`) only behaves correctly under serde when paired with the
 attribute `#[serde(default, skip_serializing_if = "Maybe::is_missing")]`.
 The `#[derive(Schema)]` macro enforces this: a `Maybe<T>` field without
 both `default` **and** `skip_serializing_if = "Maybe::is_missing"` is a

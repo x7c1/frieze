@@ -20,10 +20,10 @@ Generate OpenAPI documents from Rust types via `#[derive(Schema)]`.
   that keeps the committed documents fresh in CI.
 - **OAS 3.0 and 3.1 side by side** — the version is per-document
   runtime data, not a Cargo feature; one program can emit both.
-- **No schema list to maintain** — every `#[derive(Schema)]` type is
-  collected automatically; deriving a type is registering it (with
-  explicit registration and a no_std / WASM opt-out when you need
-  them).
+- **No schema list to maintain** — every non-generic `#[derive(Schema)]`
+  type is collected automatically, and reachable generic instantiations
+  follow transitively (with explicit registration and a no_std / WASM
+  opt-out when you need them).
 - **`uuid` / `chrono` support** — opt-in features map `Uuid`,
   `DateTime<Tz>`, and `NaiveDate` to `format: uuid` / `date-time` /
   `date`.
