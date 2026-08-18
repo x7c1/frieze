@@ -69,52 +69,25 @@ upon — refer to them by their crate-specific roles instead.
 ## Build / Test matrix
 
 The OAS version (3.0 / 3.1) is per-document runtime data, so one test
-run covers both output shapes. Three feature axes remain, all declared
-on the `frieze` crate: `inventory` (on by default; the
-`--no-default-features` runs keep the opt-out path for no_std /
-WASM-leaning consumers green), `uuid1` and `chrono04` (both off by
-default and declared only by `frieze`, so the `uuid::Uuid` and chrono
-impls need their own `-p frieze` runs):
-
-```
-cargo fmt --all -- --check
-cargo build  --workspace
-cargo build  --workspace --no-default-features
-cargo build  -p frieze --features uuid1
-cargo build  -p frieze --features chrono04
-cargo clippy --workspace --all-targets -- -D warnings
-cargo clippy --workspace --all-targets --no-default-features -- -D warnings
-cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings
-cargo clippy -p frieze --all-targets --features chrono04 -- -D warnings
-cargo test   --workspace
-cargo test   --workspace --no-default-features
-cargo test   -p frieze --features uuid1
-cargo test   -p frieze --features chrono04
-```
+run covers both output shapes. Three feature axes remain (`inventory`,
+`uuid1`, `chrono04`), giving a 13-command fmt / build / clippy / test
+matrix. The command list and its rationale live in
+[`docs/oas-versions.md` § Build / Test](docs/oas-versions.md#build--test);
+CI (`.github/workflows/ci.yml`) runs the same steps on every PR. Run
+the full matrix locally before opening a PR.
 
 ### End-to-end tests
 
 `cargo test --workspace` includes the end-to-end tests in
-`crates/apps/frieze-cli/tests/generate.rs`. They run the real
-`cargo-frieze` binary against the fixture packages and workspaces
-under `crates/apps/frieze-cli/tests/fixtures/` and therefore invoke
-real nested cargo builds. Fixture packages linked as path
-dev-dependencies (for the byte-equivalence assertions) are pulled into
-this repository's workspace by cargo's path-dependency auto-inclusion
-(which overrides `exclude`); the standalone error fixtures carry their
-own `[workspace]` table instead — see the note in the root
-`Cargo.toml`. Further notes:
-
-- The tests are serialized through a lock; each fixture builds into
-  its own persistent `target/e2e/<fixture>/` directory, so the first
-  run is cold (tens of seconds) and reruns hit the incremental cache.
-- The fixtures declare `frieze` as a path dependency into this
-  checkout, and the generated scratch crate mirrors that path (the
-  collector's rule for a path-declared `frieze`), so the e2e runs
-  resolve the unpublished `frieze` / `frieze-usecase` crates locally
-  and never touch crates.io. Production scratch crates pin the
-  crates.io releases to the CLI's own version instead.
-- Run them alone with `cargo test -p frieze-cli --test generate`.
+`crates/apps/frieze-cli/tests/generate.rs`, which run the real
+`cargo-frieze` binary against the fixtures under
+`crates/apps/frieze-cli/tests/fixtures/` and therefore invoke real
+nested cargo builds (the first run is cold, tens of seconds; reruns
+hit the incremental cache). The details — what the fixtures pin, the
+build lock, per-fixture build directories, and how fixture packages
+join this workspace — live in that file's module doc comment and the
+workspace note in the root `Cargo.toml`. Run them alone with
+`cargo test -p frieze-cli --test generate`.
 
 ## Branch and PR conventions
 
