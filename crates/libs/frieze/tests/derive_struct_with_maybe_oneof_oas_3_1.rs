@@ -1,5 +1,5 @@
 //! `Maybe<E>` where `E` is an internally-tagged enum maps to the
-//! optional + nullable shape (`Maybe<T>` in `docs/field-shapes.md`):
+//! optional + nullable shape (`Maybe<T>` in `docs/field-shapes/composite-shapes.md`):
 //! the field is dropped from `required`, and the reference to `E` is
 //! rendered through the OAS-3.1 nullable-ref wrap
 //! (`{oneOf: [{$ref: E}, {type: "null"}]}`) — the same composition used

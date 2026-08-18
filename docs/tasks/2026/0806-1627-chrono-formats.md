@@ -5,7 +5,7 @@ plan: null
 base_ref: null
 perspectives: [rust-module-structure, consistency, completeness, minimalism, clarity]
 retries_remaining: 1
-check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo build -p frieze --features uuid1 && cargo build -p frieze --features chrono04 && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings && cargo clippy -p frieze --all-targets --features chrono04 -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && cargo test -p frieze --features uuid1 && cargo test -p frieze --features chrono04 && grep -q 'format: date-time' docs/field-shapes.md && grep -q chrono04 .github/workflows/ci.yml && grep -q chrono04 RELEASING.md"
+check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo build -p frieze --features uuid1 && cargo build -p frieze --features chrono04 && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings && cargo clippy -p frieze --all-targets --features chrono04 -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && cargo test -p frieze --features uuid1 && cargo test -p frieze --features chrono04 && grep -q 'format: date-time' docs/field-shapes/scalars.md && grep -q chrono04 .github/workflows/ci.yml && grep -q chrono04 RELEASING.md"
 assignee: null
 branch: task/0806-1627-chrono-formats
 created_at: 2026-08-06T16:27:42Z
@@ -36,7 +36,7 @@ with a second opt-in cargo feature `chrono04` on the `frieze` crate
 impl → the usual trait-bound compile error): it carries no offset, so its
 serde output is not an RFC 3339 `date-time`, and mapping it anyway would
 break the format-matches-wire guarantee. State this in
-`docs/field-shapes.md`.
+`docs/field-shapes/scalars.md`.
 
 Follow the `uuid1` implementation end to end — it established the exact
 pattern (see `docs/tasks/2026/0806-1218-uuid-format.md` and the resulting
@@ -77,10 +77,10 @@ code). Concretely:
   existing reserved-name tests under
   `crates/libs/frieze/src/schemas_builder/`.
 - Verification matrix lives in **four places** — `.github/workflows/ci.yml`,
-  `CLAUDE.md`, `docs/oas-versions.md`, and `RELEASING.md` (including its
+  `CLAUDE.md`, `docs/oas-versions/README.md`, and `RELEASING.md` (including its
   "all N commands" count) — add the three `chrono04` build/clippy/test
   steps to all four, mirroring how the `uuid1` steps are placed.
-- Docs: extend `docs/field-shapes.md` with the two mappings, the
+- Docs: extend `docs/field-shapes/scalars.md` with the two mappings, the
   `NaiveDateTime` exclusion, and the same three user-setup facts the
   `uuid1` section carries (the user must add `chrono` to their own
   dependencies; the `04` suffix is the supported major — a different major
@@ -110,12 +110,12 @@ Work test-first: write the failing tests below before the implementation.
       reservation is unconditional).
 - [x] The reserved-name enumerations in the error messages include
       `DateTime` and `Date`, with the pinned wording tests updated.
-- [x] `docs/field-shapes.md` documents both mappings including the literal
+- [x] `docs/field-shapes/scalars.md` documents both mappings including the literal
       `format: date-time`, plus the `NaiveDateTime` exclusion (the grep
       gate in `check_command` enforces the literal).
 - [x] `.github/workflows/ci.yml` and `RELEASING.md` gain the `chrono04`
       steps (grep gates in `check_command`), and the matrices in
-      `CLAUDE.md` / `docs/oas-versions.md` match.
+      `CLAUDE.md` / `docs/oas-versions/README.md` match.
 
 ## Out of scope
 

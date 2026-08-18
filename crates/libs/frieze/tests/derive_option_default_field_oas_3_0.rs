@@ -1,6 +1,6 @@
 //! `Option<T>` without `#[serde(skip_serializing_if)]` produces the
 //! required + nullable shape (`Option<T>` serde default in
-//! `docs/field-shapes.md`). The field name stays in the `required` array;
+//! `docs/field-shapes/composite-shapes.md`). The field name stays in the `required` array;
 //! the value-level `nullable` marker is emitted on the inner schema.
 
 use frieze::Schema;

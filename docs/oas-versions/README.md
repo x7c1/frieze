@@ -124,7 +124,7 @@ nullable-reference wrap as a nullable nested-struct reference; see
 the table above.
 
 The `discriminator.mapping` block is deliberately omitted (see
-[Internally-tagged enums](field-shapes.md#internally-tagged-enums) in
+[Internally-tagged enums](../field-shapes/internally-tagged-enums.md) in
 `field-shapes.md` for the rationale).
 
 ### Why the difference

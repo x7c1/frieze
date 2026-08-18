@@ -21,7 +21,7 @@ $ cargo install frieze-cli
 
 **2. Derive the schemas.** Add `frieze` to `[dependencies]` and put
 `#[derive(Schema)]` on the types to expose, exactly as in
-[Getting started](../README.md#getting-started). The installed CLI and
+[Getting started](../../README.md#getting-started). The installed CLI and
 the declared `frieze` dependency must agree on the version — see the
 version matching note below.
 

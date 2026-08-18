@@ -5,7 +5,7 @@ plan: null
 base_ref: null
 perspectives: [rust-module-structure, consistency, completeness, minimalism, clarity]
 retries_remaining: 1
-check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo build -p frieze --features uuid1 && cargo build -p frieze --features chrono04 && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings && cargo clippy -p frieze --all-targets --features chrono04 -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && cargo test -p frieze --features uuid1 && cargo test -p frieze --features chrono04 && ! grep -q 'Tz: chrono::TimeZone' crates/libs/frieze/src/primitive_schema_impls.rs && ! grep -q 'escape hatch' docs/field-shapes.md"
+check_command: "cargo fmt --all -- --check && cargo build --workspace && cargo build --workspace --no-default-features && cargo build -p frieze --features uuid1 && cargo build -p frieze --features chrono04 && cargo clippy --workspace --all-targets -- -D warnings && cargo clippy --workspace --all-targets --no-default-features -- -D warnings && cargo clippy -p frieze --all-targets --features uuid1 -- -D warnings && cargo clippy -p frieze --all-targets --features chrono04 -- -D warnings && cargo test --workspace && cargo test --workspace --no-default-features && cargo test -p frieze --features uuid1 && cargo test -p frieze --features chrono04 && ! grep -q 'Tz: chrono::TimeZone' crates/libs/frieze/src/primitive_schema_impls.rs && ! grep -q 'escape hatch' docs/field-shapes/scalars.md"
 assignee: null
 branch: task/0807-0555-datetime-roundtrip-only
 created_at: 2026-08-07T05:55:40Z
@@ -24,7 +24,7 @@ and `FixedOffset`. The blanket impl therefore lets a field like
 `DateTime<chrono_tz::Tz>` obtain a schema while `#[derive(Deserialize)]`
 on the same struct cannot compile, and the usual `deserialize_with`
 escape hatch is itself rejected by the derive — a dead end that
-`docs/field-shapes.md` currently documents as a caveat.
+`docs/field-shapes/scalars.md` currently documents as a caveat.
 
 frieze exists to describe JSON wire types, and a named time zone is not a
 JSON wire concept. Per the project's line-drawing principle (unsupported
@@ -47,7 +47,7 @@ that round-trips the RFC 3339 wire:
   exactly the set chrono implements `Deserialize` for, so "has a frieze
   schema" now coincides with "round-trips the wire".
 - Docs: rewrite the time-zone passage of the chrono section in
-  `docs/field-shapes.md` — the Deserialize-dead-end caveat (including the
+  `docs/field-shapes/scalars.md` — the Deserialize-dead-end caveat (including the
   `deserialize_with` sentence) is replaced by the simpler, stronger
   statement that other time zones do not implement `Schema` and fail to
   compile, and that named zones are not representable on the RFC 3339
@@ -85,7 +85,7 @@ byte-identical output; combinations that previously half-worked
 - [x] A unit test pins that `DateTime<Utc>`, `DateTime<FixedOffset>`, and
       `DateTime<Local>` all expose the schema name `"DateTime"` and the
       scalar `date-time` schema.
-- [x] `docs/field-shapes.md` no longer contains the `deserialize_with`
+- [x] `docs/field-shapes/scalars.md` no longer contains the `deserialize_with`
       dead-end caveat (grep gate in `check_command`) and instead states
       that other time zones fail to compile.
 - [x] The full 13-command matrix passes (both features on and off).
