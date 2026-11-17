@@ -1,4 +1,5 @@
-# Weekly update pull requests, on Monday morning (Asia/Tokyo).
+# Weekly update pull requests, on Monday morning (Asia/Tokyo). For the Rust
+# toolchain this raises the version rust-toolchain.toml pins.
 #
 # Minor and patch updates of each ecosystem arrive as one grouped pull
 # request, since they rarely break anything and one CI run covers them all.
@@ -29,3 +30,11 @@ updates:
       cargo-minor-and-patch:
         applies-to: version-updates
         update-types: [minor, patch]
+
+  - package-ecosystem: rust-toolchain
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+      timezone: Asia/Tokyo
