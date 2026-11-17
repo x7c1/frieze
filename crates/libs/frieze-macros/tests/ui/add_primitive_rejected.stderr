@@ -20,5 +20,7 @@ help: the following other types implement trait `IsRegistrable`
 note: required by a bound in `SchemasBuilder::add`
  --> $WORKSPACE/crates/libs/frieze/src/schemas_builder.rs
   |
+  | impl SchemasBuilder {
+...
   |     pub fn add<T: IsRegistrable>(mut self) -> Self {
   |                   ^^^^^^^^^^^^^ required by this bound in `SchemasBuilder::add`

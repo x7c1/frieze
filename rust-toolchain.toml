@@ -1,0 +1,13 @@
+# The Rust toolchain every `cargo` call in this repository uses, locally and in
+# CI. rustup installs it (with these components) on first use; Dependabot
+# raises the version in a pull request when a new Rust release is out.
+#
+# The compile-fail tests under crates/libs/frieze-macros/tests/ui compare the
+# compiler's full diagnostic output, which can change between Rust releases.
+# When raising the version, regenerate them with
+# `TRYBUILD=overwrite cargo test -p frieze-macros --test trybuild` and review
+# the diff: only the compiler's own rendering may change, never frieze's
+# messages, labels, notes, or spans.
+[toolchain]
+channel = "1.100.0"
+components = ["rustfmt", "clippy"]
